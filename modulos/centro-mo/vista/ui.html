@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Centro MO · SGO7</title>
+<style>
+  :root { --bg:#f5f7fa; --panel:#fff; --borde:#dfe5ec; --txt:#1b2430; --mut:#6b7a8d;
+          --azul:#1c6fd6; --verde:#188a4c; --naranja:#c2571c; --rojo:#c02956; --ambar:#946f00; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 "Segoe UI",system-ui,sans-serif; background:var(--bg); color:var(--txt); }
+  header { background:#0e2a4d; color:#fff; padding:12px 22px; display:flex; align-items:center; gap:14px; }
+  header h1 { font-size:18px; margin:0; }
+  header .estado { margin-left:auto; font-size:12px; opacity:.85; }
+  header button { border:0; border-radius:8px; padding:6px 12px; cursor:pointer; background:#1c6fd6; color:#fff; font-weight:600; }
+  main { padding:16px 22px; max-width:1060px; margin:0 auto; }
+  .filtros { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .fbtn { border:1px solid var(--borde); background:#fff; border-radius:99px; padding:6px 14px;
+          cursor:pointer; font-weight:600; font-size:13px; color:var(--mut); }
+  .fbtn.activo { background:#0e2a4d; color:#fff; border-color:#0e2a4d; }
+  .fecha-label { position:sticky; top:0; background:var(--bg); font-weight:700; font-size:13px;
+                 color:#0e2a4d; padding:10px 0 6px 36px; z-index:2; }
+  .evento { position:relative; padding:0 0 12px 36px; }
+  .evento::before { content:''; position:absolute; left:12px; top:0; bottom:0; width:2px; background:var(--borde); }
+  .punto { position:absolute; left:6px; top:16px; width:14px; height:14px; border-radius:50%;
+           border:3px solid #fff; box-shadow:0 0 0 1px var(--borde); z-index:1; }
+  .p-verde{background:var(--verde);} .p-ambar{background:var(--ambar);}
+  .p-azul{background:var(--azul);} .p-gris{background:#9aa7b4;}
+  .vacio { color:var(--mut); font-size:13px; padding:20px 36px; }
+  .card { border:1px solid var(--borde); border-radius:10px; padding:10px 12px; background:var(--panel); }
+  .card.apagada { opacity:.6; }
+  .card .asunto { font-weight:600; font-size:13px; }
+  .mut { color:var(--mut); font-size:12px; }
+  .chips { margin:6px 0 4px; }
+  .chip { display:inline-block; padding:1px 9px; border-radius:99px; font-size:11px; font-weight:700;
+          color:#fff; margin:1px 3px 1px 0; white-space:nowrap; }
+  .ok { background:var(--verde); } .falta { background:var(--rojo); } .info { background:#5b6b7d; }
+  .mi { background:var(--naranja); } .prog { background:var(--verde); } .desc { background:#8a97a5; }
+  .espera { background:var(--ambar); }
+  .acciones { margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .acciones button { border:0; border-radius:7px; padding:5px 10px; font-size:12px; font-weight:600;
+                     cursor:pointer; background:#e7edf4; color:var(--txt); }
+  .acciones button.primario { background:var(--azul); color:#fff; }
+  .acciones button.verde { background:var(--verde); color:#fff; }
+  .acciones a.btn { border-radius:7px; padding:5px 10px; font-size:12px; font-weight:600; background:#e7edf4; color:var(--txt); text-decoration:none; }
+  .editar { margin-top:8px; display:none; gap:6px; flex-wrap:wrap; }
+  .editar input[type=text] { border:1px solid var(--borde); border-radius:7px; padding:5px 8px; font-size:12px; width:150px; }
+  .notas { margin-top:6px; font-size:11px; color:var(--mut); max-height:70px; overflow:auto; }
+  .vacio { color:var(--mut); font-size:13px; padding:14px 4px; }
+  #completados { grid-column:1 / -1; }
+  #completados .card { opacity:.65; }
+  .msg { font-size:12px; margin-left:4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Centro MO</h1>
+  <span class="mut" style="color:#cfe0f4">correo → planilla de mano de obra</span>
+  <span class="estado" id="poller"></span>
+  <button onclick="reanalizarTodo()">↻ Reanalizar ahora</button>
+</header>
+<main>
+  <div class="filtros" id="filtros"></div>
+  <section id="timeline"></section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+async function post(url, body){
+  const r = await fetch(url, {method:'POST', headers: body instanceof FormData ? {} : {'Content-Type':'application/json'},
+                              body: body instanceof FormData ? body : JSON.stringify(body||{})});
+  const j = await r.json();
+  if(!r.ok) throw new Error(j.error || 'Error del servidor');
+  return j;
+}
+
+// Rutas públicas de los otros módulos (las manda el servidor en api/items)
+let CFG = {balance:'/balance', liquidador2:'/liquidador2'};
+
+// Acción que necesita Outlook: el servidor deja un PEDIDO y el agente del PC lo atiende.
+// Aquí se sondea el resultado hasta 3 min. Devuelve el pedido cerrado (con resultado).
+async function pedido(id, url, body, txtOk, txtEspera){
+  msg(id, txtEspera || 'enviado al agente del PC…');
+  try {
+    const j = await post(url, body);
+    if(!j.pedido){ msg(id, txtOk||'✓'); await refrescar(); return j; }
+    const t0 = Date.now();
+    while(Date.now()-t0 < 180000){
+      await new Promise(r => setTimeout(r, 2000));
+      const p = await (await fetch(`api/pedido/${j.pedido}`)).json();
+      if(p.estado==='hecho'){ msg(id, txtOk||'✓'); await refrescar(); return p; }
+      if(p.estado==='error'){ throw new Error(p.error || 'el agente devolvió error'); }
+      msg(id, p.estado==='tomado' ? 'el agente del PC está trabajando…' : 'esperando al agente del PC…');
+    }
+    throw new Error('el agente del PC no respondió en 3 min');
+  } catch(e){ msg(id, '⚠ ' + e.message); throw e; }
+}
+
+// Qué dijo el correo sobre el MATERIAL (frase literal al pasar el ratón).
+const INSTR_MAT = {
+  no_mat:            ['falta',  '✗ correo: no liquidar material (solo MO)'],
+  parcial:           ['espera', '! correo: material con excepciones — revisar'],
+  pendiente_almacen: ['espera', '… correo: material pendiente de almacén'],
+  con_mat:           ['ok',     'correo: MO + material'],
+  solo_menciona_mo:  ['info',   'correo habla de MO; no excluye material'],
+  sin_mencion:       ['info',   'correo no excluye material'],
+};
+function chipInstrMat(im){
+  const [cls, txt] = INSTR_MAT[im.valor] || ['info', '' + im.valor];
+  const tip = im.frase ? `«${im.frase}»` + (im.fuente==='cadena' ? ' (en un mensaje anterior del hilo)' : '') : 'el correo no menciona el material';
+  return `<span class="chip ${cls}" title="${esc(tip).replace(/"/g,'&quot;')}">${esc(txt)}</span>`;
+}
+
+function chipTipo(r){
+  const cls = r.tipo==='MI' ? 'mi' : (r.tipo==='Programados' ? 'prog' : 'desc');
+  return `<span class="chip ${cls}">${esc(r.tipo)}</span>`;
+}
+
+function cardCuerpo(r){
+  const encontrado = [];
+  if(r.codigo) encontrado.push(`<span class="chip ok">${esc(r.codigo)}${r.codigo_validado?' ✓SGS':''}</span>`);
+  if(r.pdl) encontrado.push(`<span class="chip ok">PDL ${esc(r.pdl)}</span>`);
+  if(r.filas_mo && r.filas_mo.length) encontrado.push(`<span class="chip ok">${r.filas_mo.length} prestaciones</span>`);
+  if(r.nodos_filtro && r.nodos_filtro.length) encontrado.push(`<span class="chip info">solo nodos: ${esc(r.nodos_filtro.join(', '))}</span>`);
+  if(r.planilla_nativa) encontrado.push(`<span class="chip info">planilla del sistema — se usa tal cual</span>`);
+  if(r.liq_previa){
+    const lp = r.liq_previa;
+    if(lp.conflictos && lp.conflictos.length)
+      encontrado.push(`<span class="chip falta">✗ ya liquidado en SGS (${lp.conflictos.length} QP con avance)</span>`);
+    else if(lp.comparado === false && lp.con_avance_total > 0)
+      encontrado.push(`<span class="chip info">proyecto con avance previo (${lp.con_avance_total} act.) — se compara al tener planilla</span>`);
+    else
+      encontrado.push(`<span class="chip ok">✓ sin liquidación previa</span>`);
+  }
+  if(r.codigo && !r.planilla_nativa){
+    if(r.mat_aprobado === true) encontrado.push(`<span class="chip ok">MAT aprobado${(r.mat_nodos_sel&&r.mat_nodos_sel.length)?` (nodos ${esc(r.mat_nodos_sel.join(','))})`:''}</span>`);
+    else if(r.mat_aprobado === false) encontrado.push(`<span class="chip info">solo MO (MAT descartado)</span>`);
+    else if(r.excel_ruta) encontrado.push(`<span class="chip info">MAT sin revisar — planilla solo MO</span>`);
+  }
+  if(r.instruccion_mat && r.instruccion_mat.valor) encontrado.push(chipInstrMat(r.instruccion_mat));
+  (r.lideres||[]).forEach(l => encontrado.push(`<span class="chip ok">${esc(l)}</span>`));
+  if(r.fecha_ejecucion) encontrado.push(`<span class="chip ok">${esc(r.fecha_ejecucion)}</span>`);
+  const faltas = (r.faltantes||[]).map(f => `<span class="chip falta">falta: ${esc(f)}</span>`).join('');
+  const espera = r.estado==='esperando_supervisor' ? '<span class="chip espera">… esperando respuesta del supervisor</span>' : '';
+  const planilla = r.excel_ruta ? `<div class="mut">${esc(r.excel_ruta.split(/[\\/]/).pop())}</div>` : '';
+  const reparto = r.instruccion_lideres ? `<div style="margin:6px 0;padding:6px 8px;background:#fff7e6;border:1px solid #f0d49a;border-radius:8px;font-size:12px">
+      <b>Cuadrillas distintas por tramo</b> — en liquidador2 abre <i>Distribuir con IA</i> y pega este texto:
+      <div id="il${r.id}" style="white-space:pre-wrap;margin:4px 0;font-family:monospace;font-size:11px">${esc(r.instruccion_lideres)}</div>
+      <button onclick="copiarTexto('il${r.id}','${r.id}')">copiar</button></div>` : '';
+  const sesion = r.sid ? `<a href="${CFG.balance}/manual/retomar/${r.sid}" target="_blank" style="font-size:12px">sesión ERP</a>` : '';
+  const liq2 = r.liq2_url ? `<a href="${esc(r.liq2_url)}" target="_blank" style="font-size:12px">en liquidador2</a>` : '';
+
+  let botones = `<button onclick="abrirOutlook('${r.id}')">correo</button>
+                 <button onclick="reanalizar('${r.id}')">↻</button>`;
+  if(r.estado!=='completado' && r.estado!=='descartado'){
+    if(r.excel_ruta) botones += `<a class="btn" href="api/descargar/${r.id}">descargar planilla</a>
+                                 <button class="primario" onclick="enviarLiq2('${r.id}')">→ liquidador2</button>`;
+    else botones += `<button class="primario" onclick="generar('${r.id}')">generar planilla</button>`;
+    if(r.liq_previa && r.liq_previa.conflictos && r.liq_previa.conflictos.length)
+      botones += `<button class="primario" onclick="generarPend('${r.id}')">solo pendientes</button>`;
+    if(r.links_externos && r.links_externos.length && !(r.filas_mo && r.filas_mo.length))
+      botones += `<button class="primario" onclick="traerLink('${r.id}')">traer planilla del link</button>`;
+    if(r.codigo && !r.planilla_nativa)
+      botones += `<button onclick="matPreanalisis('${r.id}')">pre-análisis MAT</button>`;
+    if(r.codigo && (!r.lideres || !r.lideres.length))
+      botones += `<button onclick="lideresSGS('${r.id}')">líderes SGS</button>`;
+    if(r.codigo && (r.faltantes||[]).some(f => f.includes('fecha')))
+      botones += `<button onclick="fechaBandejas('${r.id}')">fecha de bandejas</button>`;
+    botones += `<button onclick="toggleEditar('${r.id}')">✎ completar datos</button>
+                <button onclick="consultar('${r.id}')">consultar supervisor</button>
+                <button class="verde" onclick="estado('${r.id}','completado')">✓ completado</button>
+                <button onclick="estado('${r.id}','descartado')">✗</button>`;
+  } else {
+    botones += `<button onclick="estado('${r.id}','falta_info')">↩ reabrir</button>`;
+  }
+
+  return `<div class="asunto">${esc(r.asunto)}</div>
+    <div class="mut">${esc(r.remitente)} · ${esc(r.fecha)}</div>
+    <div class="chips">${chipTipo(r)} ${encontrado.join(' ')} ${faltas} ${espera}</div>
+    ${planilla}
+    ${reparto}
+    <div class="acciones">${botones} ${sesion} ${liq2} <span class="msg mut" id="msg${r.id}"></span></div>
+    <div id="sl${r.id}" style="margin-top:4px"></div>
+    <div class="editar" id="ed${r.id}">
+      <input type="text" id="edCod${r.id}" placeholder="código DF/LCL" value="${esc(r.codigo||'')}">
+      <input type="text" id="edPdl${r.id}" placeholder="PDL (Programados)" value="${esc(r.pdl||'')}">
+      <input type="text" id="edLid${r.id}" placeholder="líder" value="${esc((r.lideres||[])[0]||'')}">
+      <input type="text" id="edNodos${r.id}" placeholder="solo nodos (ej: 11,12,13)" value="${esc((r.nodos_filtro||[]).join(','))}">
+      <input type="date" id="edFecha${r.id}" title="fecha de ejecución" value="${esc(r.fecha_ejecucion||'')}">
+      <button onclick="lideresSGS('${r.id}')">líderes SGS</button>
+      <button onclick="guardarEdicion('${r.id}')">guardar</button>
+      <input type="file" id="edFile${r.id}" accept=".xlsx,.xlsm" style="font-size:11px">
+      <button onclick="subirExcel('${r.id}')">planilla</button>
+    </div>
+    ${(r.notas&&r.notas.length)?`<div class="notas">${r.notas.slice(-4).map(esc).join('<br>')}</div>`:''}`;
+}
+
+let ULT = [];
+let FILTRO = 'activos';
+// Tarjetas con el panel de edición abierto: mientras haya alguna, el refresco
+// automático NO repinta (repintar destruía el panel y lo tecleado a los pocos
+// segundos).
+const EDITANDO = new Set();
+const FILTROS = [
+  ['activos',  'Activos',   r => r.estado!=='completado' && r.estado!=='descartado'],
+  ['listos',   'Listos',    r => r.estado==='listo_auto' || r.estado==='planilla_lista'],
+  ['falta',    'Falta info',r => r.estado==='falta_info'],
+  ['espera',   '… Esperando', r => r.estado==='esperando_supervisor'],
+  ['planillas','Planillas listas', r => r.excel_ruta && r.estado!=='completado' && r.estado!=='descartado'],
+  ['cerrados', '✓ Cerrados',  r => r.estado==='completado' || r.estado==='descartado'],
+  ['todos',    'Todos',        r => true],
+];
+
+function puntoClase(r){
+  if(r.estado==='listo_auto' || r.estado==='planilla_lista') return 'p-verde';
+  if(r.estado==='esperando_supervisor') return 'p-azul';
+  if(r.estado==='completado' || r.estado==='descartado') return 'p-gris';
+  return 'p-ambar';
+}
+
+function fechaLabel(f){
+  const hoyD = new Date();
+  const hoy = `${hoyD.getFullYear()}-${String(hoyD.getMonth()+1).padStart(2,'0')}-${String(hoyD.getDate()).padStart(2,'0')}`;
+  const ayerD = new Date(hoyD); ayerD.setDate(hoyD.getDate()-1);
+  const ayer = `${ayerD.getFullYear()}-${String(ayerD.getMonth()+1).padStart(2,'0')}-${String(ayerD.getDate()).padStart(2,'0')}`;
+  const d = new Date(f + 'T12:00:00');
+  const dias = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const base = `${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]}`;
+  if(f === hoy) return `Hoy — ${base}`;
+  if(f === ayer) return `Ayer — ${base}`;
+  return base;
+}
+
+function pintarFiltros(){
+  $('filtros').innerHTML = FILTROS.map(([k, label, fn]) => {
+    const n = ULT.filter(fn).length;
+    return `<button class="fbtn ${FILTRO===k?'activo':''}" onclick="FILTRO='${k}';EDITANDO.clear();pintar()">${label} (${n})</button>`;
+  }).join('');
+}
+
+function pintar(){
+  pintarFiltros();
+  const fn = FILTROS.find(f => f[0]===FILTRO)[2];
+  const visibles = ULT.filter(fn).sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
+  if(!visibles.length){
+    $('timeline').innerHTML = '<div class="vacio">Nada en esta vista. Marca correos en Outlook con la categoría "Orden Pendiente" y aparecerán solos aquí.</div>';
+    return;
+  }
+  let html = '', diaActual = '';
+  for(const r of visibles){
+    const dia = (r.fecha||'').slice(0,10) || 'sin fecha';
+    if(dia !== diaActual){
+      diaActual = dia;
+      html += `<div class="fecha-label">${fechaLabel(dia)}</div>`;
+    }
+    const apagada = (r.estado==='completado'||r.estado==='descartado') ? ' apagada' : '';
+    html += `<div class="evento"><span class="punto ${puntoClase(r)}"></span><div class="card${apagada}">${cardCuerpo(r)}</div></div>`;
+  }
+  $('timeline').innerHTML = html;
+}
+
+async function refrescar(){
+  try {
+    const j = await (await fetch('api/items')).json();
+    ULT = j.items;
+    CFG = j.cfg || CFG;
+    if(EDITANDO.size === 0) pintar();   // no destruir un panel de edición abierto
+    const a = j.agente || {};
+    if(!a.conectado){
+      $('poller').innerHTML = '<span style="color:#ffb3b3">⚠ agente del PC apagado' +
+        (a.visto_hace_s > 0 ? ` (visto hace ${Math.round(a.visto_hace_s/60)} min)` : '') +
+        ' — en el PC arranca iniciar_agente_centro_mo.bat</span>';
+    } else {
+      $('poller').textContent = a.scaneando ? 'el agente del PC está revisando el buzón…'
+        : (a.error ? '⚠ ' + a.error
+           : (a.ultimo_scan ? `agente del PC conectado · último scan ${a.ultimo_scan} · vigila cada ${Math.round((a.cada_s||180)/60)} min`
+                            : 'agente del PC conectado · esperando el primer scan…'));
+    }
+  } catch(e){ $('poller').textContent = '⚠ ' + e.message; }
+}
+
+function msg(id, t){ const el = $('msg'+id); if(el) el.textContent = t; }
+function toggleEditar(id){
+  const el = $('ed'+id);
+  const abrir = el.style.display !== 'flex';
+  el.style.display = abrir ? 'flex' : 'none';
+  if(abrir) EDITANDO.add(id);
+  else { EDITANDO.delete(id); refrescar(); }
+}
+
+async function accion(id, fn, txtOk){
+  msg(id, '…');
+  try { await fn(); msg(id, txtOk||'✓'); await refrescar(); }
+  catch(e){ msg(id, '⚠ ' + e.message); }
+}
+const abrirOutlook = id => pedido(id, `api/abrir-outlook/${id}`, null, 'abierto en Outlook (PC)');
+const reanalizar   = id => pedido(id, `api/reanalizar/${id}`, null, 'reanalizado');
+const generar      = id => { msg(id,'generando (consulta SGS)…'); accion(id, () => post(`api/generar/${id}`), '✓ planilla generada — descárgala con o mándala a liquidador2'); };
+const generarPend  = id => { msg(id,'generando SOLO pendientes (consulta SGS)…'); accion(id, () => post(`api/generar/${id}`, {solo_pendientes:true}), '✓ planilla de pendientes generada — descárgala con o mándala a liquidador2'); };
+const consultar    = id => pedido(id, `api/consulta/${id}`, null, 'borrador abierto en Outlook (PC) — envíalo desde allá');
+// revelar (abrir Descargas del PC) no existe en SGO7: la planilla se descarga con el botón «descargar planilla»
+const estado       = (id,e) => accion(id, () => post(`api/estado/${id}`, {estado:e}), '');
+
+async function guardarEdicion(id){
+  EDITANDO.delete(id);
+  await accion(id, () => post(`api/editar/${id}`, {
+    codigo: $('edCod'+id).value, pdl: $('edPdl'+id).value, lider: $('edLid'+id).value,
+    nodos: $('edNodos'+id).value, fecha: $('edFecha'+id).value,
+  }), 'guardado');
+}
+
+const LIDS_SUGERIDOS = {};
+
+async function lideresSGS(id){
+  msg(id, 'buscando líderes en las bandejas de SGS…');
+  try {
+    const j = await post(`api/lideres-sgs/${id}`);
+    const ls = j.lideres;
+    if(ls.length === 1){ return aplicarLideres(id, ls); }   // uno solo → directo
+    LIDS_SUGERIDOS[id] = ls;
+    EDITANDO.add(id);   // que el refresco no borre el selector
+    msg(id, `${ls.length} líderes en las bandejas — marca cuál(es) usar:`);
+    $('sl'+id).innerHTML = ls.map((l,i) =>
+      `<label style="display:inline-flex;align-items:center;gap:4px;margin:2px 10px 2px 0;font-size:12px;background:#eef4fb;border-radius:7px;padding:3px 8px;cursor:pointer">
+         <input type="checkbox" id="slc${id}_${i}"> ${esc(l.nombre)}${l.cedula ? ' · '+esc(l.cedula) : ''}</label>`
+    ).join('') +
+    `<button onclick="confirmarLideres('${id}')" style="margin-left:4px">✓ usar seleccionados</button>
+     <button onclick="cancelarLideres('${id}')">✗ cancelar</button>`;
+  } catch(e){ msg(id, '⚠ ' + e.message); }
+}
+
+function cancelarLideres(id){
+  $('sl'+id).innerHTML = '';
+  EDITANDO.delete(id);
+  msg(id, '');
+  refrescar();
+}
+
+async function confirmarLideres(id){
+  const ls = LIDS_SUGERIDOS[id] || [];
+  const sel = ls.filter((_, i) => $(`slc${id}_${i}`) && $(`slc${id}_${i}`).checked);
+  if(!sel.length){ msg(id, 'marca al menos un líder'); return; }
+  await aplicarLideres(id, sel);
+}
+
+async function fechaBandejas(id){
+  msg(id, 'consultando bandejas aprobadas en SGS…');
+  try {
+    const j = await post(`api/fecha-bandejas/${id}`);
+    EDITANDO.add(id);   // que el refresco no borre la propuesta
+    msg(id, '');
+    $('sl'+id).innerHTML =
+      `<span style="font-size:12px">Fecha sugerida: <b>${esc(j.fecha)}</b> — bandeja ${esc(j.bandeja)}${j.nodo ? ' · nodo '+esc(j.nodo) : ''} (aprobación real de la más reciente de ${j.aprobadas} atendidas por almacén)</span>
+       <button onclick="usarFechaSugerida('${id}','${esc(j.fecha)}')" style="margin-left:6px">✓ sí, usarla</button>
+       <button onclick="cancelarLideres('${id}')">✗ no</button>`;
+  } catch(e){ msg(id, '⚠ ' + e.message); }
+}
+
+async function usarFechaSugerida(id, f){
+  $('sl'+id).innerHTML = '';
+  EDITANDO.delete(id);
+  await accion(id, () => post(`api/editar/${id}`, {fecha: f}), '✓ fecha aplicada');
+}
+
+async function aplicarLideres(id, sel){
+  EDITANDO.delete(id);
+  msg(id, 'aplicando…');
+  try {
+    const j = await post(`api/aplicar-lideres/${id}`, {lideres: sel});
+    msg(id, '✓ ' + j.lideres.map(l => `${l.nombre} ${l.pct}%`).join(' · '));
+    await refrescar();
+  } catch(e){ msg(id, '⚠ ' + e.message); }
+}
+
+async function copiarTexto(elId, id){
+  try { await navigator.clipboard.writeText($(elId).innerText); msg(id, 'copiado — pégalo en Distribuir con IA'); }
+  catch(e){ msg(id, '⚠ no pude copiar: selecciónalo a mano'); }
+}
+
+const MAT_BLOQUES = {};
+
+async function matPreanalisis(id){
+  msg(id, 'cruzando planilla física vs SGS (materiales)…');
+  try {
+    const j = await post(`api/mat-preanalisis/${id}`);
+    const bloques = j.nodos || [];
+    if(!bloques.length){ msg(id, 'SGS no tiene nodos de materiales que calcen con esta planilla'); return; }
+    EDITANDO.add(id);   // que el refresco no borre el panel
+    msg(id, '');
+    let h = `<div style="font-size:12px;background:#f6f8fc;border:1px solid #dde;border-radius:8px;padding:8px;margin-top:4px">
+      <b>Pre-análisis de materiales</b> — <i>Física</i> = Excel del supervisor · resto = SGS. Valida las <b style="color:#b00">devoluciones</b> antes de aprobar.`;
+    bloques.forEach((b, bi) => {
+      h += `<div style="margin-top:6px"><label style="cursor:pointer"><input type="checkbox" id="matn${id}_${bi}" checked> <b>Nodo ${esc(b.nodo)}</b> · ${esc(b.pro)}${b.alerta_devol ? ' <span style="color:#b00;font-weight:bold">⚠ tiene devoluciones</span>' : ''}</label>
+        <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:2px">
+        <tr style="background:#e8edf5"><th style="text-align:left;padding:2px 5px">Código</th><th style="text-align:left">Descripción</th><th>Física</th><th>Desp.</th><th style="text-align:left">B. salida</th><th>Devol.</th><th style="text-align:left">↩ B. devolución</th><th>Neto</th><th>Cons.</th><th>Estado</th></tr>`;
+      (b.filas||[]).forEach(f => {
+        const dev = (f.devoluciones||0) > 0;
+        const dif = f.fisica != null && Math.abs((f.fisica||0) - (f.neto||0)) > 0.001;
+        h += `<tr style="${dev?'background:#fde8e8;':''}border-bottom:1px solid #eee">
+          <td style="padding:2px 5px">${esc(String(f.cod))}</td><td>${esc((f.desc||'').slice(0,48))}</td>
+          <td style="text-align:center;${dif?'color:#b06000;font-weight:bold':''}">${f.fisica==null?'—':f.fisica}</td>
+          <td style="text-align:center">${f.despachos}</td>
+          <td style="font-size:10px;color:#456;white-space:nowrap">${esc(f.ban_desp||'—')}</td>
+          <td style="text-align:center;${dev?'color:#b00;font-weight:bold':''}">${f.devoluciones}</td>
+          <td style="font-size:10px;white-space:nowrap;${dev?'color:#b00;font-weight:bold':'color:#456'}">${esc(f.ban_dev||'—')}</td>
+          <td style="text-align:center;font-weight:bold">${f.neto}</td>
+          <td style="text-align:center">${f.consumido}</td>
+          <td style="text-align:center">${esc(f.estado||'')}</td></tr>`;
+      });
+      h += `</table></div></div>`;
+    });
+    if(j.solo_fisica && j.solo_fisica.length){
+      h += `<div style="margin-top:6px;color:#b06000"><b>⚠ En la planilla física pero SIN movimiento en SGS:</b> ` +
+        j.solo_fisica.map(s => `${esc(String(s.cod))}×${s.cant} (nodo ${esc(String(s.nodo))})`).join(' · ') + `</div>`;
+    }
+    h += `<div style="margin-top:8px">
+      <button class="verde" onclick="matDecidir('${id}', true)">✓ apruebo — incluir MAT en la planilla</button>
+      <button onclick="matDecidir('${id}', false)">✗ solo MO</button>
+      <button onclick="cancelarLideres('${id}')">cerrar</button></div></div>`;
+    MAT_BLOQUES[id] = bloques;
+    $('sl'+id).innerHTML = h;
+  } catch(e){ msg(id, '⚠ ' + e.message); }
+}
+
+async function matDecidir(id, aprobar){
+  const bloques = MAT_BLOQUES[id] || [];
+  const nodos = bloques.filter((b, i) => { const c = $(`matn${id}_${i}`); return c && c.checked; }).map(b => String(b.nodo));
+  if(aprobar && !nodos.length){ msg(id, 'marca al menos un nodo para aprobar'); return; }
+  $('sl'+id).innerHTML = '';
+  EDITANDO.delete(id);
+  msg(id, aprobar ? 'regenerando planilla con materiales…' : 'dejando solo MO…');
+  try {
+    const j = await post(`api/mat-aprobar/${id}`, {aprobar, nodos});
+    msg(id, j.error ? ('⚠ ' + j.error) : (aprobar ? '✓ planilla con materiales lista' : '✓ solo MO'));
+    await refrescar();
+  } catch(e){ msg(id, '⚠ ' + e.message); }
+}
+
+async function enviarLiq2(id){
+  msg(id, 'enviando a liquidador2…');
+  try {
+    const j = await post(`api/enviar-liq2/${id}`);
+    msg(id, '✓ en liquidador2 — se abre la verificación');
+    window.open(j.url, '_blank');
+    await refrescar();
+  } catch(e){ msg(id, '⚠ ' + e.message); }
+}
+
+async function traerLink(id){
+  try {
+    const p = await pedido(id, `api/traer-link/${id}`, null, 'planilla traída del link', 'pidiendo al agente del PC que entre al SharePoint (10-40 s)…');
+    if(p && p.resultado) msg(id, `✓ ${p.resultado.archivo||''}: ${p.resultado.filas||0} prestaciones extraídas`);
+  } catch(e){
+    if(e.message === 'login_requerido'){
+      msg(id, 'En el PC se abrió la ventana de inicio de sesión de Microsoft. Responde SÍ a "¿Mantener la sesión iniciada?" y cierra la ventana solo cuando veas el aviso verde. Luego dale de nuevo a .');
+      try { await post('api/sp-login'); } catch(_){}
+    }
+  }
+}
+
+async function subirExcel(id){
+  const inp = $('edFile'+id);
+  if(!inp.files.length){ msg(id, 'elige el archivo primero'); return; }
+  const fd = new FormData(); fd.append('archivo', inp.files[0]);
+  EDITANDO.delete(id);
+  await accion(id, () => post(`api/subir-excel/${id}`, fd), 'planilla cargada');
+}
+
+async function reanalizarTodo(){
+  const j = await post('api/reanalizar-todo');
+  $('poller').textContent = j.agente ? 'el agente del PC revisará el buzón en su próxima vuelta (≤10 s)…'
+                                     : '⚠ agente del PC apagado — nadie puede revisar el buzón';
+  setTimeout(refrescar, 4000);
+}
+
+refrescar();
+setInterval(refrescar, 15000);
+</script>
+</body>
+</html>

@@ -1,0 +1,189 @@
+{% extends "motoverificador/base.html" %}
+{% block title %}Panel de Análisis{% endblock %}
+
+{% block extra_head %}
+<style>
+  .pro-form { display:flex; gap:10px; align-items:center; margin-bottom:20px; flex-wrap:wrap; }
+  .pro-form input { width:180px; font-size:1rem; padding:8px 12px; }
+
+  .resumen-proyecto { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
+  .res-card {
+    background:white; border-radius:8px; padding:16px 22px;
+    box-shadow:0 1px 6px rgba(0,0,0,.08); text-align:center; min-width:110px;
+  }
+  .res-card .num { font-size:1.8rem; font-weight:700; }
+  .res-card .lbl { font-size:0.72rem; color:#888; margin-top:2px; }
+  .res-card.green  .num { color:#27ae60; }
+  .res-card.blue   .num { color:#2980b9; }
+  .res-card.orange .num { color:#e67e22; }
+
+  .nodo-block { margin-bottom:12px; }
+  .nodo-header {
+    display:flex; align-items:center; gap:12px;
+    background:#1a1a2e; color:white; padding:10px 16px;
+    border-radius:8px 8px 0 0; cursor:pointer; user-select:none;
+  }
+  .nodo-header .nh-name  { font-weight:700; font-size:0.9rem; flex:1; }
+  .nodo-header .nh-pct   { font-size:1.2rem; font-weight:700; min-width:64px; text-align:right; }
+  .nodo-header .nh-extra { font-size:0.75rem; opacity:.7; }
+  .nodo-header .nh-arrow { font-size:0.8rem; opacity:.6; transition:transform .2s; }
+  .nodo-header.open .nh-arrow { transform:rotate(90deg); }
+
+  .nodo-body {
+    display:none; background:white;
+    border:1px solid #e0e0e0; border-top:none;
+    border-radius:0 0 8px 8px; overflow:hidden;
+  }
+  .nodo-body.open { display:block; }
+  .nodo-body table { font-size:0.82rem; }
+  .nodo-body th    { font-size:0.75rem; }
+
+  .pct-bar-wrap { width:70px; height:7px; background:#e9ecef; border-radius:4px;
+                  display:inline-block; vertical-align:middle; margin-right:5px; }
+  .pct-bar      { height:100%; border-radius:4px; }
+  .pct-green  { background:#27ae60; }
+  .pct-yellow { background:#f39c12; }
+  .pct-red    { background:#e74c3c; }
+
+  .lider-chip {
+    display:inline-block; background:#e8f4fd; color:#1a5276;
+    border-radius:12px; padding:2px 9px; font-size:0.73rem; margin:1px 2px; white-space:nowrap;
+  }
+  .lider-chip.warn { background:#fef9e7; color:#7d6608; }
+  .lider-chip.multi { background:#fdecea; color:#922b21; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <div class="step-badge"></div>
+    <h2>Panel de Análisis — Estado de liquidación</h2>
+  </div>
+
+  <div class="pro-form">
+    <input type="text" id="inp-pro" placeholder="Ej: PRO-051573"
+           style="text-transform:uppercase"
+           onkeydown="if(event.key==='Enter') analizar()">
+    <button class="btn btn-primary" onclick="analizar()">Analizar</button>
+    <span id="spinner" style="display:none"><span class="spinner"></span>&nbsp;Consultando SGS…</span>
+  </div>
+  <div id="error-msg" class="alert alert-danger" style="display:none"></div>
+</div>
+
+<div id="panel-content" style="display:none">
+  <div class="resumen-proyecto" id="resumen-cards"></div>
+  <div id="nodos-container"></div>
+</div>
+
+<script>
+async function analizar() {
+  const pro = document.getElementById('inp-pro').value.trim().toUpperCase();
+  if (!pro) return;
+  document.getElementById('spinner').style.display = 'inline-flex';
+  document.getElementById('panel-content').style.display = 'none';
+  document.getElementById('error-msg').style.display = 'none';
+  try {
+    const r = await fetch('/motoverificador/api/panel_analisis?pro=' + encodeURIComponent(pro));
+    const d = await r.json();
+    if (!d.ok) {
+      showErr(d.error || 'Error desconocido');
+      return;
+    }
+    renderPanel(d);
+    document.getElementById('panel-content').style.display = 'block';
+  } catch(ex) {
+    showErr('Error de red: ' + ex);
+  } finally {
+    document.getElementById('spinner').style.display = 'none';
+  }
+}
+
+function showErr(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function pctCls(p)  { return p >= 90 ? 'pct-green' : p >= 50 ? 'pct-yellow' : 'pct-red'; }
+function bar(p)     { return `<span class="pct-bar-wrap"><span class="pct-bar ${pctCls(p)}" style="width:${Math.min(p,100)}%"></span></span>`; }
+function fmt(n)     { return n == null ? '—' : Number(n).toLocaleString('es-CO', {maximumFractionDigits:3}); }
+
+function renderPanel(d) {
+  const pct = d.pct;
+  document.getElementById('resumen-cards').innerHTML = `
+    <div class="res-card blue"><div class="num">${d.pro_code}</div><div class="lbl">${d.nombre_padre}</div></div>
+    <div class="res-card ${pct>=90?'green':pct>=50?'orange':''}">
+      <div class="num">${pct}%</div><div class="lbl">% Avance proyecto</div>
+    </div>
+    <div class="res-card blue"><div class="num">${fmt(d.total_adv)}</div><div class="lbl">Total avance</div></div>
+    <div class="res-card"><div class="num">${fmt(d.total_proy)}</div><div class="lbl">Total proyectado</div></div>
+    <div class="res-card"><div class="num">${d.nodos.length}</div><div class="lbl">Nodos con avance</div></div>
+  `;
+
+  const container = document.getElementById('nodos-container');
+  container.innerHTML = '';
+
+  d.nodos.forEach((nodo, ni) => {
+    // Líderes únicos del nodo
+    const lMap = {};
+    nodo.actividades.forEach(a => a.lideres.forEach(l => { lMap[l.nombre] = (lMap[l.nombre]||0) + l.qty; }));
+    const lNames  = Object.keys(lMap);
+    const isMulti = lNames.length > 1;
+    const lchipsNodo = lNames.length === 0
+      ? '<span style="color:#aaa;font-size:0.75rem">Sin avance</span>'
+      : lNames.map(n => `<span class="lider-chip${isMulti?' multi':''}">${n} (${fmt(lMap[n])})</span>`).join('');
+
+    const rows = nodo.actividades.map(a => {
+      const isMultiA = a.lideres.length > 1;
+      const chips = a.lideres.length === 0
+        ? '<span style="color:#aaa;font-size:0.73rem">—</span>'
+        : a.lideres.map(l => `<span class="lider-chip${isMultiA?' multi':''}">${l.nombre} <em style="opacity:.7">${fmt(l.qty)}</em></span>`).join('');
+      const balStyle = a.balance < 0 ? 'color:#e74c3c;font-weight:700' : '';
+      return `<tr>
+        <td><strong>${a.act_code}</strong></td>
+        <td style="text-align:right">${fmt(a.proy)}</td>
+        <td style="text-align:right">${fmt(a.advance)}</td>
+        <td style="text-align:right;${balStyle}">${fmt(a.balance)}</td>
+        <td>${bar(a.pct)} <strong>${a.pct}%</strong></td>
+        <td>${chips}</td>
+      </tr>`;
+    }).join('');
+
+    const block = document.createElement('div');
+    block.className = 'nodo-block';
+    block.innerHTML = `
+      <div class="nodo-header" onclick="toggle(${ni})">
+        <span class="nh-arrow">▶</span>
+        <span class="nh-name">${nodo.nombre}</span>
+        <span class="nh-extra">${nodo.actividades.length} actividad(es)</span>
+        <span class="nh-extra">${fmt(nodo.total_adv)} / ${fmt(nodo.total_proy)}</span>
+        <span class="nh-pct">${bar(nodo.pct)} ${nodo.pct}%</span>
+      </div>
+      <div class="nodo-body" id="nb-${ni}">
+        <div style="padding:8px 16px 4px;border-bottom:1px solid #f0f0f0;">
+          Líderes: ${lchipsNodo}
+        </div>
+        <table>
+          <thead><tr>
+            <th>Actividad</th>
+            <th style="text-align:right">Proyectado</th>
+            <th style="text-align:right">Avance</th>
+            <th style="text-align:right">Balance</th>
+            <th>% Avance</th>
+            <th>Líder(es) actuales</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    container.appendChild(block);
+  });
+}
+
+function toggle(ni) {
+  const body = document.getElementById('nb-' + ni);
+  body.classList.toggle('open');
+  body.previousElementSibling.classList.toggle('open');
+}
+</script>
+{% endblock %}

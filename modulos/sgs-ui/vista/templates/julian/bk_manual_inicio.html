@@ -1,0 +1,161 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Acción Manual — Paso 1 de 4{% endblock %}
+{% block extra_head %}
+<style>
+  .steps { display:flex; align-items:center; margin-bottom:8px; }
+  .step-circle {
+    width:30px; height:30px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:0.82rem; font-weight:700; flex-shrink:0;
+  }
+  .step-circle.active  { background:#27ae60; color:white; }
+  .step-circle.pending { background:#e0e0e0; color:#999; }
+  .step-circle.done    { background:#c8f0da; color:#1a7a40; }
+  .step-bar  { flex:1; height:3px; }
+  .step-bar.active  { background:#27ae60; }
+  .step-bar.pending { background:#e0e0e0; }
+  .step-labels { display:flex; font-size:0.7rem; color:#aaa; margin-bottom:28px; }
+  .step-labels span { flex:1; text-align:center; }
+  .step-labels span.active { color:#27ae60; font-weight:700; }
+
+  .tipo-opt { display:none; }
+  .tipo-card {
+    border:2px solid #e0e0e0; border-radius:10px;
+    padding:18px 14px; text-align:center; cursor:pointer;
+    transition:border-color 0.18s, background 0.18s;
+  }
+  .tipo-card:hover { border-color:#a8d5b8; background:#f6fdf8; }
+  .tipo-opt:checked + .tipo-card {
+    border-color:#27ae60; background:#f0fbf4;
+  }
+  .tipo-icon { font-size:1.8rem; margin-bottom:8px; }
+  .tipo-name { font-weight:700; font-size:0.95rem; color:#1a3e2e; }
+  .tipo-sub  { font-size:0.75rem; color:#888; margin-top:3px; }
+
+  .field-group { margin-bottom:22px; }
+  .field-label { font-weight:700; font-size:0.88rem; display:block; margin-bottom:7px; color:#333; }
+  .field-input {
+    width:100%; padding:11px 14px;
+    border:1.5px solid #c3e6cb; border-radius:7px;
+    font-size:0.95rem; font-family:monospace;
+    text-transform:uppercase; outline:none;
+    transition:border-color 0.15s;
+  }
+  .field-input:focus { border-color:#27ae60; }
+  .field-hint { font-size:0.78rem; color:#888; margin-top:5px; }
+</style>
+{% endblock %}
+{% block content %}
+
+<div style="max-width:560px; margin:44px auto;">
+
+  <!-- Indicador de pasos -->
+  <div class="steps">
+    <div class="step-circle active">1</div>
+    <div class="step-bar active"></div>
+    <div class="step-circle pending">2</div>
+    <div class="step-bar pending"></div>
+    <div class="step-circle pending">3</div>
+    <div class="step-bar pending"></div>
+    <div class="step-circle pending">4</div>
+  </div>
+  <div class="step-labels">
+    <span class="active">Datos del proyecto</span>
+    <span>Mano de Obra</span>
+    <span>Materiales</span>
+    <span>Vista previa</span>
+  </div>
+
+  <div class="card">
+    <h2 style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:1.3rem;">✎</span> Acción Manual
+    </h2>
+    <p style="color:#666;font-size:0.87rem;margin-bottom:24px;">
+      Ingresa los datos del proyecto. Luego pegarás las actividades
+      directamente desde el Excel del supervisor.
+    </p>
+
+    <form method="post" id="frm-inicio">
+
+      <!-- Tipo de liquidación -->
+      <div class="field-group">
+        <label class="field-label">Tipo de liquidación</label>
+        <div style="display:flex; gap:14px;">
+          <label style="flex:1;">
+            <input type="radio" name="tipo" value="mi" class="tipo-opt" id="tipo_mi"
+                   {{ 'checked' if not tipo_prev or tipo_prev == 'mi' }}>
+            <div class="tipo-card">
+              <div class="tipo-icon">⚡</div>
+              <div class="tipo-name">Mayor Impacto</div>
+              <div class="tipo-sub">MI — sin PDL</div>
+            </div>
+          </label>
+          <label style="flex:1;">
+            <input type="radio" name="tipo" value="programado" class="tipo-opt" id="tipo_prog"
+                   {{ 'checked' if tipo_prev == 'programado' }}>
+            <div class="tipo-card">
+              <div class="tipo-icon"></div>
+              <div class="tipo-name">Programado</div>
+              <div class="tipo-sub">Requiere PDL</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- LCL / ODM -->
+      <div class="field-group">
+        <label class="field-label" for="lcl_input">Código del proyecto en SGS</label>
+        <input type="text" name="lcl" id="lcl_input" class="field-input"
+               value="{{ lcl_prev or '' }}"
+               placeholder="LCL6300985782"
+               autocomplete="off"
+               oninput="this.value=this.value.toUpperCase().trim()"
+               required>
+        <p class="field-hint">
+          Código LCL, ODM o DF que identifica el proyecto en SGS
+          (ej: <code>LCL6300985782</code>).
+        </p>
+      </div>
+
+      <!-- PDL (solo si Programado) -->
+      <div id="pdl_group" class="field-group"
+           style="display:{{ 'block' if tipo_prev == 'programado' else 'none' }};">
+        <label class="field-label" for="pdl_input">PDL / Ticket del proyecto</label>
+        <input type="text" name="pdl" id="pdl_input"
+               value="{{ pdl_prev or '' }}"
+               placeholder="PDL-12345 ó número de ticket"
+               style="width:100%;padding:11px 14px;border:1.5px solid #ffc107;border-radius:7px;
+                      font-size:0.95rem;outline:none;">
+        <p class="field-hint" style="color:#856404;">
+          Opcional — PDL o número de ticket del proyecto programado.
+        </p>
+      </div>
+
+      <button type="submit" class="btn btn-success"
+              style="width:100%;padding:13px;font-size:1rem;margin-top:4px;">
+        Siguiente: Mano de Obra →
+      </button>
+    </form>
+
+    <div style="margin-top:18px;padding-top:14px;border-top:1px solid #f0f0f0;
+                text-align:center;font-size:0.82rem;color:#999;">
+      ¿Tienes el Excel completo?
+      <a href="/julian/subir" style="color:#1a3e2e;font-weight:600;">Subir Excel →</a>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  function syncPDL() {
+    const prog = document.getElementById('tipo_prog').checked;
+    document.getElementById('pdl_group').style.display = prog ? 'block' : 'none';
+    document.getElementById('pdl_input').required = false;
+  }
+  document.querySelectorAll('input[name="tipo"]').forEach(r =>
+    r.addEventListener('change', syncPDL)
+  );
+  syncPDL();
+})();
+</script>
+{% endblock %}

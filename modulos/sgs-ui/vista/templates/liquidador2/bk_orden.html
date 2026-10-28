@@ -1,0 +1,62 @@
+{% extends "liquidador2/base.html" %}
+{% block title %}Orden de facturación #{{ o.id }} — Liquidador{% endblock %}
+{% block content %}
+<div class="card" style="max-width:680px;margin:40px auto;">
+  <h2 style="margin-bottom:4px">Orden de facturación #{{ o.id }}</h2>
+  <p style="color:#666;font-size:0.9rem;margin-bottom:16px;">
+    Enviada por <strong>{{ o.orden_enviada_por or '—' }}</strong> el {{ o.orden_enviada_co or '—' }} ·
+    estado: <strong>{{ o.orden_estado_label }}</strong>
+  </p>
+
+  <table style="width:100%;border-collapse:collapse;font-size:0.9rem;margin-bottom:16px;">
+    <tr><td style="padding:5px 8px;color:#666;width:170px">Planilla SIPWEBORA</td><td style="padding:5px 8px"><strong>{{ o.id_planilla }}</strong></td></tr>
+    <tr><td style="padding:5px 8px;color:#666">Proyecto SGS</td><td style="padding:5px 8px"><strong>{{ o.proyecto_nombre or '—' }}</strong>{% if o.pro_code %} · {{ o.pro_code }}{% endif %}</td></tr>
+    <tr><td style="padding:5px 8px;color:#666">LCL / OdM</td><td style="padding:5px 8px">{{ o.lcl or o.odm or '—' }}</td></tr>
+    <tr><td style="padding:5px 8px;color:#666">Fecha de ejecución</td><td style="padding:5px 8px">{{ o.fecha_ejecucion or '— (se toma del Excel)' }}</td></tr>
+    <tr><td style="padding:5px 8px;color:#666">Líderes</td><td style="padding:5px 8px">{% for l in (o.lideres or []) %}{{ l.nombre }}{% if l.cedula %} ({{ l.cedula }}){% endif %} — {{ l.pct }}%{% if not loop.last %} · {% endif %}{% else %}—{% endfor %}</td></tr>
+    <tr><td style="padding:5px 8px;color:#666">Semáforo del balance</td>
+        <td style="padding:5px 8px">
+          <span style="font-weight:700;color:{% if o.semaforo == 'verde' %}#2e7d32{% elif o.semaforo == 'rojo' %}#c62828{% else %}#b26a00{% endif %}">{{ (o.semaforo or '—')|upper }}</span>
+          · OK {{ o.ok }} · descuadre {{ o.rojos }} · alertas {{ o.alertas }} · consultas {{ o.consultas }}
+        </td></tr>
+    <tr><td style="padding:5px 8px;color:#666">Observación</td><td style="padding:5px 8px">{{ o.orden_nota or '—' }}</td></tr>
+    <tr><td style="padding:5px 8px;color:#666">Archivo</td><td style="padding:5px 8px">{{ o.excel_archivo }}<br><code style="font-size:0.75rem;color:#888">sha256 {{ (o.excel_sha256 or '')[:16] }}…</code></td></tr>
+  </table>
+
+  {% if o.orden_estado == 'en_liquidacion' and o.orden_sesion %}
+  <p style="background:#e8f1fb;color:#1565c0;padding:10px 12px;border-radius:6px;font-size:0.88rem;">
+    Esta orden ya está en liquidación (sesión {{ o.orden_sesion[:8] }}).
+    <a href="{{ url_for('liquidador2.verificar', sid=o.orden_sesion) }}">Abrir la sesión</a>
+    — o vuelve a cargar la planilla abajo si esa sesión se perdió.
+  </p>
+  {% elif o.orden_estado in ('liquidada', 'cancelada') %}
+  <p style="background:#f1f8e9;color:#2e7d32;padding:10px 12px;border-radius:6px;font-size:0.88rem;">
+    Orden {{ o.orden_estado_label|lower }}{% if o.orden_sesion %} · <a href="{{ url_for('liquidador2.resultado', sid=o.orden_sesion) }}">ver resultado</a>{% endif %}.
+  </p>
+  {% endif %}
+
+  {% if o.orden_estado in ('pendiente', 'en_liquidacion', 'con_fallos') %}
+  <form method="post" action="{{ url_for('liquidador2.subir') }}">
+    <input type="hidden" name="orden_id" value="{{ o.id }}">
+    <div style="margin-bottom:14px;">
+      <label style="display:block;font-weight:700;font-size:0.9rem;margin-bottom:6px;">Fecha de planilla</label>
+      <input type="date" name="fecha_planilla" value="{{ o.fecha_ejecucion or '' }}"
+             style="padding:10px 12px;border:2px solid #1565c0;border-radius:6px;font-size:1rem;width:100%;box-sizing:border-box;">
+      <p style="margin:5px 0 0;font-size:0.78rem;color:#666;">Viene de la fase final del Balance (hoja LIQUIDACION). Si la cambias, se usa la que pongas.</p>
+    </div>
+    <button type="submit" class="btn btn-primary" id="btn-subir" style="width:100%">Cargar la planilla de la orden y verificar contra SGS</button>
+    <p id="aviso-subir" style="display:none;margin:12px 0 0;padding:10px 12px;border-radius:6px;background:#e8f1fb;color:#1565c0;font-size:0.85rem;">
+      <strong>Verificando contra SGS&hellip;</strong> suele tardar 1 a 2 minutos. No cierres ni reenvíes.
+    </p>
+  </form>
+  <script>
+    (function () {
+      var form = document.querySelector("form[action$='subir']"), btn = document.getElementById("btn-subir"), aviso = document.getElementById("aviso-subir");
+      if (!form || !btn) return;
+      form.addEventListener("submit", function () { btn.disabled = true; btn.textContent = "Verificando contra SGS…"; btn.style.opacity = "0.7"; if (aviso) aviso.style.display = "block"; });
+    })();
+  </script>
+  {% endif %}
+  <p style="margin-top:16px;font-size:0.85rem"><a href="/liquidador" target="_top">← Volver al panel del Liquidador</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Balance Integrado — Resultado</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+    background: #f0f2f5;
+    min-height: 100vh;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 40px 16px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.12);
+    padding: 36px 44px;
+    width: 680px;
+    max-width: 98vw;
+  }
+  .logo-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .logo-icon {
+    width: 40px; height: 40px;
+    background: #1F3864; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 17px; font-weight: bold;
+  }
+  .logo-title { font-size: 17px; font-weight: 700; color: #1F3864; }
+
+  .ok-banner {
+    background: #eaffea; border-left: 4px solid #2a7;
+    border-radius: 4px; padding: 12px 16px;
+    font-size: 14px; color: #180; margin-bottom: 22px;
+  }
+  .warning-banner {
+    background: #fff3cd; border: 2px solid #ff9900;
+    border-left-width: 8px; border-radius: 6px;
+    padding: 14px 16px; margin-bottom: 22px;
+    color: #7a3e00; font-size: 14px; line-height: 1.35;
+  }
+  .warning-title {
+    color: #9c0006; font-weight: 800; font-size: 15px;
+    margin-bottom: 6px; text-transform: uppercase;
+  }
+  .warning-detail { font-weight: 700; color: #5a2b00; }
+
+  h2 { font-size: 14px; font-weight: 700; color: #1F3864;
+       margin-bottom: 10px; margin-top: 24px; }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 3px 12px;
+    font-size: 13px;
+    background: #f8f9fb;
+    border-radius: 6px;
+    padding: 12px 14px;
+  }
+  .meta-label { color: #555; font-weight: 600; text-align: right; }
+  .meta-value { color: #222; }
+  .meta-value.hl { color: #1F3864; font-weight: 700; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  th {
+    background: #1F3864; color: #fff;
+    padding: 7px 10px; text-align: center; font-size: 12px;
+  }
+  td { padding: 6px 10px; border-bottom: 1px solid #eee; }
+  tr:last-child td { border-bottom: none; }
+  tr:nth-child(even) td { background: #f8f9fb; }
+  td.center { text-align: center; }
+
+  .sheets-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .sheet-item {
+    padding: 9px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sheet-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+  .s1 { background: #EBF3FB; color: #2E75B6; }
+  .s2 { background: #EBF3FB; color: #2E75B6; }
+  .s3 { background: #EEF5EA; color: #375623; }
+  .s4 { background: #FDF3E7; color: #7B3F00; }
+
+  .btn-download {
+    display: block; margin-top: 28px; padding: 13px;
+    background: #1F3864; color: #fff; text-align: center;
+    border-radius: 6px; font-size: 14px; font-weight: 700;
+    text-decoration: none; transition: background .2s;
+  }
+  .btn-download:hover { background: #2E75B6; }
+
+  .btn-back {
+    display: block; margin-top: 10px; padding: 10px;
+    background: #f0f2f5; color: #555; text-align: center;
+    border-radius: 6px; font-size: 13px; text-decoration: none;
+    transition: background .2s;
+  }
+  .btn-back:hover { background: #e0e4e8; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo-bar">
+    <div class="logo-icon">BI</div>
+    <div class="logo-title">Balance Integrado — Resultado</div>
+  </div>
+
+  <div class="ok-banner">
+    Balance integrado generado correctamente. El Excel incluye datos de
+    Planillas y ERP cruzados.
+  </div>
+
+  {% if advertencias %}
+  {% for adv in advertencias %}
+  <div class="warning-banner">
+    <div class="warning-title">{{ adv.titulo }}</div>
+    <div>{{ adv.mensaje }}</div>
+    <div class="warning-detail">Esta misma advertencia queda incluida en el Excel descargado.</div>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  <!-- Metadatos Planillas -->
+  <h2>Planilla Planillas
+    {% if metadata.get('_planillas') %}
+    <span style="font-size:11px;font-weight:600;background:#D6E4F0;color:#1F3864;
+                 padding:2px 8px;border-radius:10px;vertical-align:middle;margin-left:8px;">
+      MULTI-PLANILLA
+    </span>
+    {% endif %}
+  </h2>
+  <div class="meta-grid">
+    {% if metadata.get('_planillas') %}
+    <div class="meta-label">Planillas:</div>
+    <div class="meta-value hl">{{ metadata.get('_planillas') | join(' + ') }}</div>
+    {% endif %}
+    <div class="meta-label">Empresa:</div>
+    <div class="meta-value">{{ metadata.get('empresa', '—') }}</div>
+    <div class="meta-label">OdM / Grafo:</div>
+    <div class="meta-value hl">{{ metadata.get('odm', '—') }}</div>
+    <div class="meta-label">LCL:</div>
+    <div class="meta-value">{{ metadata.get('lcl', '—') }}</div>
+    <div class="meta-label">Ticket / PDL:</div>
+    <div class="meta-value">{{ metadata.get('ticket', '—') }}</div>
+    <div class="meta-label">Zona:</div>
+    <div class="meta-value">
+      {{ metadata.get('zona_nombre') or metadata.get('zona_cd', '—') }}
+    </div>
+    <div class="meta-label">Fecha ejec.:</div>
+    <div class="meta-value">{{ metadata.get('fecha_ejecucion', '—') }}</div>
+    <div class="meta-label">Total MO:</div>
+    <div class="meta-value">{{ metadata.get('total_mo', '—') }}</div>
+    <div class="meta-label">Total Materiales:</div>
+    <div class="meta-value">{{ metadata.get('total_mat', '—') }}</div>
+  </div>
+
+  <!-- Proyecto ERP -->
+  <h2>Proyecto ERP</h2>
+  <div class="meta-grid">
+    <div class="meta-label">Nombre:</div>
+    <div class="meta-value hl">{{ sgs_padre.get('name', '—') }}</div>
+    <div class="meta-label">ODM:</div>
+    <div class="meta-value">
+      {{ sgs_padre.get('order_number') or sgs_padre.get('odm', '—') }}
+    </div>
+    <div class="meta-label">Código:</div>
+    <div class="meta-value">{{ sgs_padre.get('code', '—') }}</div>
+    <div class="meta-label">Nodos encontrados:</div>
+    <div class="meta-value">{{ nodos | length }}</div>
+  </div>
+
+  <!-- Nodos ERP -->
+  {% if nodos %}
+  <h2>Nodos ERP</h2>
+  <table>
+    <tr>
+      <th>Código PRO</th>
+      <th>Nodo</th>
+      <th>Estado</th>
+      <th>Bandejas</th>
+      <th>Materiales</th>
+    </tr>
+    {% for n in nodos %}
+    <tr>
+      <td class="center">{{ n.pro }}</td>
+      <td class="center">{{ n.nodo }}</td>
+      <td class="center">{{ n.status }}</td>
+      <td class="center">{{ n.bandejas }}</td>
+      <td class="center">{{ n.materiales }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  <!-- Hojas del Excel -->
+  <h2>Hojas del Excel generado</h2>
+  <div class="sheets-list">
+    <div class="sheet-item s1">
+      <div class="sheet-dot" style="background:#2E75B6"></div>
+      SIP_MANO_OBRA
+    </div>
+    <div class="sheet-item s2">
+      <div class="sheet-dot" style="background:#2E75B6"></div>
+      SIP_MATERIALES
+    </div>
+    <div class="sheet-item s3">
+      <div class="sheet-dot" style="background:#375623"></div>
+      SGS_BALANCE
+    </div>
+    <div class="sheet-item s4">
+      <div class="sheet-dot" style="background:#7B3F00"></div>
+      CRUCE_SIP_SGS
+    </div>
+  </div>
+
+  <a class="btn-download" href="/descargar/{{ token }}">
+    Descargar {{ filename }}
+  </a>
+  <a class="btn-back" href="/">← Generar otro balance</a>
+</div>
+</body>
+</html>

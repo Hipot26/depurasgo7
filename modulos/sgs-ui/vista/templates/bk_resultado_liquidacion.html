@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+{% block title %}Resultado Liquidación — SGS UI{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+  <h1 style="font-size:1.3rem;margin:0;">Resultado de Liquidación</h1>
+  <a href="{{ url_for('auditoria', sid=sid) }}" class="btn btn-success">
+    ↻ Verificar en SGS
+  </a>
+</div>
+<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+  <a href="{{ url_for('cierre_rapido', sid=sid) }}" class="btn btn-primary">
+    Verificar cierre rapido
+  </a>
+  <span style="font-size:0.82rem;color:#888;">
+    Abre una tabla para comparar fecha, PDL y estado antes de corregir.
+  </span>
+</div>
+<p style="color:#888;font-size:0.85rem;margin-bottom:20px;">{{ s.filename }}</p>
+
+{% set ok_count    = resultados | selectattr('ok')                          | list | length %}
+{% set err_count   = resultados | rejectattr('ok')                          | list | length %}
+{% set new_count   = resultados | selectattr('creada')                      | list | length %}
+{% set audit_ok    = resultados | selectattr('auditoria') | selectattr('auditoria.coincide') | list | length %}
+{% set audit_desc  = resultados | selectattr('ok') | selectattr('auditoria') | rejectattr('auditoria.coincide') | list | length %}
+
+<div class="stat-row" style="margin-bottom:20px;">
+  <div class="stat {{ 'green' if ok_count == resultados|length else 'blue' }}">
+    <div class="num">{{ ok_count }}</div><div class="lbl">Liquidadas OK</div>
+  </div>
+  <div class="stat {{ 'red' if err_count else 'gray' }}">
+    <div class="num">{{ err_count }}</div><div class="lbl">Con error</div>
+  </div>
+  <div class="stat gray">
+    <div class="num">{{ new_count }}</div><div class="lbl">Creadas nuevas</div>
+  </div>
+  <div style="width:1px;background:#eee;margin:0 8px;"></div>
+  <div class="stat {{ 'green' if audit_ok == ok_count else 'red' }}">
+    <div class="num">{{ audit_ok }}</div><div class="lbl">Auditoría ✓</div>
+  </div>
+  <div class="stat {{ 'red' if audit_desc else 'gray' }}">
+    <div class="num">{{ audit_desc }}</div><div class="lbl">Descuadres</div>
+  </div>
+</div>
+
+{# ── Tabla de resultados ── #}
+<div class="card">
+  <h2>Detalle</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Tipo</th><th>Código</th><th>PRO</th><th>Cant. liquidada</th>
+        <th>Nueva</th><th>Estado liq.</th>
+        <th style="border-left:2px solid #ddd;">SGS Advance</th>
+        <th>SGS Balance</th><th>Auditoría</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in resultados %}
+    {% set aud = r.auditoria or {} %}
+    <tr>
+      <td>
+        <span class="badge {{ 'badge-blue' if r.tipo == 'MAT' else 'badge-ok' }}">
+          {{ r.tipo }}
+        </span>
+      </td>
+      <td><strong>{{ r.codigo }}</strong></td>
+      <td style="font-size:0.8rem;">{{ r.pro_code }}</td>
+      <td style="text-align:right;">{{ r.cantidad }}</td>
+      <td style="text-align:center;">
+        {% if r.creada %}<span class="badge badge-blue">Nueva</span>
+        {% else %}<span style="color:#aaa;">—</span>{% endif %}
+      </td>
+      <td>
+        {% if r.ok %}
+          <span class="badge badge-ok">OK</span>
+        {% else %}
+          <span class="badge badge-error">Error</span>
+          {% if r.error %}
+            <div style="font-size:0.75rem;color:#e74c3c;margin-top:3px;">{{ r.error[:120] }}</div>
+          {% endif %}
+        {% endif %}
+      </td>
+      {# ── Auditoría ── #}
+      <td style="text-align:right;border-left:2px solid #ddd;">
+        {{ aud.advance if aud.advance is defined else '—' }}
+      </td>
+      <td style="text-align:right;">
+        {{ aud.balance if aud.balance is defined else '—' }}
+      </td>
+      <td>
+        {% if aud.estado == 'ok' %}
+          <span class="badge badge-ok">✓ Coincide</span>
+        {% elif aud.estado == 'descuadre' %}
+          <span class="badge badge-error">⚠ Descuadre</span>
+          <div style="font-size:0.75rem;color:#e74c3c;">
+            advance={{ aud.advance }} / esperado={{ r.cantidad }}
+          </div>
+        {% elif aud.estado == 'no_ejecutado' %}
+          <span class="badge badge-gray">No ejecutado</span>
+        {% elif aud.estado == 'no_encontrado' %}
+          <span class="badge badge-warn">No encontrado</span>
+        {% elif aud.estado == 'error' %}
+          <span class="badge badge-warn">Error API</span>
+        {% else %}
+          <span class="badge badge-gray">{{ aud.estado or '—' }}</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{# ── Resumen auditoría ── #}
+<div class="card" style="background:{% if audit_ok > 0 and audit_desc == 0 %}#f0faf4{% elif audit_desc > 0 %}#fff8f0{% else %}#f8f9fa{% endif %};">
+  <h2>Auditoría SGS</h2>
+  {% set auditada = resultados | selectattr('auditoria') | selectattr('auditoria.estado') | list %}
+  {% if not auditada %}
+  <div class="alert alert-info">
+    La auditoría verifica en SGS que los balances quedaron en 0 tras la liquidación.<br>
+    Odoo puede tardar unos segundos en recomputar los campos.
+    Cuando estés listo, pulsa <strong>↻ Verificar en SGS</strong> arriba.
+  </div>
+  {% elif audit_desc == 0 %}
+  <div class="alert alert-info" style="background:#d4edda;border-color:#c3e6cb;color:#155724;">
+    ✓ Todos los balances en SGS coinciden. No hay descuadres.
+  </div>
+  {% else %}
+  <div class="alert alert-warning">
+    ⚠ {{ audit_desc }} item(s) con descuadre. Revisar manualmente en SGS.
+  </div>
+  {% endif %}
+  {% if auditada %}
+  <p style="font-size:0.85rem;color:#555;margin-top:8px;">
+    Coinciden: <strong>{{ audit_ok }}</strong> &nbsp;|&nbsp;
+    Descuadres: <strong>{{ audit_desc }}</strong>
+  </p>
+  {% endif %}
+</div>
+
+{# ── Datos de errores para el botón debug (JSON embebido) ── #}
+{% set errores_todos = resultados | rejectattr('ok') | list %}
+{% if errores_todos %}
+<script>
+window._sgsDebugData = {
+  fecha:    new Date().toLocaleString(),
+  archivo:  {{ s.filename | tojson }},
+  ok:       {{ ok_count }},
+  errores:  {{ errores_todos | length }},
+  items: [
+    {% for r in errores_todos %}
+    {
+      tipo:       {{ r.tipo       | tojson }},
+      codigo:     {{ r.codigo     | tojson }},
+      pro_code:   {{ r.pro_code   | tojson }},
+      pm_id:      {{ r.pm_id      | tojson if r.pm_id is defined else 'null' }},
+      cantidad:   {{ r.cantidad   | tojson if r.cantidad is defined else 'null' }},
+      error_tipo: {{ (r.error_tipo if r.error_tipo is defined else '') | tojson }},
+      error:      {{ r.error      | tojson if r.error else '""' }},
+      screenshot: {{ (r.pasos[-1] if r.pasos else '') | tojson }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ]
+};
+</script>
+{% endif %}
+
+{# Modal debug ── #}
+<div id="debug-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
+     z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:10px;max-width:720px;width:95%;
+              max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.3);">
+    <div style="padding:16px 20px;border-bottom:1px solid #eee;display:flex;
+                align-items:center;justify-content:space-between;">
+      <strong style="font-size:1rem;">Informe técnico de errores</strong>
+      <button onclick="document.getElementById('debug-modal').style.display='none'"
+              style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#888;line-height:1;">×</button>
+    </div>
+    <div style="padding:14px 20px;flex:1;overflow-y:auto;">
+      <textarea id="debug-text" readonly
+                style="width:100%;height:320px;font-family:monospace;font-size:0.78rem;
+                       border:1px solid #ddd;border-radius:6px;padding:10px;resize:vertical;
+                       background:#f8f9fa;color:#1a1a2e;"></textarea>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid #eee;display:flex;gap:10px;align-items:center;">
+      <button id="btn-copiar" onclick="copiarDebug()"
+              style="background:#1a1a2e;color:white;border:none;padding:8px 20px;
+                     border-radius:6px;font-weight:700;cursor:pointer;">
+        Copiar
+      </button>
+      <span id="copia-ok" style="color:#27ae60;font-size:0.85rem;display:none;">✓ Copiado</span>
+      <span style="font-size:0.8rem;color:#aaa;margin-left:auto;">
+        Guardado en el servidor · copia para soporte
+      </span>
+    </div>
+  </div>
+</div>
+
+{# ── Sección de reparación ── #}
+{% set n_fallidos = resultados | rejectattr('ok') | selectattr('tipo','equalto','MAT') | selectattr('pm_id') | list | length %}
+{% if errores_todos and not n_fallidos %}
+<div class="card" style="border-left:4px solid #e74c3c;margin-top:8px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+    <div>
+      <h2 style="color:#c0392b;margin:0;border:none;padding:0;">Errores de liquidacion</h2>
+      <p style="font-size:0.85rem;color:#666;margin-top:8px;">Informe técnico guardado en el servidor.</p>
+    </div>
+    <button onclick="abrirDebug()"
+            style="background:#1a1a2e;color:white;border:none;padding:7px 16px;
+                   border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer;">
+      Informe técnico
+    </button>
+  </div>
+</div>
+{% endif %}
+{% if n_fallidos %}
+<div class="card" style="border-left:4px solid #e74c3c;margin-top:8px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;
+              margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+    <h2 style="color:#c0392b;margin:0;border:none;padding:0;">
+      Reparar errores ({{ n_fallidos }} MAT)
+    </h2>
+    <button onclick="abrirDebug()"
+            style="background:#1a1a2e;color:white;border:none;padding:7px 16px;
+                   border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer;">
+      Informe técnico
+    </button>
+  </div>
+  <p style="font-size:0.85rem;color:#666;margin-bottom:14px;">
+    Selecciona los materiales que quieres reintentar. El sistema abrirá un nuevo proceso
+    solo con esos ítems.
+  </p>
+  <form method="POST" action="{{ url_for('reparar', sid=sid) }}" id="form-reparar">
+    <div style="display:flex;flex-direction:column;gap:14px;">
+    {% for r in resultados %}
+    {% if not r.ok and r.tipo == 'MAT' and r.pm_id %}
+      {% set i = loop.index0 %}
+      {% if r.pasos %}
+        {% set ss_file = r.pasos[-1] | replace('\\', '/') | replace('//', '/') %}
+        {% set ss_file = ss_file.split('/')[-1] %}
+      {% else %}
+        {% set ss_file = None %}
+      {% endif %}
+      <div style="display:flex;gap:14px;align-items:flex-start;
+                  background:#fff8f8;border:1px solid #f5c6cb;border-radius:8px;padding:12px;">
+        <div style="padding-top:3px;">
+          <input type="checkbox" name="idx_reparar" value="{{ i }}" id="rep_{{ i }}"
+                 checked style="width:18px;height:18px;cursor:pointer;accent-color:#e74c3c;">
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+            <label for="rep_{{ i }}" style="font-weight:700;cursor:pointer;">{{ r.codigo }}</label>
+            <span style="font-size:0.8rem;color:#888;">{{ r.pro_code }}</span>
+            <span style="font-size:0.8rem;color:#888;">qty={{ r.cantidad }}</span>
+            {% if r.error_tipo is defined and r.error_tipo %}
+              <span class="badge badge-error" style="font-size:0.72rem;">{{ r.error_tipo }}</span>
+            {% endif %}
+          </div>
+          <div style="font-size:0.8rem;color:#c0392b;background:#fff;border:1px solid #f5c6cb;
+                      border-radius:4px;padding:6px 8px;font-family:monospace;
+                      word-break:break-all;max-height:60px;overflow-y:auto;">
+            {{ r.error or '(sin mensaje de error)' }}
+          </div>
+        </div>
+        {% if ss_file %}
+        <div style="flex-shrink:0;">
+          <a href="{{ url_for('log_img', filename=ss_file) }}" target="_blank"
+             title="Ver screenshot completo">
+            <img src="{{ url_for('log_img', filename=ss_file) }}"
+                 style="width:140px;height:88px;object-fit:cover;border-radius:5px;
+                        border:1px solid #ddd;display:block;">
+          </a>
+          <div style="font-size:0.68rem;color:#aaa;text-align:center;margin-top:2px;">
+            {{ ss_file }}
+          </div>
+        </div>
+        {% else %}
+        <div style="flex-shrink:0;width:140px;height:88px;background:#f0f0f0;border-radius:5px;
+                    display:flex;align-items:center;justify-content:center;
+                    font-size:0.75rem;color:#aaa;border:1px solid #ddd;">
+          sin screenshot
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+    {% endfor %}
+    </div>
+
+    <div style="margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <button type="submit" class="btn btn-danger">
+        ↻ Reintentar seleccionados
+      </button>
+      <label style="font-size:0.82rem;color:#555;cursor:pointer;display:flex;align-items:center;gap:5px;">
+        <input type="checkbox" id="chk-rep-all"
+               onchange="document.querySelectorAll('[name=idx_reparar]').forEach(c=>c.checked=this.checked)"
+               checked>
+        Todos
+      </label>
+      <span style="font-size:0.8rem;color:#aaa;">
+        El reintento abre un proceso nuevo — no modifica este reporte.
+      </span>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+<div style="margin-top:12px;display:flex;gap:12px;">
+  <a href="{{ url_for('verificar', sid=sid) }}" class="btn btn-light">← Volver a verificación</a>
+  <a href="{{ url_for('subir') }}" class="btn btn-light">Subir otro Excel</a>
+</div>
+
+<script>
+function abrirDebug() {
+  var d = window._sgsDebugData;
+  if (!d) { alert("No hay datos de error disponibles."); return; }
+
+  var lines = [];
+  lines.push("=== REPORTE DEBUG SGS UI ===");
+  lines.push("Archivo : " + d.archivo);
+  lines.push("OK      : " + d.ok + "  |  Errores: " + d.errores);
+  lines.push("");
+
+  d.items.forEach(function(r, idx) {
+    lines.push("--- ERROR #" + (idx + 1) + " ---");
+    lines.push("Tipo        : " + r.tipo);
+    lines.push("Codigo      : " + r.codigo);
+    lines.push("PRO         : " + r.pro_code);
+    if (r.pm_id)      lines.push("pm_id       : " + r.pm_id);
+    if (r.cantidad !== null) lines.push("Cantidad    : " + r.cantidad);
+    if (r.error_tipo) lines.push("Clasificacion: " + r.error_tipo);
+    lines.push("Error completo:");
+    lines.push(r.error || "(sin mensaje)");
+    var ssFile = r.screenshot ? r.screenshot.split(/[/\\]/).pop() : null;
+    if (ssFile) lines.push("Screenshot  : " + ssFile);
+    lines.push("");
+  });
+
+  lines.push("===========================");
+
+  document.getElementById("debug-text").value = lines.join("\n");
+  document.getElementById("copia-ok").style.display = "none";
+  document.getElementById("debug-modal").style.display = "flex";
+}
+
+function copiarDebug() {
+  var ta = document.getElementById("debug-text");
+  ta.select();
+  try {
+    navigator.clipboard.writeText(ta.value).then(function() {
+      mostrarCopiado();
+    }).catch(function() {
+      document.execCommand("copy");
+      mostrarCopiado();
+    });
+  } catch(e) {
+    document.execCommand("copy");
+    mostrarCopiado();
+  }
+}
+
+function mostrarCopiado() {
+  var ok = document.getElementById("copia-ok");
+  ok.style.display = "inline";
+  setTimeout(function() { ok.style.display = "none"; }, 2500);
+}
+
+// Cerrar modal con Escape
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape") document.getElementById("debug-modal").style.display = "none";
+});
+// Cerrar haciendo click fuera
+document.getElementById("debug-modal").addEventListener("click", function(e) {
+  if (e.target === this) this.style.display = "none";
+});
+</script>
+
+{% endblock %}

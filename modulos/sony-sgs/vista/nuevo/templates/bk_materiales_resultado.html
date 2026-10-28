@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Materiales Sony — Cargue generado</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+    background: #f0f2f5; min-height: 100vh;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 40px 16px;
+  }
+  .card {
+    background: #fff; border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.12);
+    padding: 36px 44px; width: 1150px; max-width: 99vw;
+  }
+  .logo-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .logo-icon {
+    width: 40px; height: 40px; background: #2e9e5b; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 17px; font-weight: bold;
+  }
+  .logo-title { font-size: 17px; font-weight: 700; color: #2e9e5b; }
+  .subtitle { font-size: 12px; color: #888; margin-bottom: 20px; }
+  .step-bar { display:flex; gap:6px; font-size:11px; color:#999; margin-bottom:18px; }
+  .step { padding:3px 10px; border-radius:10px; background:#f0f2f5; }
+  .step.on { background:#2e9e5b; color:#fff; font-weight:600; }
+
+  .resumen {
+    display: flex; gap: 22px; background: #f4faf6; border: 1.5px solid #bfe0d0;
+    border-radius: 8px; padding: 14px 18px; margin-bottom: 16px; font-size: 13px;
+    flex-wrap: wrap;
+  }
+  .resumen b { font-size: 17px; display: block; color: #1d6f3f; }
+
+  .adv {
+    margin: 12px 0; padding: 10px 14px; background: #fff8e6;
+    border-left: 4px solid #e6a817; border-radius: 4px; font-size: 12px; color: #7a5c00;
+  }
+  .adv div { margin: 2px 0; }
+
+  .btn-descargar {
+    display: block; width: 100%; padding: 14px; margin: 16px 0 8px;
+    background: #2e9e5b; color: #fff; text-align: center;
+    border-radius: 6px; font-size: 15px; font-weight: 700; text-decoration: none;
+  }
+  .btn-descargar:hover { background: #37b96b; }
+
+  h2 { font-size: 13px; font-weight: 700; color: #0F5E75; margin: 18px 0 8px; }
+  .tbl-wrap { overflow-x: auto; border: 1px solid #e2e7ea; border-radius: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; white-space: nowrap; }
+  th { background: #1F3864; color: #fff; padding: 6px 8px; text-align: left; position: sticky; top: 0; }
+  td { padding: 5px 8px; border-bottom: 1px solid #eef1f4; }
+  tr:nth-child(even) td { background: #f8f9fb; }
+  td.k1 { background: #FFE699 !important; font-weight: 700; text-align: center; }
+  td.k0 { color: #999; text-align: center; }
+  td.dev-pos { color: #9C0006; font-weight: 700; }
+
+  .btn-back {
+    display: block; margin-top: 12px; padding: 10px;
+    background: #f0f2f5; color: #555; text-align: center;
+    border-radius: 6px; font-size: 13px; text-decoration: none;
+  }
+  .btn-back:hover { background: #e0e4e8; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="logo-bar">
+    <div class="logo-icon">✓</div>
+    <div class="logo-title">Cargue generado</div>
+  </div>
+  <div class="subtitle">{{ padre.get('name','') }} — formato plantilla (Hoja1, columnas A–L)</div>
+
+  <div class="step-bar">
+    <div class="step">1 · Nodos</div>
+    <div class="step">2 · Bandejas</div>
+    <div class="step">3 · Cuadre</div>
+    <div class="step on">4 · Cargue</div>
+  </div>
+
+  <div class="resumen">
+    <div><b>{{ resumen.n_filas }}</b> filas</div>
+    <div><b>{{ resumen.n_nodos }}</b> nodos</div>
+    <div><b>{{ '%g' % resumen.total_ent }}</b> entregado</div>
+    <div><b>{{ '%g' % resumen.total_dev }}</b> devolución</div>
+    <div><b>{{ resumen.n_aportacion }}</b> filas aportación (K=1)</div>
+  </div>
+
+  {% if advertencias %}
+  <div class="adv">
+    <strong>⚠ Revisa antes de cargar:</strong>
+    {% for a in advertencias %}<div>• {{ a }}</div>{% endfor %}
+  </div>
+  {% endif %}
+
+  <a class="btn-descargar" href="/descargar/{{ token }}">⬇ Descargar {{ filename }}</a>
+
+  <h2>Vista previa del cargue</h2>
+  <div class="tbl-wrap" style="max-height:420px;overflow-y:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Id_nodo</th><th>Usuario</th><th>Fecha_asignacion</th><th>Codigo</th>
+          <th>Cant_entregada</th><th>Devolucion</th><th>Fecha_entrega</th><th>Pdi</th>
+          <th>Consecutivo</th><th>Observaciones</th><th>Aportacion</th><th>Fecha_reintegro</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in filas %}
+        <tr>
+          <td>{{ f.id_nodo }}</td>
+          <td>{{ f.usuario }}</td>
+          <td>{{ f.fecha_asignacion.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td style="font-weight:600">{{ f.codigo }}</td>
+          <td style="text-align:center">{{ '%g' % f.qty }}</td>
+          <td style="text-align:center" class="{{ 'dev-pos' if f.dev }}">{{ '%g' % f.dev }}</td>
+          <td>{{ f.fecha_entrega.strftime('%d/%m/%Y') if f.fecha_entrega else '' }}</td>
+          <td>{{ f.pdi }}</td>
+          <td>{{ f.consecutivo }}</td>
+          <td>{{ f.obs }}</td>
+          <td class="{{ 'k1' if f.k|string == '1' else 'k0' }}">{{ f.k }}</td>
+          <td>{{ f.fecha_reintegro.strftime('%d/%m/%Y') if f.fecha_reintegro else '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <a class="btn-back" href="/materiales/cuadre/{{ sid }}">← Volver al cuadre (ajustar y regenerar)</a>
+  <a class="btn-back" href="/?tab=materiales">Inicio Materiales Sony</a>
+</div>
+</body>
+</html>

@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ERP Liquidador — Verificación Materiales</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Calibri, Candara, sans-serif; background: #f0f3f7; color: #1a1a1a; }
+
+    .topbar {
+      background: #1F3864; padding: 0 28px; height: 52px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar h1 { color: #fff; font-size: 1rem; font-weight: 700; }
+    .topbar .right { display: flex; align-items: center; gap: 14px; }
+    .topbar a { color: #a8bcd4; text-decoration: none; font-size: .82rem; }
+    .topbar a:hover { color: #fff; }
+    .badge-ok   { background: #375623; color: #fff; font-size: .72rem; padding: 3px 10px; border-radius: 10px; }
+    .badge-err  { background: #c00;    color: #fff; font-size: .72rem; padding: 3px 10px; border-radius: 10px; }
+    .badge-warn { background: #856404; color: #fff; font-size: .72rem; padding: 3px 10px; border-radius: 10px; }
+
+    .main { max-width: 1500px; margin: 28px auto; padding: 0 20px; }
+
+    .card {
+      background: #fff; border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      padding: 28px 32px; margin-bottom: 20px;
+    }
+    .card h2 { color: #1F3864; font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
+    .card .meta { font-size: .82rem; color: #777; margin-bottom: 18px; }
+
+    /* Bloque PRO / proyecto */
+    .pro-header {
+      background: #dce8f5; border-left: 4px solid #1F3864;
+      border-radius: 4px; padding: 10px 16px; margin-bottom: 18px;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .pro-code {
+      font-family: Consolas, monospace; font-weight: 700;
+      font-size: .95rem; color: #1F3864;
+    }
+    .pro-nombre { font-size: .85rem; color: #333; }
+
+    /* Resumen */
+    .summary-row { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+    .sumbox { flex: 1; min-width: 100px; border-radius: 5px; padding: 11px 14px; text-align: center; }
+    .sumbox .num { font-size: 1.5rem; font-weight: 700; }
+    .sumbox .lbl { font-size: .73rem; margin-top: 2px; }
+    .sumbox.green  { background: #e2f0d9; color: #375623; }
+    .sumbox.red    { background: #fde8e8; color: #7b0000; }
+    .sumbox.yellow { background: #fff3cd; color: #856404; }
+    .sumbox.purple { background: #ede7f6; color: #4527a0; }
+    .sumbox.gray   { background: #eceff1; color: #546e7a; }
+    .sumbox.blue   { background: #dce8f5; color: #1F3864; }
+
+    .result-banner {
+      border-radius: 5px; padding: 14px 20px; margin-bottom: 22px;
+      display: flex; align-items: center; gap: 12px; font-size: .92rem; font-weight: 600;
+    }
+    .result-banner.ok   { background: #e2f0d9; border-left: 5px solid #375623; color: #375623; }
+    .result-banner.err  { background: #fde8e8; border-left: 5px solid #c00;    color: #7b0000; }
+    .result-banner.warn { background: #fff3cd; border-left: 5px solid #f0c040; color: #856404; }
+    .result-banner.info { background: #dce8f5; border-left: 5px solid #1F3864; color: #1F3864; }
+    .result-banner .icon { font-size: 1.4rem; }
+
+    /* Tabla */
+    .mat-table { width: 100%; border-collapse: collapse; font-size: .81rem; }
+    .mat-table th {
+      background: #1F3864; color: #fff;
+      padding: 9px 10px; text-align: left; font-weight: 600; white-space: nowrap;
+    }
+    .mat-table th.right  { text-align: right; }
+    .mat-table th.center { text-align: center; }
+    .mat-table td {
+      padding: 8px 10px; border-bottom: 1px solid #e8edf3; vertical-align: middle;
+    }
+    .mat-table tr:last-child td { border-bottom: none; }
+
+    .row-ok       { border-left: 4px solid #4caf50; }
+    .row-ya-liq   { border-left: 4px solid #f0a500; }
+    .row-parcial  { border-left: 4px solid #7c4dff; }
+    .row-sinmov   { border-left: 4px solid #90a4ae; }
+    .row-err      { border-left: 4px solid #f44336; }
+
+    .row-ok td      { background: #f9fdf6; }
+    .row-ya-liq td  { background: #fffde7; }
+    .row-parcial td { background: #f3e5f5; }
+    .row-sinmov td  { background: #fafafa; }
+    .row-err td     { background: #fff8f8; }
+    .row-confirmed td { background: #e8f5e9 !important; }
+
+    .num-cell { text-align: right; font-variant-numeric: tabular-nums;
+                font-family: Consolas, monospace; font-size: .8rem; }
+    .code { font-family: Consolas, monospace; font-weight: 700; color: #1F3864; }
+    .nodo-chip {
+      background: #dce8f5; color: #1F3864; font-size: .74rem; font-weight: 700;
+      padding: 2px 8px; border-radius: 10px; white-space: nowrap;
+    }
+
+    /* Estado badges */
+    .estado-badge {
+      display: inline-block; font-size: .72rem; font-weight: 700;
+      padding: 3px 9px; border-radius: 3px; white-space: nowrap;
+      text-transform: uppercase; letter-spacing: .3px;
+    }
+    .estado-ok       { background: #e2f0d9; color: #375623; }
+    .estado-ya-liq   { background: #fff3cd; color: #856404; }
+    .estado-parcial  { background: #ede7f6; color: #4527a0; }
+    .estado-sinmov   { background: #eceff1; color: #546e7a; }
+    .estado-sinmovok { background: #e2f0d9; color: #375623; }
+    .estado-desc     { background: #fde8e8; color: #c00; }
+    .estado-nf       { background: #fde8e8; color: #7b0000; }
+
+    .advance-val { color: #856404; font-weight: 700; }
+    .advance-zero { color: #90a4ae; }
+    .diff-ok  { color: #375623; font-weight: 700; }
+    .diff-err { color: #c00;    font-weight: 700; }
+    .diff-zero { color: #90a4ae; }
+
+    /* Checkbox */
+    .check-cell { text-align: center; }
+    .check-wrap input[type="checkbox"] {
+      width: 18px; height: 18px; cursor: pointer; accent-color: #375623;
+    }
+    .check-na { font-size: .75rem; color: #c00; font-weight: 700; text-transform: uppercase; }
+
+    .check-instruction {
+      background: #fff8e1; border: 1px solid #f0c040;
+      border-radius: 5px; padding: 12px 18px; margin-bottom: 18px;
+      font-size: .86rem; color: #856404; display: flex; align-items: center; gap: 10px;
+    }
+
+    .blocked-box {
+      background: #fde8e8; border: 1.5px solid #f44336;
+      border-radius: 5px; padding: 18px 24px; margin-bottom: 18px;
+      color: #7b0000; font-size: .9rem;
+    }
+    .blocked-box .big { font-size: 1.3rem; margin-bottom: 6px; font-weight: 700; }
+
+    .actions { display: flex; gap: 12px; align-items: center; margin-top: 28px; flex-wrap: wrap; }
+    .btn-approve {
+      padding: 12px 32px; background: #375623; color: #fff;
+      border: none; border-radius: 4px; font-size: 1rem;
+      font-family: inherit; font-weight: 700; cursor: pointer;
+      transition: background .2s; letter-spacing: .3px;
+    }
+    .btn-approve:disabled { background: #9cbe8c; cursor: not-allowed; opacity: .7; }
+    .btn-approve:not(:disabled):hover { background: #4a7030; }
+    .btn-secondary {
+      padding: 11px 20px; background: #fff; color: #1F3864;
+      border: 1.5px solid #1F3864; border-radius: 4px;
+      font-size: .9rem; font-family: inherit; font-weight: 600;
+      cursor: pointer; text-decoration: none; display: inline-block;
+    }
+    .btn-secondary:hover { background: #f0f3f7; }
+
+    #checks-counter { font-size: .85rem; color: #555; margin-left: 4px; }
+    #checks-counter.all-done { color: #375623; font-weight: 700; }
+
+    .err-list { margin: 10px 0; }
+    .err-list li {
+      font-size: .82rem; color: #856404; background: #fff8e1;
+      border-radius: 3px; padding: 4px 10px; margin-bottom: 3px; list-style: none;
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>ERP — Sistema Liquidador</h1>
+  <div class="right">
+    {% if s.mat_checks %}
+      {% set n_desc2 = s.mat_checks | selectattr('estado','equalto','descuadre') | list | length %}
+      {% set n_nf2   = s.mat_checks | selectattr('estado','equalto','no_encontrado') | list | length %}
+      {% if n_desc2 == 0 and n_nf2 == 0 %}
+        <span class="badge-ok">Materiales verificados</span>
+      {% else %}
+        <span class="badge-err">Descuadres detectados</span>
+      {% endif %}
+    {% endif %}
+    <a href="{{ url_for('liquidacion.verificar_get', sid=sid) }}">← Mano de Obra</a>
+    <a href="{{ url_for('liquidacion.logout') }}">Cerrar sesión</a>
+  </div>
+</div>
+
+<div class="main">
+<div class="card">
+  <h2>Verificación de Materiales</h2>
+  <p class="meta">
+    Archivo: <strong>{{ s.filename }}</strong> &nbsp;|&nbsp;
+    Fuente: hoja <strong>CRUCE_SERGIO</strong>
+    {% if s.mat_checks %}&nbsp;|&nbsp; {{ s.mat_checks|length }} materiales{% endif %}
+  </p>
+
+  <!-- Bloque PRO / Proyecto -->
+  {% if s.mat_pro_code or s.mat_pro_nombre %}
+  <div class="pro-header">
+    <span class="pro-code">[{{ s.mat_pro_code }}]</span>
+    <span class="pro-nombre">{{ s.mat_pro_nombre }}</span>
+  </div>
+  {% endif %}
+
+  {% if sgs_error is defined %}
+  <!-- ── Error de conexión ERP ──────────────────────────────── -->
+  <div class="result-banner err">
+    <span class="icon">⛔</span><span>{{ sgs_error }}</span>
+  </div>
+  <div class="actions">
+    <a href="{{ url_for('liquidacion.verificar_get', sid=sid) }}" class="btn-secondary">
+      ← Volver a Mano de Obra
+    </a>
+  </div>
+
+  {% elif not s.mat_checks %}
+  <!-- ── Sin materiales ─────────────────────────────────────── -->
+  <div class="result-banner warn">
+    <span class="icon">⚠</span>
+    <span>No se encontraron materiales en CRUCE_SERGIO o la hoja está vacía.</span>
+  </div>
+  {% if s.mat_errs %}
+  <ul class="err-list">{% for e in s.mat_errs %}<li>{{ e }}</li>{% endfor %}</ul>
+  {% endif %}
+  <div class="actions">
+    <a href="{{ url_for('liquidacion.verificar_get', sid=sid) }}" class="btn-secondary">
+      ← Volver a Mano de Obra
+    </a>
+  </div>
+
+  {% else %}
+  <!-- ── Tabla principal ────────────────────────────────────── -->
+
+  {% set n_ok      = s.mat_checks | selectattr('ok','equalto',true) | list | length %}
+  {% set n_ya_liq  = s.mat_checks | selectattr('estado','equalto','ya_liquidado')   | list | length %}
+  {% set n_parcial = s.mat_checks | selectattr('estado','equalto','avance_parcial') | list | length %}
+  {% set n_sinmov_a= s.mat_checks | selectattr('estado','equalto','sin_mov')        | list | length %}
+  {% set n_sinmov_b= s.mat_checks | selectattr('estado','equalto','sin_mov_ok')     | list | length %}
+  {% set n_sinmov  = n_sinmov_a + n_sinmov_b %}
+  {% set n_desc    = s.mat_checks | selectattr('estado','equalto','descuadre')      | list | length %}
+  {% set n_nf      = s.mat_checks | selectattr('estado','equalto','no_encontrado')  | list | length %}
+  {% set n_errs    = n_desc + n_nf %}
+  {% set checkables = s.mat_checks | selectattr('ok','equalto',true) | list %}
+
+  <!-- Resumen -->
+  <div class="summary-row">
+    {% if n_ok - n_ya_liq - n_parcial - n_sinmov > 0 %}
+    <div class="sumbox green">
+      <div class="num">{{ n_ok - n_ya_liq - n_parcial - n_sinmov }}</div>
+      <div class="lbl">Pendientes</div>
+    </div>
+    {% endif %}
+    {% if n_ya_liq %}
+    <div class="sumbox yellow">
+      <div class="num">{{ n_ya_liq }}</div>
+      <div class="lbl">Ya liquidados</div>
+    </div>
+    {% endif %}
+    {% if n_parcial %}
+    <div class="sumbox purple">
+      <div class="num">{{ n_parcial }}</div>
+      <div class="lbl">Parciales</div>
+    </div>
+    {% endif %}
+    {% if n_sinmov %}
+    <div class="sumbox gray">
+      <div class="num">{{ n_sinmov }}</div>
+      <div class="lbl">Sin movimiento</div>
+    </div>
+    {% endif %}
+    {% if n_desc %}
+    <div class="sumbox red">
+      <div class="num">{{ n_desc }}</div>
+      <div class="lbl">Descuadres</div>
+    </div>
+    {% endif %}
+    {% if n_nf %}
+    <div class="sumbox red">
+      <div class="num">{{ n_nf }}</div>
+      <div class="lbl">No encontrados</div>
+    </div>
+    {% endif %}
+    <div class="sumbox blue">
+      <div class="num">{{ s.mat_checks|length }}</div>
+      <div class="lbl">Total</div>
+    </div>
+  </div>
+
+  <!-- Banner global -->
+  {% if n_errs > 0 %}
+  <div class="result-banner err">
+    <span class="icon">⛔</span>
+    <div>
+      <strong>{{ n_errs }} material(es) con problemas:</strong>
+      {% if n_desc %} {{ n_desc }} con cantidad diferente.{% endif %}
+      {% if n_nf %} {{ n_nf }} no encontrado(s) en ERP.{% endif %}
+      Revisa el Excel o ERP antes de aprobar.
+    </div>
+  </div>
+  {% elif n_ya_liq > 0 or n_parcial > 0 %}
+  <div class="result-banner warn">
+    <span class="icon">⚠</span>
+    <div>
+      {% if n_ya_liq %}
+        <strong>{{ n_ya_liq }} material(es) ya liquidado(s) al 100%</strong> — el motor los ignorará automáticamente.{% endif %}
+      {% if n_parcial %}
+        <strong>{{ n_parcial }} con avance parcial</strong> — el motor solo liquidará el delta pendiente.{% endif %}
+      <br>Confirma que has revisado todos los checks para continuar.
+    </div>
+  </div>
+  {% else %}
+  <div class="result-banner ok">
+    <span class="icon">✅</span>
+    <span>Todos los materiales cuadran con ERP. Confirma cada fila para habilitar la aprobación.</span>
+  </div>
+  {% endif %}
+
+  {% if confirm_error is defined %}
+  <div class="result-banner err" style="margin-bottom:12px;">
+    <span class="icon">⚠</span><span>{{ confirm_error }}</span>
+  </div>
+  {% endif %}
+
+  {% if s.mat_errs %}
+  <ul class="err-list" style="margin-bottom:14px;">
+    {% for e in s.mat_errs %}<li>{{ e }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  <!-- Bloqueo si descuadres -->
+  {% if n_errs > 0 %}
+  <div class="blocked-box">
+    <div class="big">🚫 Aprobación bloqueada</div>
+    Existen {{ n_errs }} material(es) con descuadre o no encontrados en ERP.
+    Resuelve las diferencias antes de continuar.
+  </div>
+  {% endif %}
+
+  <!-- Instrucción -->
+  <div class="check-instruction">
+    <span>📦</span>
+    <span>
+      Revisa cada fila antes de marcar el check.
+      <strong>Ya liquidados</strong> y <strong>parciales</strong> también requieren confirmación explícita.
+    </span>
+  </div>
+
+  <!-- Formulario + tabla -->
+  <form method="POST" action="{{ url_for('liquidacion.materiales', sid=sid) }}" id="mat-form">
+  <div style="overflow-x:auto;">
+  <table class="mat-table">
+    <thead>
+      <tr>
+        <th>Nodo</th>
+        <th>Código</th>
+        <th style="min-width:200px;">Descripción</th>
+        <th class="right">SIP Cant.</th>
+        <th class="right">ERP Desp.</th>
+        <th class="right">ERP Dev.</th>
+        <th class="right">ERP Neto</th>
+        <th class="right">Excel Neto</th>
+        <th class="right">Advance</th>
+        <th class="right">Dif.</th>
+        <th class="center">Estado</th>
+        <th class="center" style="min-width:54px;">Liquidar</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for mc in s.mat_checks %}
+      {% if mc.estado == 'ya_liquidado' %}
+        {% set row_cls = 'row-ya-liq' %}
+      {% elif mc.estado == 'avance_parcial' %}
+        {% set row_cls = 'row-parcial' %}
+      {% elif mc.ok %}
+        {% set row_cls = 'row-ok' if mc.estado != 'sin_mov' else 'row-sinmov' %}
+      {% else %}
+        {% set row_cls = 'row-err' %}
+      {% endif %}
+      <tr class="{{ row_cls }}">
+
+        <!-- Nodo + PRO -->
+        <td>
+          <span class="nodo-chip">NODO {{ mc.mat.nodo }}</span>
+          {% if s.mat_nodo_pro_map is defined %}
+            {% set pro_n = s.mat_nodo_pro_map.get(mc.mat.nodo, '') %}
+            {% if pro_n %}
+            <div style="font-size:.72rem;color:#1F3864;font-weight:700;margin-top:3px;">{{ pro_n }}</div>
+            {% endif %}
+          {% endif %}
+        </td>
+
+        <!-- Código -->
+        <td><span class="code">{{ mc.mat.codigo }}</span></td>
+
+        <!-- Descripción -->
+        <td style="font-size:.79rem;">{{ mc.mat.descripcion or '—' }}</td>
+
+        <!-- SIP Cant. -->
+        <td class="num-cell">
+          {% if mc.mat.sip_cant is not none %}{{ "%.2f"|format(mc.mat.sip_cant) }}
+          {% else %}<span style="color:#aaa;">—</span>{% endif %}
+        </td>
+
+        <!-- ERP Despacho -->
+        <td class="num-cell">
+          {% if mc.sgs_despachado is not none %}{{ "%.2f"|format(mc.sgs_despachado) }}
+          {% else %}<span style="color:#aaa;">—</span>{% endif %}
+        </td>
+
+        <!-- ERP Devolución -->
+        <td class="num-cell">
+          {% if mc.sgs_devuelto is not none %}{{ "%.2f"|format(mc.sgs_devuelto) }}
+          {% else %}<span style="color:#aaa;">—</span>{% endif %}
+        </td>
+
+        <!-- ERP Neto -->
+        <td class="num-cell">
+          {% if mc.sgs_neto is not none %}{{ "%.2f"|format(mc.sgs_neto) }}
+          {% else %}<span style="color:#aaa;">—</span>{% endif %}
+        </td>
+
+        <!-- Excel Neto -->
+        <td class="num-cell">{{ "%.2f"|format(mc.mat.sgs_neto_excel) }}</td>
+
+        <!-- Advance (ya liquidado) -->
+        <td class="num-cell">
+          {% if mc.sgs_advance is not none %}
+            {% if mc.sgs_advance > 0 %}
+              <span class="advance-val">{{ "%.2f"|format(mc.sgs_advance) }}</span>
+            {% else %}
+              <span class="advance-zero">0.00</span>
+            {% endif %}
+          {% else %}
+            <span style="color:#aaa;">—</span>
+          {% endif %}
+        </td>
+
+        <!-- Diferencia -->
+        <td class="num-cell">
+          {% if mc.diferencia is not none %}
+            {% if mc.diferencia == 0 %}<span class="diff-zero">0.00</span>
+            {% else %}<span class="diff-err">{{ "%.2f"|format(mc.diferencia) }}</span>{% endif %}
+          {% elif mc.estado == 'sin_mov_ok' %}
+            <span class="diff-zero">—</span>
+          {% else %}
+            <span class="diff-err">!</span>
+          {% endif %}
+        </td>
+
+        <!-- Estado -->
+        <td class="check-cell">
+          {% if mc.estado == 'ok' %}
+            <span class="estado-badge estado-ok">Pendiente</span>
+          {% elif mc.estado == 'ya_liquidado' %}
+            <span class="estado-badge estado-ya-liq">Ya liquidado</span>
+          {% elif mc.estado == 'avance_parcial' %}
+            <span class="estado-badge estado-parcial">Parcial</span>
+          {% elif mc.estado == 'sin_mov' %}
+            <span class="estado-badge estado-sinmov">Sin mov.</span>
+          {% elif mc.estado == 'sin_mov_ok' %}
+            <span class="estado-badge estado-sinmovok">Sin mov. OK</span>
+          {% elif mc.estado == 'descuadre' %}
+            <span class="estado-badge estado-desc">Descuadre</span>
+          {% elif mc.estado == 'no_encontrado' %}
+            <span class="estado-badge estado-nf">No encontrado</span>
+          {% else %}
+            <span class="estado-badge">{{ mc.estado }}</span>
+          {% endif %}
+        </td>
+
+        <!-- Checkbox — solo filas ok (incluyendo ya_liquidado y avance_parcial) -->
+        <td class="check-cell">
+          {% if mc.ok %}
+            <div class="check-wrap">
+              <input type="checkbox" name="mat_confirmado" value="{{ loop.index0 }}"
+                     onchange="actualizarChecks()">
+            </div>
+          {% else %}
+            <span class="check-na">✗</span>
+          {% endif %}
+        </td>
+
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <!-- Acciones -->
+  <div class="actions">
+    {% if n_errs == 0 %}
+    <button type="submit" class="btn-approve" id="btn-approve" disabled>
+      Liquidar seleccionados (<span id="sel-count">0</span>)
+    </button>
+    <span id="checks-counter" style="font-size:.82rem;color:#555;">
+      0 de {{ checkables|length }} posibles seleccionados
+    </span>
+    {% endif %}
+    <a href="{{ url_for('liquidacion.verificar_get', sid=sid) }}" class="btn-secondary">
+      ← Volver a Mano de Obra
+    </a>
+  </div>
+  </form>
+
+  <script>
+  var totalCheckables = {{ checkables|length }};
+
+  function actualizarChecks() {
+    var checks = document.querySelectorAll('input[name="mat_confirmado"]:checked');
+    var n = checks.length;
+    var counter = document.getElementById('checks-counter');
+    var selCount = document.getElementById('sel-count');
+    var btn = document.getElementById('btn-approve');
+    if (counter) {
+      counter.textContent = n + ' de ' + totalCheckables + ' posibles seleccionados';
+      counter.className = (n === totalCheckables && totalCheckables > 0) ? 'all-done' : '';
+    }
+    if (selCount) selCount.textContent = n;
+    // Habilitar con al menos 1 seleccionado
+    if (btn) btn.disabled = (n === 0);
+    checks.forEach(function(cb) {
+      var tr = cb.closest('tr');
+      if (tr) tr.classList.add('row-confirmed');
+    });
+    document.querySelectorAll('input[name="mat_confirmado"]:not(:checked)').forEach(function(cb) {
+      var tr = cb.closest('tr');
+      if (tr) tr.classList.remove('row-confirmed');
+    });
+  }
+  actualizarChecks();
+  </script>
+
+  {% endif %}
+
+</div><!-- /card -->
+</div><!-- /main -->
+</body>
+</html>

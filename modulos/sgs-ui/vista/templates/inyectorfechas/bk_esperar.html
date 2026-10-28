@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Inyector de Fechas — Ejecutando{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>Inyectando fechas — {{ s.filename }}</h2>
+
+  <div style="background:#f0f2f5; border-radius:8px; height:22px; overflow:hidden; margin-bottom:10px;">
+    <div id="barra" style="background:#27ae60; height:100%; width:0%;
+                           transition:width .5s; border-radius:8px;"></div>
+  </div>
+  <p id="resumen" style="font-size:0.85rem; color:#555; margin-bottom:16px;">Iniciando…</p>
+
+  <pre id="logs" style="background:#1a1a2e; color:#d0d0e0; font-size:0.76rem;
+                        padding:14px; border-radius:8px; max-height:320px;
+                        overflow-y:auto; white-space:pre-wrap;"></pre>
+</div>
+
+<div class="card" id="card-resultados" style="display:none;">
+  <h2>Resultados</h2>
+  <table>
+    <thead>
+      <tr><th>PRO</th><th>Nodo</th><th>Fecha</th><th>Resultado</th><th>Detalle</th></tr>
+    </thead>
+    <tbody id="tbody-res"></tbody>
+  </table>
+  <div style="margin-top:16px;">
+    <a class="btn btn-primary" href="{{ url_for('inyectorfechas.analizar', sid=sid) }}">
+      ↻ Reanalizar contra SGS
+    </a>
+  </div>
+</div>
+
+<script>
+const sid = "{{ sid }}";
+let terminado = false;
+
+function esc(t) {
+  const d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML;
+}
+
+async function poll() {
+  if (terminado) return;
+  try {
+    const r = await fetch(`{{ url_for('inyectorfechas.api_job_estado', sid=sid) }}`);
+    const d = await r.json();
+
+    document.getElementById('barra').style.width = (d.progreso || 0) + '%';
+    document.getElementById('resumen').textContent =
+      `${d.progreso || 0}% — ${d.ok_count || 0} OK / ${d.errores || 0} errores de ${d.total || 0} nodo(s)`;
+
+    const pre = document.getElementById('logs');
+    pre.textContent = (d.logs || []).join('\n');
+    pre.scrollTop = pre.scrollHeight;
+
+    if (d.estado === 'listo') {
+      terminado = true;
+      document.getElementById('barra').style.background =
+        (d.errores || 0) > 0 ? '#f39c12' : '#27ae60';
+      const tb = document.getElementById('tbody-res');
+      tb.innerHTML = '';
+      (d.resultados || []).forEach(res => {
+        let badge;
+        if (res.ok && res.verificado) {
+          badge = '<span class="badge badge-ok">OK VERIFICADO</span>';
+        } else if (res.ok) {
+          badge = '<span class="badge badge-warn">ESCRITO — REVISAR</span>';
+        } else {
+          badge = '<span class="badge badge-error">ERROR</span>';
+        }
+        tb.insertAdjacentHTML('beforeend',
+          `<tr>
+             <td><b>${esc(res.pro_code)}</b></td>
+             <td style="font-size:0.8rem;">${esc(res.nombre)}</td>
+             <td>${esc(res.fecha)}</td>
+             <td>${badge}</td>
+             <td style="font-size:0.78rem;">${esc(res.error || res.msg || '')}</td>
+           </tr>`);
+      });
+      document.getElementById('card-resultados').style.display = 'block';
+    }
+  } catch (e) { /* servidor ocupado — reintenta */ }
+  if (!terminado) setTimeout(poll, 2000);
+}
+poll();
+</script>
+
+{% endblock %}

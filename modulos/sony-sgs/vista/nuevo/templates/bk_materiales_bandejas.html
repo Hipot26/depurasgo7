@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Materiales Sony — Bandejas</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+    background: #f0f2f5; min-height: 100vh;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 40px 16px;
+  }
+  .card {
+    background: #fff; border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.12);
+    padding: 36px 44px; width: 1100px; max-width: 99vw;
+  }
+  .logo-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .logo-icon {
+    width: 40px; height: 40px; background: #0F5E75; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 15px; font-weight: bold;
+  }
+  .logo-title { font-size: 17px; font-weight: 700; color: #0F5E75; }
+  .subtitle { font-size: 12px; color: #888; margin-bottom: 24px; }
+  .step-bar { display:flex; gap:6px; font-size:11px; color:#999; margin-bottom:18px; }
+  .step { padding:3px 10px; border-radius:10px; background:#f0f2f5; }
+  .step.on { background:#0F5E75; color:#fff; font-weight:600; }
+
+  .nodo-hdr {
+    background: #0F5E75; color: #fff; border-radius: 6px 6px 0 0;
+    padding: 8px 14px; font-size: 13px; font-weight: 700;
+    margin-top: 18px; display: flex; gap: 14px; align-items: baseline;
+  }
+  .nodo-hdr .sub { font-weight: 400; font-size: 11px; opacity: .85; }
+
+  /* Tabla estilo SGS */
+  .sgs-table { width: 100%; border-collapse: collapse; font-size: 12px; border: 1px solid #dfe3e8; }
+  .sgs-table th {
+    background: #fff; color: #444; font-weight: 700;
+    padding: 8px 9px; text-align: left; border-bottom: 2px solid #dfe3e8;
+    white-space: nowrap;
+  }
+  .sgs-table td { padding: 7px 9px; border-bottom: 1px solid #eef1f4; vertical-align: middle; }
+  .sgs-table tr:hover td { background: #f4f9fb; }
+  .sgs-table tr.sel td { background: #e6f3f7; }
+  .sgs-table td.center, .sgs-table th.center { text-align: center; }
+  input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: #0F5E75; }
+
+  .badge {
+    display: inline-block; padding: 2px 9px; border-radius: 4px;
+    font-size: 11px; font-weight: 600; border: 1px solid rgba(0,0,0,.08);
+    white-space: nowrap;
+  }
+  .tipo-desp { color: #375623; }
+  .tipo-dev  { color: #9C0006; font-weight: 700; }
+
+  .toolbar { display: flex; gap: 8px; margin: 14px 0 4px; flex-wrap: wrap; }
+  .btn-sm {
+    padding: 5px 12px; font-size: 12px; font-weight: 600;
+    border: 1.5px solid #ccc; border-radius: 5px;
+    background: #f8f9fb; color: #555; cursor: pointer;
+  }
+  .btn-sm:hover { background: #e8ecf0; }
+  .counter { font-size: 12px; color: #555; margin: 8px 0 4px; }
+  .counter span { font-weight: 700; color: #0F5E75; }
+
+  .hint-box {
+    margin-top: 16px; padding: 10px 14px; background: #f2f8fa;
+    border-left: 4px solid #0F5E75; border-radius: 4px; font-size: 12px; color: #445;
+  }
+  .error {
+    margin: 14px 0; padding: 10px 14px; background: #ffeaea;
+    border-left: 4px solid #e53; border-radius: 4px; font-size: 13px; color: #c00;
+  }
+  .btn-generar {
+    width: 100%; padding: 13px; background: #0F5E75; color: #fff;
+    border: none; border-radius: 6px; font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-top: 16px;
+  }
+  .btn-generar:hover { background: #17849e; }
+  .btn-generar:disabled { background: #aaa; cursor: not-allowed; }
+  .btn-back {
+    display: block; margin-top: 10px; padding: 10px;
+    background: #f0f2f5; color: #555; text-align: center;
+    border-radius: 6px; font-size: 13px; text-decoration: none;
+  }
+  .btn-back:hover { background: #e0e4e8; }
+  .spinner { display: none; text-align: center; margin-top: 12px; color: #555; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="logo-bar">
+    <div class="logo-icon">MAT</div>
+    <div class="logo-title">Materiales Sony</div>
+  </div>
+  <div class="subtitle">
+    {{ padre.get('name','') }} — marca las bandejas que tienes físicamente
+    (despachos <strong>y</strong> devoluciones ya hechas en SGS)
+  </div>
+
+  <div class="step-bar">
+    <div class="step">1 · Nodos</div>
+    <div class="step on">2 · Bandejas</div>
+    <div class="step">3 · Cuadre</div>
+    <div class="step">4 · Cargue</div>
+  </div>
+
+  {% if error %}
+  <div class="error">{{ error }}</div>
+  {% endif %}
+
+  <div class="toolbar">
+    <button type="button" class="btn-sm" onclick="marcar('all')">Seleccionar todas</button>
+    <button type="button" class="btn-sm" onclick="marcar('none')">Ninguna</button>
+    <button type="button" class="btn-sm" onclick="marcar('desp')">Solo despachos</button>
+    <button type="button" class="btn-sm" onclick="marcar('desp_dev')">Despachos + devoluciones</button>
+  </div>
+  <div class="counter">
+    Seleccionadas: <span id="cnt-desp">0</span> despachos · <span id="cnt-dev">0</span> devoluciones
+  </div>
+
+  <form method="POST" id="frm-ban">
+    {% for g in grupos %}
+    <div class="nodo-hdr">
+      <span>NODO {{ g.nodo }}</span>
+      <span class="sub">{{ g.pro }} — {{ g.name }}</span>
+      <span class="sub" style="margin-left:auto">{{ g.bandejas|length }} bandejas</span>
+    </div>
+    <table class="sgs-table">
+      <thead>
+        <tr>
+          <th class="center" style="width:36px"></th>
+          <th>Bandeja</th>
+          <th>Tipo</th>
+          <th>Equipo</th>
+          <th>Gestor Del Proyecto</th>
+          <th class="center">Fecha</th>
+          <th>Mov. Productos</th>
+          <th class="center">Materiales</th>
+          <th class="center">Estado</th>
+          <th class="center">Estado Entrega</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in g.bandejas %}
+        <tr data-dev="{{ '1' if b.es_dev else '0' }}">
+          <td class="center">
+            <input type="checkbox" name="ban_ids" value="{{ b.id }}" onchange="contar(); this.closest('tr').classList.toggle('sel', this.checked)">
+          </td>
+          <td style="font-weight:600">{{ b.name }}</td>
+          <td class="{{ 'tipo-dev' if b.es_dev else 'tipo-desp' }}">{{ b.tipo }}</td>
+          <td>{{ b.equipo }}</td>
+          <td>{{ b.gestor }}</td>
+          <td class="center">{{ b.fecha }}</td>
+          <td>{{ b.picking }}</td>
+          <td class="center">{{ b.n_mats }} <span style="color:#999">({{ '%g' % b.qty_total }} und)</span></td>
+          <td class="center">
+            <span class="badge" style="background:{{ b.estado.bg or '#fff' }};color:{{ b.estado.fg }}">{{ b.estado.txt }}</span>
+          </td>
+          <td class="center">
+            <span class="badge" style="background:{{ b.entrega.bg or '#fff' }};color:{{ b.entrega.fg }}">{{ b.entrega.txt }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not g.bandejas %}
+        <tr><td colspan="10" style="color:#999;font-style:italic;text-align:center">Sin bandejas en este nodo</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+    {% endfor %}
+
+    <div class="hint-box">
+      <strong>Tip:</strong> marca también las bandejas de <strong>Devolución</strong> que ya existen en SGS —
+      el sistema cruza esas cantidades automáticamente contra los materiales de los despachos.
+      En el siguiente paso podrás además poner devoluciones manuales que aún no están en SGS.
+    </div>
+
+    <button type="submit" class="btn-generar" id="btn-gen">Armar cuadre de materiales →</button>
+    <div class="spinner" id="sp">Cruzando despachos y devoluciones…</div>
+  </form>
+
+  <a class="btn-back" href="/materiales/nodos/{{ sid }}">← Volver a nodos</a>
+</div>
+
+<script>
+  function contar() {
+    var d = 0, v = 0;
+    document.querySelectorAll('input[name="ban_ids"]:checked').forEach(function(cb) {
+      if (cb.closest('tr').dataset.dev === '1') v++; else d++;
+    });
+    document.getElementById('cnt-desp').textContent = d;
+    document.getElementById('cnt-dev').textContent = v;
+  }
+  function marcar(modo) {
+    document.querySelectorAll('input[name="ban_ids"]').forEach(function(cb) {
+      var esDev = cb.closest('tr').dataset.dev === '1';
+      if (modo === 'all') cb.checked = true;
+      else if (modo === 'none') cb.checked = false;
+      else if (modo === 'desp') cb.checked = !esDev;
+      else if (modo === 'desp_dev') cb.checked = true;
+      cb.closest('tr').classList.toggle('sel', cb.checked);
+    });
+    contar();
+  }
+  contar();
+
+  document.getElementById('frm-ban').addEventListener('submit', function(e) {
+    var desp = 0;
+    document.querySelectorAll('input[name="ban_ids"]:checked').forEach(function(cb) {
+      if (cb.closest('tr').dataset.dev === '0') desp++;
+    });
+    if (desp === 0) {
+      alert('Selecciona al menos una bandeja de Despacho — las devoluciones solas no generan cargue.');
+      e.preventDefault(); return false;
+    }
+    document.getElementById('btn-gen').disabled = true;
+    document.getElementById('sp').style.display = 'block';
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Inyector de Fechas — Análisis{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>Inyector de Fechas — Análisis de {{ s.filename }}</h2>
+  <p style="font-size:0.85rem; color:#666; margin-bottom:6px;">
+    Reporte: <b>{{ s.n_filas }}</b> prestaciones,
+    rango <b>{{ s.rango[0] }}</b> → <b>{{ s.rango[1] }}</b>.
+    Análisis fresco contra SGS (solo lectura) —
+    <a href="{{ url_for('inyectorfechas.analizar', sid=sid) }}">↻ reanalizar</a> ·
+    <a href="{{ url_for('inyectorfechas.inicio') }}">subir otro reporte</a>
+  </p>
+</div>
+
+<div class="stat-row">
+  <div class="stat red">  <div class="num">{{ meta.sin_fecha }}</div>   <div class="lbl">SIN FECHA FIN</div></div>
+  <div class="stat blue"> <div class="num">{{ meta.difiere }}</div>     <div class="lbl">FECHA DIFIERE</div></div>
+  <div class="stat gray"> <div class="num">{{ meta.solo_estado }}</div> <div class="lbl">SOLO ESTADO</div></div>
+  <div class="stat green"><div class="num">{{ meta.ok }}</div>          <div class="lbl">OK</div></div>
+  <div class="stat gray"> <div class="num">{{ meta.no_encontrado }}</div><div class="lbl">NO ENCONTRADOS</div></div>
+  <div class="stat">      <div class="num">{{ meta.total }}</div>       <div class="lbl">NODOS EN REPORTE</div></div>
+</div>
+
+{% if s.warnings %}
+<div class="alert alert-warning">
+  <b>Advertencias del reporte:</b>
+  <ul class="warns">
+    {% for w in s.warnings %}<li>{{ w }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="card">
+  <form method="POST" action="{{ url_for('inyectorfechas.ejecutar', sid=sid) }}"
+        onsubmit="return confirmarInyeccion(this);">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:40px;"><input type="checkbox" id="toggle-all"></th>
+        <th>PRO / Nodo</th>
+        <th>Líder (reporte)</th>
+        <th>Fecha reporte</th>
+        <th>Fin real SGS</th>
+        <th>Fechas del form</th>
+        <th>Estado SGS</th>
+        <th>Diagnóstico</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr style="{% if r.categoria == 'sin_fecha' %}background:#fff5f5;{% elif r.categoria == 'ok' %}opacity:0.6;{% endif %}">
+        <td>
+          {% if r.pid and r.categoria != 'ok' and r.categoria != 'no_encontrado' %}
+          <input type="checkbox" name="pro" value="{{ r.pro_code }}" class="chk-nodo"
+                 {% if r.preseleccionado %}checked{% endif %}>
+          {% endif %}
+        </td>
+        <td>
+          <b>{{ r.pro_code }}</b><br>
+          <span style="font-size:0.78rem; color:#777;">{{ r.nombre_sgs if r.nombre_sgs != '-' else r.nombre_rep }}</span>
+        </td>
+        <td style="font-size:0.8rem;">{{ r.lider_rep }}<br>
+          <span style="color:#999;">{{ r.proceso_rep }} · {{ r.n_prest }} prest.</span>
+        </td>
+        <td>
+          <b>{{ r.fecha_objetivo_ui }}</b>
+          {% if r.multifecha %}
+          <br><span class="badge badge-warn" title="Prestaciones en varias fechas: {{ r.fechas_rep|join(', ') }}. Se usa la última.">multifecha</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if r.fin_real_ui == '-' %}
+            <span class="badge badge-error">VACÍA</span>
+          {% else %}
+            {{ r.fin_real_ui }}
+          {% endif %}
+        </td>
+        <td style="font-size:0.78rem;">
+          {% if r.fechas_detalle %}
+          <details>
+            <summary style="cursor:pointer;">
+              {{ r.n_coinciden }}/7 coinciden{% if r.n_vacias %} · <span style="color:#e74c3c;">{{ r.n_vacias }} vacía(s)</span>{% endif %}
+            </summary>
+            <table style="margin-top:6px; font-size:0.76rem;">
+              {% for f in r.fechas_detalle %}
+              <tr>
+                <td style="padding:2px 6px;">{{ f.label }}</td>
+                <td style="padding:2px 6px; {% if f.vacia %}color:#e74c3c; font-weight:700;{% elif f.coincide %}color:#27ae60;{% endif %}">
+                  {{ f.actual_ui }}
+                </td>
+              </tr>
+              {% endfor %}
+            </table>
+          </details>
+          {% else %}-{% endif %}
+        </td>
+        <td style="font-size:0.78rem;">
+          {{ r.estado_actual }}
+          {% if r.estado_destino %}
+          <br><span style="color:#2980b9;">→ {{ r.estado_destino }}</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if r.categoria == 'sin_fecha' %}
+            <span class="badge badge-error">SIN FECHA FIN</span>
+          {% elif r.categoria == 'difiere' %}
+            <span class="badge badge-blue">DIFIERE</span>
+          {% elif r.categoria == 'solo_estado' %}
+            <span class="badge badge-warn">SOLO ESTADO</span>
+          {% elif r.categoria == 'no_encontrado' %}
+            <span class="badge badge-gray">NO ENCONTRADO</span>
+          {% else %}
+            <span class="badge badge-ok">OK</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div style="margin-top:18px; display:flex; gap:12px; align-items:center;">
+    <button type="submit" class="btn btn-danger">
+      Inyectar fechas en los nodos seleccionados
+    </button>
+    <span style="font-size:0.8rem; color:#888;">
+      Escribe las 7 fechas del form + estado 1.4 (si falta) via navegador.
+      El PDL no se modifica. Cada escritura se verifica con lectura fresca.
+    </span>
+  </div>
+  </form>
+</div>
+
+<script>
+document.getElementById('toggle-all').addEventListener('change', function () {
+  document.querySelectorAll('.chk-nodo').forEach(c => { c.checked = this.checked; });
+});
+
+function confirmarInyeccion(form) {
+  const n = form.querySelectorAll('.chk-nodo:checked').length;
+  if (n === 0) { alert('No hay nodos seleccionados.'); return false; }
+  return confirm(
+    '¿Inyectar fechas en ' + n + ' nodo(s)?\n\n' +
+    'Se escribirán las 7 fechas del proyecto y el estado ' +
+    '1.4-TERMINADO/EN BALANCE (donde falte) en SGS.'
+  );
+}
+</script>
+
+{% endblock %}

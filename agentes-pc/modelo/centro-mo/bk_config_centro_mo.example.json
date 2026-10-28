@@ -1,0 +1,4 @@
+{
+  "api_url": "https://<servidor>/centro-mo/agente",
+  "token": "<CENTRO_MO_AGENTE_TOKEN del servidor>"
+}

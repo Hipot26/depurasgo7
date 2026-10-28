@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title>Materiales Zona VII</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{ --bg:#0b1220; --card:#131c2e; --card2:#0e1626; --line:#1f2c45; --txt:#e6edf7;
+         --muted:#8aa0bd; --accent:#3b82f6; --accent2:#2563eb; --ok:#22c55e; --warn:#f59e0b;
+         --bad:#ef4444; --chip:#1c2a44; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--txt);
+        font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; font-size:14px; }
+  a{ color:var(--accent); }
+  header{ display:flex; align-items:center; justify-content:space-between; padding:14px 22px;
+          border-bottom:1px solid var(--line); background:linear-gradient(180deg,#101a2e,#0b1220); position:sticky; top:0; z-index:20; }
+  .brand{ font-size:19px; font-weight:800; }
+  .brand span{ color:var(--accent); }
+  .who{ color:var(--muted); font-size:12px; }
+  .who a{ color:var(--muted); margin-left:12px; }
+  .wrap{ padding:18px 22px 60px; max-width:1500px; margin:0 auto; }
+
+  .panel{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:16px; }
+  .controls{ display:flex; flex-wrap:wrap; gap:14px 18px; align-items:flex-end; }
+  .ctl{ display:flex; flex-direction:column; gap:6px; }
+  .ctl label{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+  input[type=date]{ background:var(--card2); border:1px solid var(--line); color:var(--txt);
+        padding:9px 11px; border-radius:9px; font-size:14px; }
+  .presets{ display:flex; gap:6px; flex-wrap:wrap; }
+  .presets button{ background:var(--chip); border:1px solid var(--line); color:var(--muted);
+        padding:7px 11px; border-radius:8px; cursor:pointer; font-size:12px; }
+  .presets button:hover{ color:#fff; border-color:var(--accent); }
+  .zonas{ display:flex; gap:8px; flex-wrap:wrap; }
+  .zchip{ display:inline-flex; align-items:center; gap:6px; background:var(--chip); border:1px solid var(--line);
+        padding:7px 11px; border-radius:20px; cursor:pointer; font-size:12.5px; user-select:none; }
+  .zchip.on{ background:rgba(59,130,246,.18); border-color:var(--accent); color:#fff; }
+  .btn{ background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; border:none;
+        padding:11px 20px; border-radius:10px; cursor:pointer; font-weight:700; font-size:14px; }
+  .btn:hover{ filter:brightness(1.08); }
+  .btn.sec{ background:#16223a; border:1px solid var(--line); }
+  .btn[disabled]{ opacity:.5; cursor:not-allowed; }
+
+  .cards{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
+  .kpi{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+  .kpi .l{ font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+  .kpi .v{ font-size:26px; font-weight:800; margin-top:4px; }
+  .kpi .s{ font-size:11px; color:var(--muted); margin-top:2px; }
+  .kpi.warn .v{ color:var(--warn); } .kpi.ok .v{ color:var(--ok); } .kpi.acc .v{ color:var(--accent); }
+
+  .tabs{ display:flex; gap:6px; margin-bottom:14px; }
+  .tab{ padding:9px 16px; border-radius:10px 10px 0 0; cursor:pointer; color:var(--muted); border-bottom:2px solid transparent; }
+  .tab.on{ color:#fff; border-bottom-color:var(--accent); background:var(--card); }
+
+  .charts{ display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:14px; }
+  .chartbox{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+  .chartbox h3{ margin:0 0 10px; font-size:13px; color:var(--muted); font-weight:600; }
+  .chartbox .cwrap{ position:relative; height:240px; }
+
+  .filters{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; align-items:center; }
+  .filters select, .filters input[type=text]{ background:var(--card2); border:1px solid var(--line);
+        color:var(--txt); padding:8px 10px; border-radius:8px; font-size:13px; }
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th{ text-align:left; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.4px;
+      padding:10px 10px; border-bottom:1px solid var(--line); position:sticky; top:58px; background:var(--bg); }
+  td{ padding:9px 10px; border-bottom:1px solid #16203400; border-bottom:1px solid #15203a; vertical-align:top; }
+  tr.fam{ cursor:pointer; }
+  tr.fam:hover{ background:#0f1a2e; }
+  .pill{ display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; }
+  .pill.pendiente{ background:rgba(245,158,11,.15); color:var(--warn); }
+  .pill.completo{ background:rgba(34,197,94,.15); color:var(--ok); }
+  .pill.sin_materiales{ background:rgba(138,160,189,.15); color:var(--muted); }
+  .tipo{ font-size:11px; color:var(--muted); border:1px solid var(--line); padding:2px 7px; border-radius:6px; }
+  .mono{ font-family:ui-monospace,Consolas,monospace; }
+  .num{ text-align:right; font-variant-numeric:tabular-nums; }
+  .antig.hi{ color:var(--bad); font-weight:700; }
+  .det{ background:var(--card2); }
+  .det td{ padding:0; }
+  .detinner{ padding:12px 16px 16px; }
+  .nodo{ margin:10px 0 4px; font-size:12px; color:var(--muted); }
+  .mat{ display:grid; grid-template-columns:1.4fr 90px 100px 120px 1.1fr 120px; gap:8px;
+        padding:7px 10px; border-bottom:1px solid #15203a; align-items:center; }
+  .mat.h{ color:var(--muted); font-size:11px; text-transform:uppercase; }
+  .bandejas{ grid-column:1/-1; color:var(--muted); font-size:11.5px; padding:2px 0 6px; }
+  .muted{ color:var(--muted); }
+  .empty{ text-align:center; color:var(--muted); padding:50px 0; }
+  .spinner{ display:inline-block; width:16px; height:16px; border:2px solid #ffffff55; border-top-color:#fff;
+        border-radius:50%; animation:sp .7s linear infinite; vertical-align:-3px; margin-right:7px; }
+  @keyframes sp{ to{ transform:rotate(360deg); } }
+  .hide{ display:none !important; }
+  .note{ font-size:12px; color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">📦 Materiales <span>Zona VII</span></div>
+  <div class="who">{{ usuario.split('@')[0] if usuario else '' }} <a href="/materiales/logout">Salir</a></div>
+</header>
+
+<div class="wrap">
+  <!-- Controles -->
+  <div class="panel">
+    <div class="controls">
+      <div class="ctl">
+        <label>Desde</label>
+        <input type="date" id="f_desde">
+      </div>
+      <div class="ctl">
+        <label>Hasta</label>
+        <input type="date" id="f_hasta">
+      </div>
+      <div class="ctl">
+        <label>Atajos</label>
+        <div class="presets">
+          <button data-p="mes">Este mes</button>
+          <button data-p="prev">Mes pasado</button>
+          <button data-p="3m">Últ. 3 meses</button>
+          <button data-p="año">Este año</button>
+        </div>
+      </div>
+      <div class="ctl" style="flex:1; min-width:260px;">
+        <label>Zonas</label>
+        <div class="zonas" id="zonas"></div>
+      </div>
+      <div class="ctl">
+        <label>&nbsp;</label>
+        <button class="btn" id="btnAnalizar">Analizar</button>
+      </div>
+      <div class="ctl">
+        <label>&nbsp;</label>
+        <button class="btn sec" id="btnExport" disabled>⬇ Excel</button>
+      </div>
+    </div>
+    <div class="note" id="periodo" style="margin-top:10px;"></div>
+  </div>
+
+  <div id="resultArea" class="hide">
+    <!-- KPIs -->
+    <div class="cards" id="kpis"></div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab on" data-t="dash">📊 Dashboard</div>
+      <div class="tab" data-t="detalle">📋 Detalle</div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="tab-dash">
+      <div class="charts">
+        <div class="chartbox"><h3>Estado de materiales</h3><div class="cwrap"><canvas id="chEstado"></canvas></div></div>
+        <div class="chartbox"><h3>MO liquidada por supervisor</h3><div class="cwrap"><canvas id="chSup"></canvas></div></div>
+        <div class="chartbox"><h3>Valor pendiente por zona</h3><div class="cwrap"><canvas id="chZona"></canvas></div></div>
+        <div class="chartbox"><h3>Antigüedad de lo pendiente (almacén)</h3><div class="cwrap"><canvas id="chAntig"></canvas></div></div>
+        <div class="chartbox"><h3>Top líderes por valor pendiente</h3><div class="cwrap"><canvas id="chLider"></canvas></div></div>
+        <div class="chartbox" id="boxMes"><h3>Evolución mensual (MO)</h3><div class="cwrap"><canvas id="chMes"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- Detalle -->
+    <div id="tab-detalle" class="hide">
+      <div class="panel">
+        <div class="filters">
+          <select id="fl_estado"><option value="">Todos los estados</option>
+            <option value="pendiente">Pendiente</option><option value="completo">Completo</option>
+            <option value="sin_materiales">Sin materiales</option></select>
+          <select id="fl_zona"><option value="">Todas las zonas</option></select>
+          <select id="fl_sup"><option value="">Todos los supervisores</option></select>
+          <select id="fl_tipo"><option value="">DF y 6300</option>
+            <option value="programado">6300</option><option value="mayor_impacto">DF</option></select>
+          <input type="text" id="fl_q" placeholder="Buscar PDL, código, proyecto…" style="flex:1; min-width:200px;">
+          <span class="note" id="cont"></span>
+        </div>
+        <div style="overflow:auto;">
+          <table>
+            <thead><tr>
+              <th></th><th>Tipo</th><th>Estado</th><th>Zona</th><th>PDL / OT</th><th>LCL</th>
+              <th>Proyecto padre</th><th>Supervisor</th><th class="num">MO</th>
+              <th class="num">Valor pend.</th><th>Antig.</th><th>Líder a liquidar</th>
+            </tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="placeholder" class="empty">Selecciona el periodo y las zonas, luego pulsa <b>Analizar</b>.</div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const fmtMoney = n => "$" + Math.round(n||0).toLocaleString("es-CO");
+const fmtNum   = n => (Math.round((n||0)*100)/100).toLocaleString("es-CO");
+let DATA = null, ZONAS = [], ZSEL = new Set(), CHARTS = {};
+
+// ── Fechas / presets ──
+function ymd(d){ return d.toISOString().slice(0,10); }
+function setRange(p){
+  const now = new Date(); let a, b = now;
+  if(p==="mes"){ a = new Date(now.getFullYear(), now.getMonth(), 1); }
+  else if(p==="prev"){ a = new Date(now.getFullYear(), now.getMonth()-1, 1); b = new Date(now.getFullYear(), now.getMonth(), 0); }
+  else if(p==="3m"){ a = new Date(now.getFullYear(), now.getMonth()-2, 1); }
+  else if(p==="año"){ a = new Date(now.getFullYear(), 0, 1); }
+  $("#f_desde").value = ymd(a); $("#f_hasta").value = ymd(b);
+}
+document.querySelectorAll(".presets button").forEach(b=>b.onclick=()=>setRange(b.dataset.p));
+
+// ── Zonas ──
+async function loadZonas(){
+  const r = await fetch("/materiales/api/zonas"); const j = await r.json();
+  ZONAS = j.zonas || [];
+  ZSEL = new Set(ZONAS.map(z=>z.id));   // todas por defecto
+  const cont = $("#zonas"); cont.innerHTML = "";
+  ZONAS.forEach(z=>{
+    const el = document.createElement("span");
+    el.className = "zchip on"; el.dataset.id = z.id; el.innerHTML = `<input type="checkbox" checked> ${z.label}`;
+    el.onclick = (e)=>{ if(e.target.tagName!=="INPUT"){ const c=el.querySelector("input"); c.checked=!c.checked; }
+      const c=el.querySelector("input");
+      if(c.checked){ ZSEL.add(z.id); el.classList.add("on"); } else { ZSEL.delete(z.id); el.classList.remove("on"); } };
+    cont.appendChild(el);
+  });
+  // poblar filtro de zona
+  const fz = $("#fl_zona");
+  ZONAS.forEach(z=>{ const o=document.createElement("option"); o.value=z.id; o.textContent=z.label; fz.appendChild(o); });
+}
+const zonaLabel = id => (ZONAS.find(z=>z.id===id)||{}).label || id;
+
+// ── Analizar ──
+async function analizar(){
+  const btn = $("#btnAnalizar"); const old = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Analizando…';
+  $("#periodo").textContent = "";
+  try{
+    const body = { fecha_inicio: $("#f_desde").value, fecha_fin: $("#f_hasta").value,
+                   zonas: [...ZSEL], supervisores: [] };
+    const r = await fetch("/materiales/api/analizar", {method:"POST",
+        headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
+    const j = await r.json();
+    if(j.login_required){ location.href="/materiales/login"; return; }
+    if(!j.ok){ alert("Error: " + (j.error||"desconocido")); return; }
+    DATA = j; render();
+  }catch(e){ alert("Error de red: " + e); }
+  finally{ btn.disabled=false; btn.innerHTML=old; }
+}
+$("#btnAnalizar").onclick = analizar;
+
+// ── Export ──
+$("#btnExport").onclick = ()=>{
+  const q = new URLSearchParams({ fecha_inicio:$("#f_desde").value, fecha_fin:$("#f_hasta").value,
+      zonas:[...ZSEL].join(","), supervisores:"" });
+  window.location = "/materiales/api/export?" + q.toString();
+};
+
+// ── Render ──
+function render(){
+  $("#placeholder").classList.add("hide");
+  $("#resultArea").classList.remove("hide");
+  $("#btnExport").disabled = (DATA.n_total===0);
+  $("#periodo").innerHTML = `Periodo <b>${DATA.periodo}</b>` +
+      (DATA.cache ? ' · <span class="muted">(caché)</span>' : '') +
+      (DATA.capacidades && DATA.capacidades.costos ? '' : ' · <span class="muted">costos no disponibles</span>');
+  renderKpis(); renderCharts(); buildSupFilter(); renderTable();
+}
+
+function renderKpis(){
+  const d = DATA;
+  const pct = d.n_total ? Math.round(d.n_pendiente/d.n_total*100) : 0;
+  const cards = [
+    ["Proyectos", d.n_total, `${d.n_programado} prog · ${d.n_mayor_impacto} DF`, "acc"],
+    ["Con pendiente", d.n_pendiente, `${pct}% del total`, "warn"],
+    ["Completos", d.n_completo, "materiales liquidados", "ok"],
+    ["MO liquidada", fmtMoney(d.mo_total), "total del periodo", ""],
+    ["Valor pendiente", fmtMoney(d.valor_pendiente_total), "costo de lo pendiente", "warn"],
+  ];
+  $("#kpis").innerHTML = cards.map(c=>`<div class="kpi ${c[3]}"><div class="l">${c[0]}</div>
+      <div class="v">${c[1]}</div><div class="s">${c[2]}</div></div>`).join("");
+}
+
+function destroyCharts(){ Object.values(CHARTS).forEach(c=>c&&c.destroy()); CHARTS={}; }
+const GRID = "#1f2c45", TICK = "#8aa0bd";
+const baseOpts = (horiz)=>({ responsive:true, maintainAspectRatio:false, indexAxis: horiz?"y":"x",
+  plugins:{ legend:{ display:false }, tooltip:{ } },
+  scales:{ x:{ grid:{color:GRID}, ticks:{color:TICK} }, y:{ grid:{color:GRID}, ticks:{color:TICK} } } });
+
+function renderCharts(){
+  destroyCharts();
+  const ag = DATA.agregados || {};
+  // Estado doughnut
+  CHARTS.estado = new Chart($("#chEstado"), { type:"doughnut",
+    data:{ labels:["Pendiente","Completo","Sin materiales"],
+      datasets:[{ data:[DATA.n_pendiente, DATA.n_completo, DATA.n_sin_mat],
+        backgroundColor:["#f59e0b","#22c55e","#64748b"], borderWidth:0 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:"bottom", labels:{color:TICK} } } } });
+  // MO por supervisor
+  const sup = (ag.por_supervisor||[]).slice(0,10);
+  CHARTS.sup = new Chart($("#chSup"), { type:"bar",
+    data:{ labels:sup.map(s=>shorten(s.nombre)), datasets:[{ data:sup.map(s=>Math.round(s.mo)),
+      backgroundColor:"#3b82f6", borderRadius:5 }] }, options: baseOpts(true) });
+  // Valor pendiente por zona
+  const zn = ag.por_zona||[];
+  CHARTS.zona = new Chart($("#chZona"), { type:"bar",
+    data:{ labels:zn.map(z=>z.nombre), datasets:[{ data:zn.map(z=>Math.round(z.valor_pend)),
+      backgroundColor:"#f59e0b", borderRadius:5 }] }, options: baseOpts(false) });
+  // Antigüedad buckets
+  const bk = ag.antiguedad_buckets||{};
+  CHARTS.antig = new Chart($("#chAntig"), { type:"bar",
+    data:{ labels:["0-15","16-30","31-60","60+"], datasets:[{ data:[bk["0-15"]||0,bk["16-30"]||0,bk["31-60"]||0,bk["60+"]||0],
+      backgroundColor:["#22c55e","#84cc16","#f59e0b","#ef4444"], borderRadius:5 }] }, options: baseOpts(false) });
+  // Top líderes
+  const ld = (ag.top_lideres||[]).slice(0,10);
+  CHARTS.lider = new Chart($("#chLider"), { type:"bar",
+    data:{ labels:ld.map(l=>shorten(l.nombre)), datasets:[{ data:ld.map(l=>Math.round(l.valor_pend)),
+      backgroundColor:"#8b5cf6", borderRadius:5 }] }, options: baseOpts(true) });
+  // Evolución mensual
+  const ms = ag.por_mes||[];
+  $("#boxMes").classList.toggle("hide", ms.length<2);
+  if(ms.length>=2){
+    CHARTS.mes = new Chart($("#chMes"), { type:"line",
+      data:{ labels:ms.map(m=>m.mes), datasets:[
+        { label:"MO", data:ms.map(m=>Math.round(m.mo)), borderColor:"#3b82f6", backgroundColor:"#3b82f644", tension:.3, fill:true },
+      ]}, options: baseOpts(false) });
+  }
+}
+function shorten(s){ s=s||""; const p=s.split(" "); return p.length>2 ? p.slice(0,2).join(" ") : s; }
+
+// ── Tabla ──
+function buildSupFilter(){
+  const sel = $("#fl_sup"); sel.length = 1;
+  const sups = [...new Set(DATA.familias.map(f=>f.supervisor_full||f.supervisor).filter(Boolean))].sort();
+  sups.forEach(s=>{ const o=document.createElement("option"); o.value=s; o.textContent=s; sel.appendChild(o); });
+}
+["fl_estado","fl_zona","fl_sup","fl_tipo"].forEach(id=>$("#"+id).onchange=renderTable);
+$("#fl_q").oninput = renderTable;
+
+function renderTable(){
+  const fe=$("#fl_estado").value, fz=$("#fl_zona").value, fs=$("#fl_sup").value,
+        ft=$("#fl_tipo").value, fq=$("#fl_q").value.trim().toLowerCase();
+  let rows = DATA.familias.filter(f=>{
+    if(fe && f.clasificacion!==fe) return false;
+    if(fz && f.zona!==fz) return false;
+    if(fs && (f.supervisor_full||f.supervisor)!==fs) return false;
+    if(ft && f.tipo!==ft) return false;
+    if(fq){ const blob=(f.pdl_code+" "+f.lcl+" "+f.padre_code+" "+f.padre_name+" "+(f.lider_liquidar||"")).toLowerCase();
+            if(!blob.includes(fq)) return false; }
+    return true;
+  });
+  $("#cont").textContent = `${rows.length} de ${DATA.familias.length} proyectos`;
+  const tb = $("#tbody"); tb.innerHTML = "";
+  if(!rows.length){ tb.innerHTML = `<tr><td colspan="12" class="empty">Sin resultados con esos filtros.</td></tr>`; return; }
+  rows.forEach((f,i)=>{
+    const antig = f.antiguedad_almacen_dias ?? f.antiguedad_aprob_dias;
+    const hi = antig!=null && antig>30 ? "hi":"";
+    const tr = document.createElement("tr"); tr.className="fam";
+    tr.innerHTML = `
+      <td>${f.n_pendientes?'▸':''}</td>
+      <td><span class="tipo">${f.tipo==='programado'?'6300':f.tipo==='mayor_impacto'?'DF':'—'}</span></td>
+      <td><span class="pill ${f.clasificacion}">${f.clasificacion==='sin_materiales'?'Sin mat.':f.clasificacion}</span></td>
+      <td>${zonaLabel(f.zona)}</td>
+      <td class="mono">${f.pdl_code||''}</td>
+      <td class="mono">${f.lcl&&f.lcl!=='N/A'?f.lcl:'—'}</td>
+      <td>${f.padre_name||f.padre_code||''}</td>
+      <td>${f.supervisor_full||f.supervisor||''}</td>
+      <td class="num">${fmtMoney(f.mo_value)}</td>
+      <td class="num">${f.valor_pendiente?fmtMoney(f.valor_pendiente):'—'}</td>
+      <td class="antig ${hi}">${antig!=null?antig+'d':'—'}</td>
+      <td>${f.lider_liquidar||'—'}</td>`;
+    const det = document.createElement("tr"); det.className="det hide";
+    det.innerHTML = `<td colspan="12"><div class="detinner">${detalleHTML(f)}</div></td>`;
+    if(f.n_pendientes){ tr.onclick=()=>{ det.classList.toggle("hide");
+        tr.querySelector("td").textContent = det.classList.contains("hide")?'▸':'▾'; }; }
+    tb.appendChild(tr); tb.appendChild(det);
+  });
+}
+
+function detalleHTML(f){
+  const nodos = (f.nodos_mat||[]).filter(n=>n.estado_mat==='pendiente' && (n.pendientes||[]).length);
+  if(!nodos.length) return '<span class="muted">Sin materiales pendientes.</span>';
+  let h = "";
+  nodos.forEach(n=>{
+    h += `<div class="nodo">▪ Nodo <b>${n.nodo?('N'+n.nodo):(n.pro_code||'')}</b> — ${n.pro_code||''} · valor pend. ${fmtMoney(n.valor_pendiente)}</div>`;
+    h += `<div class="mat h"><div>Material</div><div class="num">Pend.</div><div class="num">Costo u.</div><div class="num">Valor</div><div>Líder</div><div class="num">Antig. almacén</div></div>`;
+    (n.pendientes||[]).forEach(p=>{
+      const a = p.antiguedad_almacen_dias ?? p.antiguedad_aprob_dias;
+      const hi = a!=null && a>30 ? "hi":"";
+      const fa = p.fecha_almacen || p.fecha_aprobacion || "";
+      h += `<div class="mat">
+        <div><span class="mono">${p.codigo||''}</span> ${p.nombre||''}</div>
+        <div class="num">${fmtNum(p.pendiente)}</div>
+        <div class="num">${p.costo_unit?fmtMoney(p.costo_unit):'—'}</div>
+        <div class="num">${p.valor_pendiente?fmtMoney(p.valor_pendiente):'—'}</div>
+        <div>${p.lider||'—'}</div>
+        <div class="num antig ${hi}">${a!=null?(a+'d'):'—'}${fa?` <span class="muted">(${fa})</span>`:''}</div>`;
+      const jb = justBandejas(p); if(jb) h += `<div class="bandejas">🧾 ${jb}</div>`;
+      h += `</div>`;
+    });
+  });
+  return h;
+}
+function justBandejas(p){
+  const d=p.bandejas_despacho||[], v=p.bandejas_devolucion||[]; const parts=[];
+  if(d.length) parts.push("Despacho: "+d.map(b=>`${b.nombre} (+${fmtNum(b.qty)})`).join(", "));
+  if(v.length) parts.push("Devolución: "+v.map(b=>`${b.nombre} (-${fmtNum(b.qty)})`).join(", "));
+  return parts.length ? parts.join("  |  ")+`  → neto ${fmtNum(p.neto)}` : "";
+}
+
+// ── Tabs ──
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on")); t.classList.add("on");
+  $("#tab-dash").classList.toggle("hide", t.dataset.t!=="dash");
+  $("#tab-detalle").classList.toggle("hide", t.dataset.t!=="detalle");
+});
+
+// ── Init ──
+(async function(){ setRange("mes"); await loadZonas(); })();
+</script>
+</body>
+</html>

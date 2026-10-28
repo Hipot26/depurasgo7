@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Auditoría de Líderes y Materiales — SGS UI{% endblock %}
+
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:flex-end;">
+  <h1 style="font-size:1.5rem; margin-bottom:10px;">Auditoría de Líderes y Materiales</h1>
+  <a href="{{ request.referrer or url_for('aprobar', sid=sid) }}" class="btn btn-light" style="margin-bottom:10px;">
+    &larr; Volver
+  </a>
+</div>
+
+<p style="margin-bottom: 20px; font-size: 0.9rem; color: #555;">
+  Esta pantalla analiza todos los materiales detectados para el proyecto. Compara <strong>A quién se le despachó</strong> el material desde el almacén (Bandeja) frente a <strong>A quién se le registró el consumo</strong>.
+</p>
+
+<div class="card">
+  <h2>Materiales del Proyecto ({{ checks_mat|length }})</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Descripción</th>
+        <th>Despachado</th>
+        <th>Advance Real</th>
+        <th>Líderes Despacho (Dueño Bandeja)</th>
+        <th>Líderes Liquidación (Consumo)</th>
+        <th>Diagnóstico / Alertas</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for mc in checks_mat %}
+      
+      {# Lógica de cruce y alerta #}
+      {% set desp = mc.get('lideres_despacho', []) %}
+      {% set liq = mc.get('lideres_liquidacion', []) %}
+      
+      {% set malos = [] %}
+      {% for l in liq %}
+        {% if l not in desp %}
+          {% set _ = malos.append(l) %}
+        {% endif %}
+      {% endfor %}
+      
+      {% set tiene_descuadre = malos|length > 0 %}
+      
+      <tr style="{% if tiene_descuadre %}background:#ffe6e6;{% endif %}">
+        <td><strong>{{ mc.mat.codigo }}</strong></td>
+        <td style="font-size:0.8rem;">{{ mc.mat.descripcion[:40] if mc.mat.descripcion else '—' }}</td>
+        
+        <td style="text-align:right;">{{ "%.2f"|format(mc.sgs_despachado) if mc.sgs_despachado != None else '—' }}</td>
+        <td style="text-align:right;">{{ "%.2f"|format(mc.advance_real) if mc.advance_real != None else '—' }}</td>
+        
+        <td style="font-size:0.8rem;">
+          {% if desp %}
+            <ul style="margin:0; padding-left:14px;">
+              {% for d in desp %}<li>{{ d }}</li>{% endfor %}
+            </ul>
+          {% else %}
+            <span style="color:#888;">N/A</span>
+          {% endif %}
+        </td>
+        
+        <td style="font-size:0.8rem;">
+          {% if liq %}
+            <ul style="margin:0; padding-left:14px;">
+              {% for l in liq %}
+                <li style="{% if l in malos %}color:red; font-weight:bold;{% endif %}">{{ l }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <span style="color:#888;">Aún sin liquidar</span>
+          {% endif %}
+        </td>
+        
+        <td style="font-size:0.85rem;">
+          {% if tiene_descuadre %}
+            <strong style="color:#cc0000;">⚠ ALERTA:</strong><br>
+            Se le liquidó a <strong>{{ malos|join(', ') }}</strong><br>
+            pero debías liquidarlo a la bandeja de <strong>{{ desp|join(', ') if desp else 'NADIE (Sin stock)' }}</strong>
+          {% elif not desp and not liq %}
+            <span style="color:#888;">Sin movimientos</span>
+          {% else %}
+            <span style="color:green;">✓ Ok o Pendiente normal</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      
+      {% if not checks_mat %}
+      <tr>
+        <td colspan="7" style="text-align:center;">No hay materiales para analizar en este plan.</td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

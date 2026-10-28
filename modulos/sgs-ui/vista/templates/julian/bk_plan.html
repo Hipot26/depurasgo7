@@ -1,0 +1,62 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Plan de liquidacion — Presupuesto{% endblock %}
+{% block content %}
+
+<h1 style="font-size:1.3rem;margin-bottom:20px;">Plan de liquidación — {{ s.filename }}</h1>
+
+{% set idx_mo  = s.indices_mo_aprobados  or [] %}
+{% set idx_mat = s.indices_mat_aprobados or [] %}
+{% set checks_mo  = s.checks_mo  or [] %}
+{% set checks_mat = s.checks_mat or [] %}
+
+<div class="card">
+  <h2>Items aprobados para liquidar</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Tipo</th><th>Nodo/PRO</th><th>QP</th>
+        <th>Código</th><th>Cantidad</th><th>PRO SGS</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for i in idx_mo %}
+      {% if i < checks_mo|length %}
+      {% set ck = checks_mo[i] %}
+      <tr>
+        <td><span class="badge badge-ok">MO</span></td>
+        <td>{{ ck.row.pro or '—' }}</td>
+        <td style="font-size:0.8rem;color:#2980b9;">{{ ck.row.qp_code or '—' }}</td>
+        <td><strong>{{ ck.row.codigo }}</strong></td>
+        <td style="text-align:right">{{ ck.row.cantidad }}</td>
+        <td style="font-size:0.8rem;">{{ ck.pro_code or '—' }}</td>
+      </tr>
+      {% endif %}
+    {% endfor %}
+    {% for i in idx_mat %}
+      {% if i < checks_mat|length %}
+      {% set mc = checks_mat[i] %}
+      <tr>
+        <td><span class="badge badge-blue">MAT</span></td>
+        <td>{{ mc.mat.nodo }}</td>
+        <td>—</td>
+        <td><strong>{{ mc.mat.codigo }}</strong></td>
+        <td style="text-align:right">{{ mc.sgs_neto or mc.mat.sgs_neto_excel }}</td>
+        <td style="font-size:0.8rem;">{{ mc.pro_code or '—' }}</td>
+      </tr>
+      {% endif %}
+    {% endfor %}
+    {% if not idx_mo and not idx_mat %}
+    <tr><td colspan="6" style="text-align:center;color:#888;">Sin items aprobados.</td></tr>
+    {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<div style="display:flex;gap:12px;margin-top:8px;">
+  <a href="{{ url_for('julian.verificar', sid=sid) }}" class="btn btn-light">
+    &larr; Volver a verificacion
+  </a>
+  <a href="{{ url_for('julian.subir') }}" class="btn btn-light">Subir otro Presupuesto</a>
+</div>
+
+{% endblock %}

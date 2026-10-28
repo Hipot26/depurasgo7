@@ -1,0 +1,243 @@
+{% extends "liquidador2/base.html" %}
+{% block title %}Distribución IA — SGS UI{% endblock %}
+{% block content %}
+
+<div style="max-width:900px;margin:0 auto;">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+  <a href="{{ url_for('liquidador2.verificar', sid=sid) }}"
+     style="color:#1565c0;font-size:0.88rem;">← Volver a verificación</a>
+  <h1 style="font-size:1.25rem;margin:0;">Distribución con IA — {{ s.filename }}</h1>
+</div>
+
+{# ── Banner: asignación activa ── #}
+{% if ia_nodo_lider %}
+<div style="padding:10px 16px;background:#e8f5e9;border-left:4px solid #388e3c;
+            border-radius:6px;margin-bottom:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+  <span style="font-weight:700;color:#2e7d32;">
+    Asignación IA activa: {{ ia_nodo_lider|length }} nodo(s) asignados
+  </span>
+  <span style="font-size:0.82rem;color:#555;">
+    {% for nodo, info in ia_nodo_lider.items() %}
+      <span style="margin-right:12px;">Nodo {{ nodo }}: <strong>{{ info.partner_nombre }}</strong></span>
+    {% endfor %}
+  </span>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2 style="margin-bottom:6px;">Paso 1 — Pega el texto con las asignaciones</h2>
+  <p style="font-size:0.85rem;color:#555;margin-bottom:16px;">
+    Describe en lenguaje natural quién es el líder de cada nodo.
+    La IA extraerá las asignaciones y buscará los líderes en SGS.
+    <br>Ejemplo: <em>"Nodo 54 y 55 van con Andres Pamplona, el 56 con Jose Rodriguez"</em>
+  </p>
+
+  <form method="POST" action="{{ url_for('liquidador2.ia_distribucion', sid=sid) }}">
+    <input type="hidden" name="action" value="parsear">
+    <textarea name="texto" rows="5" required
+              placeholder="Pega aquí las instrucciones de distribución..."
+              style="width:100%;box-sizing:border-box;padding:10px;font-size:0.9rem;
+                     border:2px solid #1565c0;border-radius:6px;resize:vertical;">{{ texto }}</textarea>
+    <div style="margin-top:10px;display:flex;gap:10px;align-items:center;">
+      <button type="submit" class="btn btn-primary">Analizar con IA ▸</button>
+      <span style="font-size:0.8rem;color:#888;">
+        Nodos conocidos en esta sesión:
+        {% if nodos_conocidos %}
+          {{ nodos_conocidos|join(', ') }}
+        {% else %}
+          (ninguno detectado)
+        {% endif %}
+      </span>
+    </div>
+  </form>
+
+  {% if error %}
+  <div style="margin-top:14px;padding:10px 14px;background:#ffebee;border-radius:6px;
+              border-left:3px solid #c62828;color:#c62828;font-size:0.88rem;">
+    {{ error }}
+  </div>
+  {% endif %}
+</div>
+
+{# ── Tabla de confirmación ── #}
+{% if ia_resultado is not none %}
+<div class="card" style="margin-top:20px;">
+  <h2 style="margin-bottom:6px;">Paso 2 — Confirmar asignaciones</h2>
+  <p style="font-size:0.85rem;color:#555;margin-bottom:14px;">
+    Verifica que la IA encontró los líderes correctos. Puedes ajustar el líder en cada fila antes de aplicar.
+    Las filas en amarillo corresponden a nodos que no están en el Excel actual.
+  </p>
+
+  {% if ia_resultado %}
+  <form method="POST" action="{{ url_for('liquidador2.ia_distribucion', sid=sid) }}">
+    <input type="hidden" name="action" value="aplicar">
+    <input type="hidden" name="texto" value="{{ texto }}">
+
+    <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+      <thead>
+        <tr style="background:#e3f2fd;">
+          <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #1565c0;">Nodo</th>
+          <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #1565c0;">IA parseó</th>
+          <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #1565c0;">Líder SGS encontrado</th>
+          <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #1565c0;">Confianza</th>
+          <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #1565c0;">Cédula</th>
+          <th style="padding:8px 12px;text-align:left;border-bottom:2px solid #1565c0;">Incluir</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for fila in ia_resultado %}
+      <tr style="background:{{ '#fffde7' if not fila.en_nodos else '#fff' }};border-bottom:1px solid #eee;">
+        <td style="padding:7px 12px;font-weight:700;">
+          {{ fila.nodo }}
+          {% if not fila.en_nodos %}
+          <span style="font-size:0.75rem;color:#f57c00;margin-left:4px;">no en Excel</span>
+          {% endif %}
+        </td>
+        <td style="padding:7px 12px;color:#555;">{{ fila.lider_ia }}</td>
+        <td style="padding:7px 12px;position:relative;min-width:220px;">
+          <input type="text"
+                 id="inp-lider-{{ fila.nodo }}"
+                 value="{{ fila.lider_match }}"
+                 placeholder="{{ '⚠ No encontrado — escribe para buscar' if not fila.lider_match else '' }}"
+                 autocomplete="off"
+                 style="width:100%;box-sizing:border-box;padding:4px 6px;font-size:0.88rem;
+                        border:1px solid {{ '#1565c0' if fila.lider_match else '#e53935' }};
+                        border-radius:4px;">
+          <input type="hidden" name="lider_nodo_{{ fila.nodo }}"
+                 id="hid-lider-{{ fila.nodo }}" value="{{ fila.lider_match }}">
+          <input type="hidden" name="cedula_nodo_{{ fila.nodo }}"
+                 id="cedula-{{ fila.nodo }}" value="{{ fila.cedula }}">
+          <div id="drop-lider-{{ fila.nodo }}"
+               style="display:none;position:absolute;top:100%;left:0;right:0;
+                      background:#fff;border:1px solid #1565c0;border-radius:4px;
+                      z-index:300;max-height:180px;overflow-y:auto;
+                      box-shadow:0 4px 12px rgba(0,0,0,0.18);"></div>
+        </td>
+        <td style="padding:7px 12px;">
+          {% if fila.score >= 80 %}
+            <span style="color:#2e7d32;font-weight:700;">{{ fila.score }}%</span>
+          {% elif fila.score >= 50 %}
+            <span style="color:#b26a00;font-weight:700;">{{ fila.score }}%</span>
+          {% else %}
+            <span style="color:#c62828;font-weight:700;">{{ fila.score }}%</span>
+          {% endif %}
+        </td>
+        <td style="padding:7px 12px;font-family:monospace;font-size:0.82rem;color:#555;">
+          <span id="ced-display-{{ fila.nodo }}">{{ fila.cedula or '—' }}</span>
+        </td>
+        <td style="padding:7px 12px;text-align:center;">
+          {% if fila.lider_match %}
+          <input type="checkbox" name="nodo_incluido_{{ fila.nodo }}" value="1" checked>
+          {% else %}
+          <input type="checkbox" name="nodo_incluido_{{ fila.nodo }}" value="1">
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    <div style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+      <button type="submit" class="btn btn-primary"
+              onclick="return filtrarNoIncluidos()">
+        Aplicar asignación IA ▸
+      </button>
+      <a href="{{ url_for('liquidador2.verificar', sid=sid) }}"
+         class="btn" style="background:#eee;color:#333;">Cancelar</a>
+      <span style="font-size:0.82rem;color:#888;">
+        Al aplicar, los nodos seleccionados quedan pre-asignados en la pantalla de verificación.
+        Puedes cambiarlos manualmente antes de liquidar.
+      </span>
+    </div>
+  </form>
+
+  {% else %}
+  <div style="padding:14px;background:#fff3e0;border-radius:6px;color:#e65100;">
+    La IA no encontró asignaciones en el texto. Intenta con más detalle.
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+</div>
+
+<script>
+var LIDERES_CEDULA  = {{ lideres_dict|tojson }};
+var _selCedDia      = {};  // nombre → cedula seleccionada en esta página
+
+// ── Autocomplete conectado a SGS ──────────────────────────────────────────────
+function _diaAcAttach(inp, hid, cedHid, cedSpan, drop) {
+  var timer = null;
+  inp.addEventListener('input', function() {
+    clearTimeout(timer);
+    var q = inp.value.trim();
+    if (q.length < 2) { drop.style.display = 'none'; return; }
+    timer = setTimeout(function() {
+      fetch('/liquidador2/api/buscar_lider?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(items) {
+          drop.innerHTML = '';
+          if (!items.length) { drop.style.display = 'none'; return; }
+          items.forEach(function(it) {
+            var cedOk = it.cedula && /^C\d+$/.test(it.cedula.trim());
+            var el = document.createElement('div');
+            el.style.cssText = 'padding:6px 10px;cursor:' + (cedOk ? 'pointer' : 'not-allowed') +
+              ';font-size:0.85rem;' + (cedOk ? '' : 'opacity:0.45;');
+            el.textContent = it.nombre + (cedOk ? ' (' + it.cedula + ')' : ' ⚠ sin cédula');
+            el.addEventListener('mousedown', function(e) {
+              e.preventDefault();
+              if (!cedOk) return;
+              _selCedDia[it.nombre] = it.cedula.trim();
+              inp.value = it.nombre;
+              hid.value = it.nombre;
+              cedHid.value = it.cedula.trim();
+              if (cedSpan) cedSpan.textContent = it.cedula.trim();
+              inp.style.borderColor = '#1565c0';
+              drop.style.display = 'none';
+            });
+            drop.appendChild(el);
+          });
+          drop.style.display = '';
+        })
+        .catch(function() { drop.style.display = 'none'; });
+    }, 350);
+  });
+  inp.addEventListener('blur', function() {
+    setTimeout(function() { drop.style.display = 'none'; }, 200);
+    // Si el texto no coincide con el valor confirmado, intentar aceptarlo si tiene cédula conocida
+    if (inp.value !== hid.value) {
+      var ced = LIDERES_CEDULA[inp.value] || _selCedDia[inp.value] || '';
+      if (ced) {
+        hid.value = inp.value;
+        cedHid.value = ced;
+        if (cedSpan) cedSpan.textContent = ced;
+      } else {
+        inp.value = hid.value;  // revertir
+      }
+    }
+  });
+}
+
+// Inicializar autocomplete en cada fila con input visible
+document.querySelectorAll('[id^="inp-lider-"]').forEach(function(inp) {
+  var nodo    = inp.id.replace('inp-lider-', '');
+  var hid     = document.getElementById('hid-lider-' + nodo);
+  var cedHid  = document.getElementById('cedula-' + nodo);
+  var cedSpan = document.getElementById('ced-display-' + nodo);
+  var drop    = document.getElementById('drop-lider-' + nodo);
+  if (hid && cedHid && drop) _diaAcAttach(inp, hid, cedHid, cedSpan, drop);
+});
+
+function filtrarNoIncluidos() {
+  document.querySelectorAll('[name^="nodo_incluido_"]').forEach(function(chk) {
+    if (!chk.checked) {
+      var nodo = chk.name.replace('nodo_incluido_', '');
+      var hidL = document.getElementById('hid-lider-' + nodo);
+      var ced  = document.getElementById('cedula-' + nodo);
+      if (hidL) hidL.disabled = true;
+      if (ced)  ced.disabled  = true;
+    }
+  });
+  return true;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Balance ERP — Resultado</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+    background: #f0f2f5;
+    min-height: 100vh;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 40px 16px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.12);
+    padding: 36px 44px;
+    width: 680px;
+    max-width: 98vw;
+  }
+  .logo-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .logo-icon {
+    width: 40px; height: 40px;
+    background: #375623; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 17px; font-weight: bold;
+  }
+  .logo-title { font-size: 17px; font-weight: 700; color: #375623; }
+
+  .ok-banner {
+    background: #eaffea; border-left: 4px solid #2a7;
+    border-radius: 4px; padding: 12px 16px;
+    font-size: 14px; color: #180; margin-bottom: 22px;
+  }
+
+  h2 { font-size: 14px; font-weight: 700; color: #375623;
+       margin-bottom: 10px; margin-top: 24px; }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 3px 12px;
+    font-size: 13px;
+    background: #f8f9fb;
+    border-radius: 6px;
+    padding: 12px 14px;
+  }
+  .meta-label { color: #555; font-weight: 600; text-align: right; }
+  .meta-value { color: #222; }
+  .meta-value.hl { color: #375623; font-weight: 700; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  th {
+    background: #375623; color: #fff;
+    padding: 7px 10px; text-align: center; font-size: 12px;
+  }
+  td { padding: 6px 10px; border-bottom: 1px solid #eee; }
+  tr:last-child td { border-bottom: none; }
+  tr:nth-child(even) td { background: #f8f9fb; }
+  td.center { text-align: center; }
+
+  .sheets-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .sheet-item {
+    padding: 9px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sheet-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+
+  .btn-download {
+    display: block; margin-top: 28px; padding: 13px;
+    background: #375623; color: #fff; text-align: center;
+    border-radius: 6px; font-size: 14px; font-weight: 700;
+    text-decoration: none; transition: background .2s;
+  }
+  .btn-download:hover { background: #4a7230; }
+
+  .btn-back {
+    display: block; margin-top: 10px; padding: 10px;
+    background: #f0f2f5; color: #555; text-align: center;
+    border-radius: 6px; font-size: 13px; text-decoration: none;
+    transition: background .2s;
+  }
+  .btn-back:hover { background: #e0e4e8; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo-bar">
+    <div class="logo-icon">ERP</div>
+    <div class="logo-title">Balance ERP — Resultado</div>
+  </div>
+
+  <div class="ok-banner">
+    Balance ERP generado correctamente. Incluye bandejas vs liquidación por nodo.
+  </div>
+
+  <h2>Proyecto ERP</h2>
+  <div class="meta-grid">
+    <div class="meta-label">Nombre:</div>
+    <div class="meta-value hl">{{ padre.get('name', '—') }}</div>
+    <div class="meta-label">OdM:</div>
+    <div class="meta-value">{{ odm }}</div>
+    <div class="meta-label">Código padre:</div>
+    <div class="meta-value">{{ padre.get('code', '—') }}</div>
+    <div class="meta-label">Contrato:</div>
+    <div class="meta-value">{{ padre.get('contract_id', [None, '—'])[1] if padre.get('contract_id') else '—' }}</div>
+    <div class="meta-label">Cliente:</div>
+    <div class="meta-value">{{ padre.get('customer_id', [None, '—'])[1] if padre.get('customer_id') else '—' }}</div>
+    <div class="meta-label">Nodos encontrados:</div>
+    <div class="meta-value">{{ nodos | length }}</div>
+  </div>
+
+  {% if nodos %}
+  <h2>Nodos</h2>
+  <table>
+    <tr>
+      <th>Código PRO</th>
+      <th>Nodo</th>
+      <th>Estado</th>
+      <th>Bandejas</th>
+      <th>Materiales</th>
+    </tr>
+    {% for n in nodos %}
+    <tr>
+      <td class="center">{{ n.pro }}</td>
+      <td class="center">{{ n.nodo }}</td>
+      <td class="center">{{ n.status }}</td>
+      <td class="center">{{ n.bandejas }}</td>
+      <td class="center">{{ n.materiales }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  <h2>Hojas del Excel generado</h2>
+  <div class="sheets-list">
+    <div class="sheet-item" style="background:#EEF5EA;color:#375623;">
+      <div class="sheet-dot" style="background:#375623;"></div>
+      BALANCE ERP
+    </div>
+    <div class="sheet-item" style="background:#EEF5EA;color:#375623;">
+      <div class="sheet-dot" style="background:#2E75B6;"></div>
+      CRUCE BAN-LIQ
+    </div>
+  </div>
+
+  <a class="btn-download" href="/descargar/{{ token }}">
+    Descargar {{ filename }}
+  </a>
+  <a class="btn-back" href="/?tab=sgs">← Generar otro balance</a>
+</div>
+</body>
+</html>

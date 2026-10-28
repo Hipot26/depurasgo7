@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nodos — Balance ERP Manual</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+  background: #f0f2f5; min-height: 100vh;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 32px 16px;
+}
+.card {
+  background: #fff; border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.12);
+  padding: 32px 44px; width: 820px; max-width: 98vw;
+}
+.steps { display: flex; align-items: center; margin-bottom: 28px; }
+.step { display: flex; flex-direction: column; align-items: center; flex: 1; }
+.step-circle {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+}
+.step-circle.done   { background: #375623; color: #fff; }
+.step-circle.active { background: #375623; color: #fff; }
+.step-circle.pending{ background: #e0e0e0; color: #999; }
+.step-label { font-size: 10px; color: #666; margin-top: 4px; text-align: center; }
+.step-label.active { color: #375623; font-weight: 700; }
+.step-line { flex: 1; height: 2px; background: #e0e0e0; }
+.step-line.done { background: #375623; }
+
+.meta-bar {
+  display: flex; gap: 8px; align-items: center;
+  background: #f8f9fb; border-radius: 6px; padding: 8px 14px;
+  margin-bottom: 20px; font-size: 12px;
+}
+.tag { padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+.tag-lcl { background: #1F3864; color: #fff; }
+.tag-pro  { background: #E2EFDA; color: #375623; }
+
+.mo-confirm {
+  background: #f4f7f2; border: 1.5px solid #d4e6cc;
+  border-radius: 6px; padding: 8px 14px;
+  font-size: 12px; margin-bottom: 16px; color: #375623;
+}
+
+/* Loading */
+.loading-box {
+  text-align: center; padding: 40px 20px;
+  color: #555; font-size: 14px;
+}
+.spinner-ring {
+  display: inline-block; width: 40px; height: 40px;
+  border: 4px solid #d4e6cc; border-top-color: #375623;
+  border-radius: 50%; animation: spin 0.9s linear infinite;
+  margin-bottom: 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Error */
+.error-box {
+  padding: 14px 16px; background: #ffeaea;
+  border-left: 4px solid #e53; border-radius: 4px;
+  font-size: 13px; color: #c00; margin: 12px 0;
+}
+
+/* Nodos table */
+.section-title {
+  font-size: 13px; font-weight: 700; color: #375623;
+  margin: 16px 0 8px;
+}
+.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.tbl th { background: #375623; color: #fff; padding: 6px 10px; text-align: center; }
+.tbl td { padding: 7px 10px; border-bottom: 1px solid #eee; vertical-align: middle; }
+.tbl tr:nth-child(even) td { background: #f8f9fb; }
+.tbl td.c { text-align: center; }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 10px; font-weight: 700;
+}
+.badge-ok    { background: #C6EFCE; color: #375623; }
+.badge-cable { background: #DEEBF7; color: #2563a8; }
+.badge-miss  { background: #FFC7CE; color: #9b1c1c; }
+
+/* Unresolved section */
+.unresolved-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid #eee; font-size: 12px;
+}
+.unresolved-row:last-child { border-bottom: none; }
+.nodo-label {
+  min-width: 90px; font-weight: 700; color: #555;
+}
+.pro-input {
+  flex: 1; padding: 5px 10px; border: 1.5px solid #d4e6cc;
+  border-radius: 5px; font-size: 12px; font-family: monospace;
+  transition: border .2s;
+}
+.pro-input:focus { outline: none; border-color: #375623; }
+.pro-status { font-size: 11px; min-width: 120px; }
+.pro-ok   { color: #375623; font-weight: 700; }
+.pro-err  { color: #c00; }
+.pro-wait { color: #888; }
+.btn-check {
+  padding: 5px 12px; font-size: 11px; font-weight: 700;
+  border: 1.5px solid #d4e6cc; border-radius: 5px;
+  background: #f4f7f2; color: #375623; cursor: pointer;
+}
+.btn-check:hover { background: #e8f1e4; }
+
+/* Add-extra section */
+.add-row {
+  display: flex; gap: 8px; margin-top: 10px; align-items: center;
+}
+.add-input {
+  flex: 1; padding: 6px 10px; border: 1.5px solid #d4e6cc;
+  border-radius: 5px; font-size: 12px; font-family: monospace;
+  text-transform: uppercase;
+}
+.add-input:focus { outline: none; border-color: #375623; }
+.btn-add {
+  padding: 6px 14px; font-size: 12px; font-weight: 700;
+  border: none; border-radius: 5px;
+  background: #375623; color: #fff; cursor: pointer;
+}
+.btn-add:hover { background: #4a7230; }
+.extras-list { margin-top: 8px; }
+.extra-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #E2EFDA; color: #375623; font-size: 11px; font-weight: 700;
+  padding: 3px 10px; border-radius: 10px; margin: 3px 3px 0 0;
+}
+.extra-chip button {
+  background: none; border: none; cursor: pointer;
+  color: #375623; font-size: 13px; line-height: 1; padding: 0;
+}
+
+/* Buttons */
+.btn-row { display: flex; gap: 10px; margin-top: 22px; }
+.btn {
+  padding: 12px 18px; font-size: 13px; font-weight: 700;
+  border: none; border-radius: 6px; cursor: pointer; transition: background .2s;
+}
+.btn-back  { background: #f0f2f5; color: #555; flex: 0 0 auto; border: 1.5px solid #ccc; }
+.btn-back:hover { background: #e0e4e8; }
+.btn-next  { background: #375623; color: #fff; flex: 1; }
+.btn-next:hover { background: #4a7230; }
+.btn-next:disabled { background: #aaa; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-circle done">✓</div>
+      <div class="step-label">Datos del proyecto</div>
+    </div>
+    <div class="step-line done"></div>
+    <div class="step">
+      <div class="step-circle done">✓</div>
+      <div class="step-label">Mano de Obra</div>
+    </div>
+    <div class="step-line done"></div>
+    <div class="step">
+      <div class="step-circle active">3</div>
+      <div class="step-label active">Selección de Nodos</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step">
+      <div class="step-circle pending">4</div>
+      <div class="step-label">Vista previa</div>
+    </div>
+  </div>
+
+  <div class="meta-bar">
+    <span class="tag tag-lcl">{{ sesion.lcl_odm }}</span>
+    <span class="tag tag-pro">{{ sesion.padre.get('code', '—') }}</span>
+    <a href="/?tab=sgs" style="margin-left:auto;font-size:11px;color:#888;text-decoration:none">← Cambiar proyecto</a>
+  </div>
+
+  <div class="mo-confirm">
+    ✅ MO confirmada: {{ sesion.rows_mo|length }} actividades —
+    {% for r in sesion.rows_mo[:4] %}{{ r.qp }}{% if not loop.last %}, {% endif %}{% endfor %}
+    {% if sesion.rows_mo|length > 4 %}…{% endif %}
+    &nbsp;|&nbsp;
+    <a href="/manual/mo/{{ sid }}" style="color:#375623;font-size:11px">✏ Editar MO</a>
+  </div>
+
+  <h2 style="font-size:15px;font-weight:700;color:#375623;margin-bottom:14px">Paso 3 — Selección de Nodos</h2>
+
+  {% if sgs_ready is none or sgs_ready == false %}
+  <!-- ESTADO: Cargando -->
+  <div class="loading-box" id="loading-state">
+    <div class="spinner-ring"></div>
+    <div>Consultando ERP, espera un momento…</div>
+    <div style="font-size:11px;color:#aaa;margin-top:6px">Esta pantalla se actualiza automáticamente</div>
+  </div>
+  <script>
+    setTimeout(function(){ location.reload(); }, 2000);
+  </script>
+
+  {% elif sgs_error %}
+  <!-- ESTADO: Error -->
+  <div class="error-box">
+    ⚠ Error consultando ERP: {{ sgs_error }}
+  </div>
+  <div style="margin-top:14px">
+    <a href="/manual/nodos/{{ sid }}" class="btn btn-back" style="text-decoration:none;display:inline-block">
+      ↺ Reintentar
+    </a>
+  </div>
+
+  {% else %}
+  <!-- ESTADO: Listo -->
+
+  {% if errores_pro %}
+  <div class="error-box">
+    {% for e in errores_pro %}<div>• {{ e }}</div>{% endfor %}
+  </div>
+  {% endif %}
+
+  <form method="POST" id="frm-nodos">
+
+    {% set encontrados = nodos_resueltos.encontrados %}
+    {% set no_encontrados = nodos_resueltos.no_encontrados %}
+
+    <!-- Nodos encontrados en ERP -->
+    {% if encontrados %}
+    <div class="section-title">Nodos encontrados en ERP</div>
+    <table class="tbl">
+      <tr>
+        <th style="width:36px">✓</th>
+        <th>Nodo MO</th>
+        <th>PRO ERP</th>
+        <th>Nombre</th>
+        <th>Estado</th>
+      </tr>
+      {% for n in encontrados %}
+      <tr>
+        <td class="c">
+          <input type="checkbox" name="pro_sel" value="{{ n.pro }}" checked>
+        </td>
+        <td class="c"><strong>{{ n.num }}</strong></td>
+        <td class="c" style="font-family:monospace;font-size:11px">{{ n.pro }}</td>
+        <td style="font-size:11px">{{ n.nodo_raw }}</td>
+        <td class="c"><span class="badge badge-ok">encontrado</span></td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+
+    <!-- Nodos no encontrados (cable o sin match) -->
+    {% if no_encontrados %}
+    <div class="section-title" style="margin-top:20px">Nodos sin coincidencia automática</div>
+    <div style="font-size:11px;color:#888;margin-bottom:10px">
+      Estos nodos de tu MO no se encontraron automáticamente en ERP.
+      Si conoces el código PRO correspondiente, ingrésalo para incluirlos en el balance.
+    </div>
+    {% for nodo_id in no_encontrados %}
+    <div class="unresolved-row">
+      <div class="nodo-label">
+        {% if 'AL' in nodo_id %}
+        <span class="badge badge-cable">Cable</span>
+        {% else %}
+        <span class="badge badge-miss">sin match</span>
+        {% endif %}
+        &nbsp;{{ nodo_id }}
+      </div>
+      <input type="text" class="pro-input" id="inp-{{ loop.index }}"
+             placeholder="PRO-XXXXXX (opcional)"
+             data-idx="{{ loop.index }}"
+             oninput="this.value=this.value.toUpperCase()">
+      <button type="button" class="btn-check" onclick="validarPro({{ loop.index }})">Verificar</button>
+      <div class="pro-status" id="st-{{ loop.index }}"></div>
+      <input type="hidden" name="pro_extra" id="hid-{{ loop.index }}" value="">
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- Agregar nodos adicionales -->
+    <div class="section-title" style="margin-top:22px">Agregar nodos adicionales</div>
+    <div style="font-size:11px;color:#888;margin-bottom:8px">
+      ¿Necesitas incluir un nodo que no está en la MO? Ingresa su código PRO.
+    </div>
+    <div class="add-row">
+      <input type="text" class="add-input" id="inp-add"
+             placeholder="PRO-XXXXXX"
+             oninput="this.value=this.value.toUpperCase()"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();agregarExtra();}">
+      <button type="button" class="btn-add" onclick="agregarExtra()">+ Agregar</button>
+    </div>
+    <div class="extras-list" id="extras-list"></div>
+    <!-- Los extras adicionales se inyectan como hidden inputs por JS -->
+    <div id="extras-hiddens"></div>
+
+    <div class="btn-row">
+      <a class="btn btn-back" href="/manual/mo/{{ sid }}">← MO</a>
+      <button type="submit" class="btn btn-next" id="btn-next">Ver vista previa →</button>
+    </div>
+  </form>
+  {% endif %}
+
+</div>
+
+<script>
+var _validados = {};  // idx → pro validado
+
+function validarPro(idx) {
+  var inp = document.getElementById('inp-' + idx);
+  var st  = document.getElementById('st-' + idx);
+  var hid = document.getElementById('hid-' + idx);
+  var pro = inp.value.trim();
+  if (!pro) { st.innerHTML = ''; hid.value = ''; return; }
+  st.className = 'pro-status pro-wait';
+  st.textContent = 'Verificando…';
+  fetch('/api/validar-pro?pro=' + encodeURIComponent(pro))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        st.className = 'pro-status pro-ok';
+        st.textContent = '✓ ' + (d.name || d.code);
+        hid.value = d.code || pro;
+        _validados[idx] = d.code || pro;
+      } else {
+        st.className = 'pro-status pro-err';
+        st.textContent = '✗ ' + (d.error || 'No encontrado');
+        hid.value = '';
+        delete _validados[idx];
+      }
+    })
+    .catch(function(){
+      st.className = 'pro-status pro-err';
+      st.textContent = '✗ Error de red';
+      hid.value = '';
+    });
+}
+
+// Extras adicionales (fuera de la MO)
+var _extras = [];
+
+function agregarExtra() {
+  var inp = document.getElementById('inp-add');
+  var pro = inp.value.trim();
+  if (!pro || _extras.indexOf(pro) !== -1) return;
+
+  // Validar primero
+  inp.disabled = true;
+  fetch('/api/validar-pro?pro=' + encodeURIComponent(pro))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      inp.disabled = false;
+      if (d.ok) {
+        var code = d.code || pro;
+        if (_extras.indexOf(code) !== -1) { inp.value = ''; return; }
+        _extras.push(code);
+        renderExtras();
+        inp.value = '';
+      } else {
+        alert((d.error || 'No encontrado en ERP') + '\n\nVerifica el código e intenta de nuevo.');
+      }
+    })
+    .catch(function(){ inp.disabled = false; alert('Error de red al verificar PRO.'); });
+}
+
+function quitarExtra(code) {
+  _extras = _extras.filter(function(x){ return x !== code; });
+  renderExtras();
+}
+
+function renderExtras() {
+  var list = document.getElementById('extras-list');
+  var hids = document.getElementById('extras-hiddens');
+  if (_extras.length === 0) {
+    list.innerHTML = '';
+    hids.innerHTML = '';
+    return;
+  }
+  list.innerHTML = _extras.map(function(c){
+    return '<span class="extra-chip">' + c +
+           '<button type="button" onclick="quitarExtra(\'' + c + '\')" title="Quitar">×</button>' +
+           '</span>';
+  }).join('');
+  hids.innerHTML = _extras.map(function(c){
+    return '<input type="hidden" name="pro_extra" value="' + c + '">';
+  }).join('');
+}
+</script>
+</body>
+</html>

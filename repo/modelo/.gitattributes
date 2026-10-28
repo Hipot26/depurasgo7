@@ -1,0 +1,23 @@
+# Normalización de fin de línea: el servidor corre Linux; se guarda LF en el repositorio.
+* text=auto eol=lf
+
+*.py    text diff=python
+*.js    text
+*.jsx   text
+*.html  text
+*.css   text
+*.md    text
+*.sh    text eol=lf
+*.yml   text
+*.yaml  text
+*.toml  text
+*.json  text
+*.sql   text
+
+# Binarios
+*.xlsx  binary
+*.png   binary
+*.jpg   binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary

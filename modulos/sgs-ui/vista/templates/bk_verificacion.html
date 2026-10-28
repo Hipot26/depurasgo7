@@ -1,0 +1,891 @@
+{% extends "base.html" %}
+{% block title %}Verificacion — SGS UI{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+  <h1 style="font-size:1.3rem;">Verificacion: {{ s.filename }}</h1>
+  <span style="color:#888;font-size:0.85rem;">{{ s.verificado_at }}</span>
+</div>
+
+{# ── Resumen general ── #}
+<div class="stat-row">
+  <div class="stat {{ 'green' if resumen_mo.ok == resumen_mo.total else 'blue' }}">
+    <div class="num">{{ resumen_mo.ok }}</div>
+    <div class="lbl">MO OK</div>
+  </div>
+  <div class="stat {{ 'red' if resumen_mo.error else 'gray' }}">
+    <div class="num">{{ resumen_mo.error }}</div>
+    <div class="lbl">MO con error</div>
+  </div>
+  <div class="stat gray">
+    <div class="num">{{ resumen_mo.ya_liquidado }}</div>
+    <div class="lbl">MO ya liquidadas</div>
+  </div>
+  <div style="width:1px;background:#eee;margin:0 8px;"></div>
+  <div class="stat {{ 'green' if resumen_mat.ok == resumen_mat.total else 'blue' }}">
+    <div class="num">{{ resumen_mat.ok }}</div>
+    <div class="lbl">MAT OK</div>
+  </div>
+  <div class="stat {{ 'red' if resumen_mat.error else 'gray' }}">
+    <div class="num">{{ resumen_mat.error }}</div>
+    <div class="lbl">MAT con error</div>
+  </div>
+  <div class="stat gray">
+    <div class="num">{{ resumen_mat.ya_liquidado }}</div>
+    <div class="lbl">MAT ya liquidados</div>
+  </div>
+</div>
+
+{% if s.total_mo %}
+<div class="alert alert-info">
+  Total MO en Excel: <strong>${{ "{:,.2f}".format(s.total_mo) }}</strong>
+</div>
+{% endif %}
+
+{# Errores de parseo #}
+{% if s.errs_mo or s.errs_mat %}
+<div class="card">
+  <h2>Avisos del parser</h2>
+  {% for e in s.errs_mo %}
+    <div class="alert {{ 'alert-info' if '[INFO]' in e else 'alert-warning' }}">{{ e }}</div>
+  {% endfor %}
+  {% for e in s.errs_mat %}
+    <div class="alert alert-warning">{{ e }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Panel: Nodos faltantes en SGS ── #}
+{% if nodos_faltantes %}
+<div class="card" style="border-left:4px solid #f59e0b;margin-bottom:20px;">
+  <h2 style="color:#92400e;">
+    Nodos a crear en SGS ({{ nodos_faltantes|length }})
+  </h2>
+  <p style="color:#78350f;font-size:0.9rem;margin-bottom:12px;">
+    Estos nodos del Excel no existen aun en SGS. Crealos antes de liquidar.
+    <strong>Dry run</strong> abre el formulario sin guardar para que puedas revisar.
+    <strong>Crear (real)</strong> guarda directamente — no se puede deshacer.
+  </p>
+  <table style="width:100%;border-collapse:collapse;font-size:0.9rem;">
+    <thead>
+      <tr style="background:#fef3c7;">
+        <th style="padding:6px 10px;text-align:left;">DF (order_number)</th>
+        <th style="padding:6px 10px;text-align:left;">Nodo a crear</th>
+        <th style="padding:6px 10px;text-align:left;">Nodos existentes en SGS</th>
+        <th style="padding:6px 10px;text-align:left;">PDL</th>
+        <th style="padding:6px 10px;text-align:center;">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for nf in nodos_faltantes %}
+    <tr style="border-top:1px solid #fde68a;">
+      <td style="padding:8px 10px;font-family:monospace;">{{ nf.df_id }}</td>
+      <td style="padding:8px 10px;"><strong>{{ nf.nodo_val }}</strong></td>
+      <td style="padding:8px 10px;font-size:0.8rem;color:#6b7280;">
+        {% if nf.nodo_sgs_disponibles %}
+          {% for n in nf.nodo_sgs_disponibles %}
+            <span title="{{ n.name }}">{{ n.code }}(nodo={{ n.nodo }})</span>{% if not loop.last %}, {% endif %}
+          {% endfor %}
+        {% else %}
+          <em>ninguno</em>
+        {% endif %}
+      </td>
+      <td style="padding:8px 10px;font-family:monospace;font-size:0.8rem;">
+        {{ s.pdl_detectado or '-' }}
+      </td>
+      <td style="padding:8px 10px;text-align:center;">
+        <form method="POST" action="{{ url_for('crear_nodo', sid=sid) }}"
+              style="display:inline-flex;gap:6px;align-items:center;">
+          <input type="hidden" name="df_id"    value="{{ nf.df_id }}">
+          <input type="hidden" name="nodo_val" value="{{ nf.nodo_val }}">
+          <input type="hidden" name="pdl_val"  value="{{ s.pdl_detectado or '-' }}">
+          <button type="submit" name="dry_run" value="1"
+                  style="padding:4px 10px;background:#fef3c7;border:1px solid #f59e0b;border-radius:4px;cursor:pointer;font-size:0.82rem;">
+            Dry run
+          </button>
+          <button type="submit" name="dry_run" value="0"
+                  style="padding:4px 10px;background:#f59e0b;border:none;border-radius:4px;cursor:pointer;color:#fff;font-size:0.82rem;"
+                  onclick="return confirm('Crear nodo {{ nf.nodo_val }} para DF {{ nf.df_id }} en SGS?\nEsta accion escribe en SGS y no se puede deshacer facilmente.')">
+            Crear (real)
+          </button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{# ── Tabla MO ── #}
+{% if checks_mo %}
+{% set mo_liquidables = checks_mo | selectattr('ok') | rejectattr('ya_liquidada') | list %}
+<style>
+  .mo-lider-section { margin-bottom: 18px; }
+  .mo-lider-alerta-bar { display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:9px 14px;background:#fff3cd;border:1px solid #ffc107;border-radius:7px;font-size:0.88rem;color:#856404;font-weight:600; }
+  .mo-lider-card { border:2px solid #ffc107;border-radius:8px;background:#fff;overflow:hidden;margin-bottom:12px;transition:border-color 0.2s; }
+  .mo-lider-card.configurado { border-color:#28a745; }
+  .mo-lider-card-top { background:#fff8e1;padding:11px 16px;display:flex;align-items:center;justify-content:space-between;transition:background 0.2s; }
+  .mo-lider-card.configurado .mo-lider-card-top { background:#f0fff4; }
+  .mo-lider-pro { font-weight:700;font-size:0.9rem;color:#333; }
+  .mo-lider-pnombre { font-size:0.74rem;color:#777;margin-top:2px; }
+  .mo-status-badge { font-size:0.76rem;font-weight:700;padding:3px 11px;border-radius:12px;background:#ffc107;color:#333;white-space:nowrap;transition:background 0.2s,color 0.2s; }
+  .mo-lider-card.configurado .mo-status-badge { background:#28a745;color:#fff; }
+  .mo-lider-card-body { padding:13px 16px; }
+  .mo-lider-nombres { background:#f8f9fa;border-radius:6px;padding:9px 13px;margin-bottom:13px;font-size:0.84rem;line-height:1.9; }
+  .lider-n { display:flex;gap:8px;align-items:baseline; }
+  .lider-num { font-weight:700;color:#555;min-width:18px; }
+  .lider-nombre { color:#111; }
+  .mo-opciones-label { font-size:0.79rem;font-weight:700;color:#555;margin-bottom:8px; }
+  .mo-opciones { display:flex;flex-direction:column;gap:7px; }
+  .mo-opcion-btn { display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 14px;border:1.5px solid #dee2e6;border-radius:7px;background:#fafafa;font-size:0.84rem;color:#333;transition:border-color 0.15s,background 0.15s; }
+  .mo-opcion-btn:hover { border-color:#999;background:#f0f0f0; }
+  .mo-opcion-btn.selected { border-color:#2e7d32;background:#e8f5e9; }
+  .mo-opcion-btn input[type="radio"] { accent-color:#2e7d32;width:15px;height:15px;flex-shrink:0;cursor:pointer; }
+  .mo-split-panel { margin-top:10px;padding:11px 14px;background:#f1f8f1;border:1px solid #c8e6c9;border-radius:6px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:0.83rem; }
+  .mo-split-panel input[type="number"] { width:62px;padding:5px 8px;border:1.5px solid #81c784;border-radius:5px;font-size:0.9rem;font-weight:700;text-align:center; }
+  .mo-split-lider2 { color:#2e7d32;font-weight:700; }
+  .mo-split-error { color:#c62828;font-size:0.76rem;display:none; }
+  .mo-split-panel select { padding:5px 8px;border:1.5px solid #81c784;border-radius:5px;font-size:0.8rem;min-width:160px; }
+  .mo-global-box { border:1px solid #c8d8e8;border-radius:8px;background:#f4f8fc;padding:14px 16px;margin-bottom:14px; }
+  .mo-global-title { font-weight:700;font-size:0.84rem;color:#1a3e6e;margin-bottom:10px; }
+  .mo-global-row { display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap; }
+  .mo-global-sublabel { font-size:0.73rem;color:#555;margin-bottom:3px; }
+  .mo-global-row select { padding:7px 8px;border:1px solid #b0c4de;border-radius:5px;font-size:0.82rem; }
+  .btn-global-apply { background:#1a3e2e;color:white;border:none;border-radius:6px;padding:8px 16px;font-size:0.82rem;font-weight:700;cursor:pointer;white-space:nowrap; }
+  .btn-global-apply:hover { background:#245036; }
+</style>
+<div class="card">
+  <h2>Mano de Obra ({{ checks_mo|length }} filas)</h2>
+
+  {# ── Panel PCT (proporcional por cedula/porcentaje) ── #}
+  {% if mo_liquidables %}
+  <div id="pct-panel" style="margin-bottom:16px;border:1.5px solid #c8d8f8;border-radius:8px;background:#f4f8fc;padding:14px 16px;">
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:700;font-size:0.88rem;color:#1a3e6e;">
+      <input type="checkbox" id="chk-pct-mode" onchange="pctToggle(this.checked)" style="width:15px;height:15px;cursor:pointer;accent-color:#1a3e6e;">
+      Proporcion general por porcentajes
+      <span style="font-weight:400;color:#666;font-size:0.8rem;">— distribuye todas las prestaciones MO entre N lideres segun % definido</span>
+    </label>
+    <div id="pct-config" style="display:none;margin-top:14px;border-top:1px solid #d4e4f4;padding-top:14px;">
+      <p style="font-size:0.82rem;color:#555;margin:0 0 14px;line-height:1.5;">
+        Ingresa la cedula y nombre de cada lider junto con su porcentaje. El sistema repartira las prestaciones por cantidad proporcional.
+      </p>
+      <div id="pct-lideres-box"></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap;">
+        <button type="button" onclick="pctAgregarFila()" style="background:#1a3e6e;color:white;border:none;border-radius:6px;padding:7px 16px;font-size:0.82rem;font-weight:700;cursor:pointer;">+ Agregar lider</button>
+        <span id="pct-suma" style="font-size:0.85rem;font-weight:700;color:#888;min-width:120px;">Total: 0 %</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap;">
+        <button type="button" id="btn-calcular-pct" onclick="pctCalcular()" style="background:#27ae60;color:white;border:none;border-radius:6px;padding:9px 22px;font-size:0.85rem;font-weight:700;cursor:pointer;">Calcular distribucion</button>
+        <span id="pct-spin" style="display:none;font-size:0.82rem;color:#888;">Calculando...</span>
+        <span id="pct-error" style="display:none;color:#c62828;font-size:0.82rem;font-weight:600;"></span>
+      </div>
+      <div id="pct-preview" style="display:none;margin-top:18px;"></div>
+      <form id="form-liquidar-pct" method="POST" action="{{ url_for('liquidar_pct', sid=sid) }}" style="display:none;margin-top:14px;">
+        <button type="submit" style="background:#c62828;color:white;border:none;border-radius:6px;padding:11px 28px;font-size:0.9rem;font-weight:700;cursor:pointer;"
+                onclick="return confirm('Confirmas liquidar la distribucion calculada?\nEsta accion escribira en SGS y no se puede deshacer facilmente.')">
+          Liquidar distribucion
+        </button>
+        <span style="font-size:0.78rem;color:#888;margin-left:10px;">Usa la misma ruta que la liquidacion MO normal.</span>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <form method="POST" action="{{ url_for('liquidar', sid=sid) }}" id="form-liquidar-mo">
+  {% if mo_lider_grupos %}
+  <script>const MO_GRUPOS_RAIZ = {{ mo_lider_grupos|tojson }};</script>
+  {% for grupo in mo_lider_grupos %}
+  <input type="hidden" name="mo_group_mode_{{ grupo.key }}" class="mo-group-mode" data-group="{{ grupo.key }}" value="">
+  <input type="hidden" name="mo_group_a_{{ grupo.key }}"    class="mo-group-a"    data-group="{{ grupo.key }}" value="">
+  <input type="hidden" name="mo_group_b_{{ grupo.key }}"    class="mo-group-b"    data-group="{{ grupo.key }}" value="">
+  <input type="hidden" name="mo_group_pct_{{ grupo.key }}"  class="mo-group-pct"  data-group="{{ grupo.key }}" value="50">
+  {% endfor %}
+
+  <div class="mo-lider-section">
+    <div class="mo-lider-alerta-bar">
+      &#9888; {{ mo_lider_grupos|length }} proyecto(s) con multiples lideres — configura la distribucion antes de seleccionar prestaciones
+    </div>
+    {% if mo_lider_grupos|length > 1 %}
+    <div class="mo-global-box">
+      <div class="mo-global-title">Configuracion global — aplicar a todos los proyectos</div>
+      <div class="mo-global-row">
+        <div>
+          <div class="mo-global-sublabel">Modo</div>
+          <select id="mo-global-mode" onchange="onGlobalMode()">
+            <option value="uno">100% a un lider</option>
+            <option value="dos">Dividir entre dos lideres</option>
+          </select>
+        </div>
+        <div>
+          <div class="mo-global-sublabel">Lider A</div>
+          <select id="mo-global-a" style="min-width:210px;"></select>
+        </div>
+        <div id="mo-global-b-wrap" style="display:none;">
+          <div class="mo-global-sublabel">Lider B</div>
+          <select id="mo-global-b" style="min-width:210px;"></select>
+        </div>
+        <div id="mo-global-pct-wrap" style="display:none;">
+          <div class="mo-global-sublabel">% Lider A</div>
+          <input type="number" id="mo-global-pct" min="1" max="99" value="50"
+                 style="width:64px;padding:6px 8px;border:1.5px solid #b0c4de;border-radius:5px;">
+        </div>
+        <div style="align-self:flex-end;">
+          <button type="button" class="btn-global-apply" onclick="aplicarGlobal()">Aplicar a todos &#9658;</button>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% for grupo in mo_lider_grupos %}
+    <div class="mo-lider-card" id="mo-lider-card-{{ grupo.key }}" data-group="{{ grupo.key }}">
+      <div class="mo-lider-card-top">
+        <div>
+          <div class="mo-lider-pro">{{ grupo.pro_code }}</div>
+          {% if grupo.pnombre %}<div class="mo-lider-pnombre">{{ grupo.pnombre[:60] }}</div>{% endif %}
+        </div>
+        <span class="mo-status-badge" id="mo-status-badge-{{ grupo.key }}">Pendiente de configuracion</span>
+      </div>
+      <div class="mo-lider-card-body">
+        <div class="mo-lider-nombres">
+          {% for lider in grupo.lideres %}
+          <div class="lider-n">
+            <span class="lider-num">{{ loop.index }}.</span>
+            <span class="lider-nombre">{{ lider.nombre }}{% if lider.cedula %} <span style="color:#888;font-size:0.75rem;">({{ lider.cedula }})</span>{% endif %}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="mo-opciones-label">Selecciona como distribuir las prestaciones de este proyecto:</div>
+        <div class="mo-opciones">
+          {% for lider in grupo.lideres %}
+          <label class="mo-opcion-btn" id="mo-opt-idx{{ loop.index0 }}-{{ grupo.key }}">
+            <input type="radio" name="mo_radio_{{ grupo.key }}" value="idx{{ loop.index0 }}"
+                   onchange="onLiderRadio('{{ grupo.key }}', 'idx{{ loop.index0 }}')">
+            100% al lider {{ loop.index }} — <strong>{{ lider.nombre }}</strong>
+          </label>
+          {% endfor %}
+          {% if grupo.lideres|length > 1 %}
+          <label class="mo-opcion-btn" id="mo-opt-dividir-{{ grupo.key }}">
+            <input type="radio" name="mo_radio_{{ grupo.key }}" value="dividir"
+                   onchange="onLiderRadio('{{ grupo.key }}', 'dividir')">
+            Dividir por porcentaje entre dos lideres
+          </label>
+          {% endif %}
+        </div>
+        <div class="mo-split-panel" id="mo-split-panel-{{ grupo.key }}" style="display:none;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.83rem;">Lider A:
+            <select id="mo-split-a-{{ grupo.key }}" onchange="onSplitSelect('{{ grupo.key }}')">
+              {% for lider in grupo.lideres %}
+              <option value="{{ lider.nombre }}">{{ loop.index }}. {{ lider.nombre }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:0.83rem;">
+            <input type="number" id="mo-split-input-{{ grupo.key }}" min="1" max="99" step="1" value="50"
+                   oninput="onSplitPct('{{ grupo.key }}', this.value)">
+            %
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.83rem;">Lider B:
+            <select id="mo-split-b-{{ grupo.key }}" onchange="onSplitSelect('{{ grupo.key }}')">
+              {% for lider in grupo.lideres %}
+              <option value="{{ lider.nombre }}" {% if loop.index == 2 %}selected{% endif %}>{{ loop.index }}. {{ lider.nombre }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <span style="font-size:0.83rem;">Lider B recibe: <span class="mo-split-lider2" id="mo-split-resto-{{ grupo.key }}">50%</span></span>
+          <span class="mo-split-error" id="mo-split-err-{{ grupo.key }}">El porcentaje debe estar entre 1 y 99.</span>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <table>
+    <thead>
+      <tr>
+        <th style="width:36px;">
+          {% if mo_liquidables %}
+          <input type="checkbox" id="chk-all" title="Seleccionar todas"
+                 onchange="toggleAll(this)" style="cursor:pointer;">
+          {% endif %}
+        </th>
+        <th>Fila</th><th>Nodo/PRO</th><th>Codigo</th><th>Cantidad</th>
+        <th>PRO SGS</th><th>Lider</th><th>Estado</th><th>Errores / Avisos</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for ck in checks_mo %}
+    {% set row = ck.row %}
+    {% set liquidable = ck.ok and not ck.ya_liquidada %}
+    {% set lideres = ck.lideres if ck.lideres is defined else [] %}
+    <tr {% if liquidable %}class="fila-liquidable"{% endif %}>
+      <td>
+        {% if liquidable %}
+        <input type="checkbox" name="idx_mo" value="{{ loop.index0 }}"
+               class="chk-mo" data-lider-group="{% if lideres|length > 1 %}{{ ck.pid or ck.pro_code }}{% endif %}" style="cursor:pointer;">
+        {% endif %}
+      </td>
+      <td>{{ row.fila }}</td>
+      <td>{{ row.pro or row._odm or '—' }}</td>
+      <td><strong>{{ row.codigo }}</strong></td>
+      <td style="text-align:right">{{ row.cantidad }}</td>
+      <td>
+        {% if ck.pro_code %}
+          <span style="font-size:0.8rem;">{{ ck.pro_code }}</span><br>
+          <span style="color:#888;font-size:0.75rem;">{{ ck.pnombre[:40] if ck.pnombre else '' }}</span>
+        {% else %}—{% endif %}
+      </td>
+      <td style="font-size:0.8rem;">
+        {% if lideres|length > 1 %}
+          {{ lideres|length }} lideres<br>
+          <span style="color:#777;font-size:0.74rem;">usar control del proyecto</span>
+        {% else %}
+          {{ ck.partner_nombre if ck.partner_nombre else '—' }}
+        {% endif %}
+      </td>
+      <td>
+        {% if ck.ya_liquidada %}
+          <span class="badge badge-gray">Ya liquidada</span>
+        {% elif ck.ok %}
+          {% if ck.act_existente and ck.act_existente.advance > 0 %}
+            <span class="badge badge-warn">Avance parcial</span>
+          {% else %}
+            <span class="badge badge-ok">OK</span>
+          {% endif %}
+        {% else %}
+          <span class="badge badge-error">Error</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if ck.errores %}
+          <ul class="errores">{% for e in ck.errores %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% endif %}
+        {% if ck.advertencias %}
+          <ul class="warns">{% for w in ck.advertencias %}<li>{{ w }}</li>{% endfor %}</ul>
+        {% endif %}
+        {% if ck.lider_faltante and ck.pid %}
+          <form method="POST" action="{{ url_for('agregar_lider', sid=sid) }}" style="margin-top:4px">
+            <input type="hidden" name="pid"      value="{{ ck.pid }}">
+            <input type="hidden" name="df_id"    value="{{ ck.df_detectado or '' }}">
+            <input type="hidden" name="pro_code" value="{{ ck.pro_code or '' }}">
+            <button type="submit" class="btn btn-xs btn-warning"
+                    onclick="return confirm('¿Agregar líder del nodo hermano a {{ ck.pro_code }}?')">
+              + Agregar líder
+            </button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  {% if mo_liquidables %}
+  <div style="margin-top:14px;display:flex;align-items:center;gap:14px;">
+    <span id="lbl-seleccionadas" style="font-size:0.85rem;color:#555;">
+      0 seleccionadas
+    </span>
+    <button type="submit" id="btn-liquidar" class="btn btn-success" disabled
+            onclick="return confirmarLiquidar()">
+      Liquidar seleccionadas →
+    </button>
+  </div>
+  {% endif %}
+  </form>
+</div>
+
+<script>
+// ── Checkbox "Seleccionar todas" ────────────────────────────────────────────
+function toggleAll(master) {
+  document.querySelectorAll('.chk-mo').forEach(c => { if (!c.disabled) c.checked = master.checked; });
+  actualizarContador();
+}
+document.querySelectorAll('.chk-mo').forEach(c => c.addEventListener('change', actualizarContador));
+
+// ── Validar grupos configurados ────────────────────────────────────────────
+function _isGrupoConfigurado(group) {
+  var mode = document.querySelector('.mo-group-mode[data-group="' + group + '"]');
+  var a    = document.querySelector('.mo-group-a[data-group="'    + group + '"]');
+  var b    = document.querySelector('.mo-group-b[data-group="'    + group + '"]');
+  var pct  = document.querySelector('.mo-group-pct[data-group="'  + group + '"]');
+  if (!mode || !mode.value) return false;
+  if (!a    || !a.value)    return false;
+  if (mode.value === 'dos') {
+    if (!b || !b.value || b.value === a.value) return false;
+    var pctNum = pct ? Number(pct.value) : 0;
+    if (pctNum <= 0 || pctNum >= 100) return false;
+  }
+  return true;
+}
+
+function updateLiderStatus(group) {
+  var ok    = _isGrupoConfigurado(group);
+  var card  = document.getElementById('mo-lider-card-' + group);
+  var badge = document.getElementById('mo-status-badge-' + group);
+  if (card)  card.classList.toggle('configurado', ok);
+  if (badge) badge.textContent = ok ? 'Configurado' : 'Pendiente de configuracion';
+  document.querySelectorAll('.chk-mo[data-lider-group="' + group + '"]').forEach(function(chk) {
+    if (!ok) chk.checked = false;
+    chk.disabled = !ok;
+    var tr = chk.closest('tr');
+    if (tr) tr.style.opacity = ok ? '' : '0.45';
+  });
+  actualizarContador();
+}
+
+// ── Radio: 100% a lider N o dividir ───────────────────────────────────────
+function onLiderRadio(group, value) {
+  var g_      = (typeof MO_GRUPOS_RAIZ !== 'undefined' ? MO_GRUPOS_RAIZ : []).find(function(x){ return String(x.key) === String(group); }) || {};
+  var lideres = g_.lideres || [];
+  var mode  = document.querySelector('.mo-group-mode[data-group="' + group + '"]');
+  var aEl   = document.querySelector('.mo-group-a[data-group="'    + group + '"]');
+  var bEl   = document.querySelector('.mo-group-b[data-group="'    + group + '"]');
+  var pct   = document.querySelector('.mo-group-pct[data-group="'  + group + '"]');
+  var split = document.getElementById('mo-split-panel-' + group);
+  var opts  = document.querySelectorAll('[id^="mo-opt-"][id$="-' + group + '"]');
+
+  opts.forEach(function(el) { el.classList.remove('selected'); });
+
+  if (value.indexOf('idx') === 0) {
+    var idx    = parseInt(value.replace('idx', ''), 10);
+    var nombre = (lideres[idx] || {}).nombre || '';
+    if (mode) mode.value = 'uno';
+    if (aEl)  aEl.value  = nombre;
+    if (bEl)  bEl.value  = '';
+    if (pct)  pct.value  = '50';
+    if (split) split.style.display = 'none';
+    var selOpt = document.getElementById('mo-opt-idx' + idx + '-' + group);
+    if (selOpt) selOpt.classList.add('selected');
+  } else {
+    if (mode) mode.value = 'dos';
+    if (split) split.style.display = 'flex';
+    var divOpt = document.getElementById('mo-opt-dividir-' + group);
+    if (divOpt) divOpt.classList.add('selected');
+    onSplitSelect(group);
+  }
+  updateLiderStatus(group);
+}
+
+function onSplitSelect(group) {
+  var a   = (document.getElementById('mo-split-a-' + group) || {}).value || '';
+  var b   = (document.getElementById('mo-split-b-' + group) || {}).value || '';
+  var pct = Number((document.getElementById('mo-split-input-' + group) || {}).value || 50);
+  var aEl = document.querySelector('.mo-group-a[data-group="'   + group + '"]');
+  var bEl = document.querySelector('.mo-group-b[data-group="'   + group + '"]');
+  if (aEl) aEl.value = a;
+  if (bEl) bEl.value = b;
+  onSplitPct(group, pct);
+}
+
+function onSplitPct(group, val) {
+  var pct    = parseFloat(val) || 0;
+  var resto  = Math.round((100 - pct) * 10) / 10;
+  var restEl = document.getElementById('mo-split-resto-' + group);
+  var errEl  = document.getElementById('mo-split-err-'   + group);
+  var pctHid = document.querySelector('.mo-group-pct[data-group="' + group + '"]');
+  if (restEl) restEl.textContent = resto + '%';
+  var valido = pct > 0 && pct < 100;
+  if (errEl)  errEl.style.display = valido ? 'none' : 'inline';
+  if (pctHid) pctHid.value = pct;
+  updateLiderStatus(group);
+}
+
+// ── Aplicar configuracion global a todos los proyectos ────────────────────
+function onGlobalMode() {
+  var modo = (document.getElementById('mo-global-mode') || {}).value;
+  var bw   = document.getElementById('mo-global-b-wrap');
+  var pw   = document.getElementById('mo-global-pct-wrap');
+  var gA   = document.getElementById('mo-global-a');
+  if (bw) bw.style.display = modo === 'dos' ? '' : 'none';
+  if (pw) pw.style.display = modo === 'dos' ? '' : 'none';
+
+  // Poblar selects globales con union de lideres de todos los grupos
+  var todos = {};
+  (typeof MO_GRUPOS_RAIZ !== 'undefined' ? MO_GRUPOS_RAIZ : []).forEach(function(g) {
+    (g.lideres || []).forEach(function(l) { todos[l.nombre] = true; });
+  });
+  var nombres = Object.keys(todos);
+  [document.getElementById('mo-global-a'), document.getElementById('mo-global-b')].forEach(function(sel) {
+    if (!sel) return;
+    var cur = sel.value;
+    sel.innerHTML = '';
+    nombres.forEach(function(n) {
+      var o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o);
+    });
+    if (cur) sel.value = cur;
+  });
+}
+
+function aplicarGlobal() {
+  var modo = (document.getElementById('mo-global-mode') || {}).value || 'uno';
+  var gA   = ((document.getElementById('mo-global-a') || {}).value || '').trim();
+  var gB   = ((document.getElementById('mo-global-b') || {}).value || '').trim();
+  var gPct = Number((document.getElementById('mo-global-pct') || {}).value || 50);
+  (typeof MO_GRUPOS_RAIZ !== 'undefined' ? MO_GRUPOS_RAIZ : []).forEach(function(g) {
+    var key = g.key;
+    var nombres = (g.lideres || []).map(function(l) { return l.nombre; });
+    var idx = nombres.indexOf(gA);
+    if (idx === -1) return;
+    onLiderRadio(key, modo === 'dos' ? 'dividir' : 'idx' + idx);
+    if (modo === 'dos') {
+      var selA = document.getElementById('mo-split-a-' + key);
+      var selB = document.getElementById('mo-split-b-' + key);
+      var inp  = document.getElementById('mo-split-input-' + key);
+      if (selA) selA.value = gA;
+      if (selB && gB) selB.value = gB;
+      if (inp)  inp.value = gPct;
+      onSplitPct(key, gPct);
+      onSplitSelect(key);
+    }
+  });
+}
+
+// Inicializar global selects al cargar
+document.addEventListener('DOMContentLoaded', function() {
+  if (document.getElementById('mo-global-mode')) onGlobalMode();
+  // Inicializar estado de cada grupo
+  (typeof MO_GRUPOS_RAIZ !== 'undefined' ? MO_GRUPOS_RAIZ : []).forEach(function(g) {
+    updateLiderStatus(g.key);
+  });
+});
+
+// ── Contador de seleccionadas y validacion ─────────────────────────────────
+function validarLideresMO() {
+  var ok = true;
+  var gruposRequeridos = new Set();
+  document.querySelectorAll('.chk-mo:checked').forEach(function(chk) {
+    var group = chk.dataset.liderGroup;
+    if (group) gruposRequeridos.add(group);
+  });
+  gruposRequeridos.forEach(function(group) {
+    if (!_isGrupoConfigurado(group)) ok = false;
+  });
+  return ok;
+}
+
+function actualizarContador() {
+  var n = document.querySelectorAll('.chk-mo:checked').length;
+  var lbl = document.getElementById('lbl-seleccionadas');
+  var btn = document.getElementById('btn-liquidar');
+  if (lbl) lbl.textContent = n + ' seleccionada' + (n !== 1 ? 's' : '');
+  if (btn) btn.disabled = n === 0 || !validarLideresMO();
+}
+
+function confirmarLiquidar() {
+  var n = document.querySelectorAll('.chk-mo:checked').length;
+  if (!validarLideresMO()) {
+    alert('Completa la eleccion de lideres para cada MO seleccionada.');
+    return false;
+  }
+  return confirm('Liquidar ' + n + ' actividad(es) MO en SGS?\n\nSe abrira el navegador Playwright y ejecutara las acciones. No cerrar hasta que termine.');
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PANEL PCT — proporcion general por cedula/porcentaje
+// ══════════════════════════════════════════════════════════════════════════
+var _pctFilaId = 0;
+
+function pctToggle(activo) {
+  var cfg = document.getElementById('pct-config');
+  if (!cfg) return;
+  cfg.style.display = activo ? 'block' : 'none';
+  if (activo && document.querySelectorAll('.pct-fila').length === 0) {
+    pctAgregarFila();
+    pctAgregarFila();
+  }
+}
+
+function pctAgregarFila() {
+  _pctFilaId++;
+  var id = _pctFilaId;
+  var fila = document.createElement('div');
+  fila.className = 'pct-fila';
+  fila.id = 'pct-fila-' + id;
+  fila.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;';
+  fila.innerHTML =
+    '<input type="text" id="pct-cedula-' + id + '" placeholder="Cedula (ej: C1234567890)" ' +
+    '  style="font-size:0.82rem;padding:7px 10px;border:1.5px solid #b0c4de;border-radius:5px;min-width:175px;" ' +
+    '  oninput="pctActualizarSuma()">' +
+    '<button type="button" onclick="pctBuscarNombre(' + id + ')" ' +
+    '  style="background:#5c6bc0;color:white;border:none;border-radius:5px;padding:7px 12px;' +
+    '         font-size:0.78rem;font-weight:700;cursor:pointer;white-space:nowrap;">' +
+    '  Buscar en SGS' +
+    '</button>' +
+    '<input type="text" id="pct-nombre-' + id + '" placeholder="Nombre del lider" ' +
+    '  style="font-size:0.82rem;padding:7px 10px;border:1.5px solid #b0c4de;border-radius:5px;min-width:200px;flex:1;" ' +
+    '  oninput="pctActualizarSuma()">' +
+    '<input type="number" id="pct-pct-' + id + '" placeholder="%" min="1" max="99" step="1" value="" ' +
+    '  style="font-size:0.82rem;padding:7px;border:1.5px solid #b0c4de;border-radius:5px;width:65px;" ' +
+    '  oninput="pctActualizarSuma()">' +
+    '<span id="pct-warn-' + id + '" ' +
+    '  style="display:none;font-size:0.75rem;color:#e65100;font-weight:700;white-space:nowrap;" ' +
+    '  title="La cedula no tiene C">? Sin C</span>' +
+    '<button type="button" onclick="pctEliminarFila(' + id + ')" ' +
+    '  style="background:#eee;border:none;border-radius:5px;padding:7px 10px;cursor:pointer;color:#555;font-size:0.85rem;">X</button>';
+  document.getElementById('pct-lideres-box').appendChild(fila);
+  pctActualizarSuma();
+}
+
+function pctEliminarFila(id) {
+  var el = document.getElementById('pct-fila-' + id);
+  if (el) el.remove();
+  pctActualizarSuma();
+}
+
+function pctActualizarSuma() {
+  var suma = 0;
+  document.querySelectorAll('.pct-fila').forEach(function(fila) {
+    var id  = fila.id.replace('pct-fila-', '');
+    var pct = parseFloat(((document.getElementById('pct-pct-' + id) || {}).value) || 0) || 0;
+    suma += pct;
+    var cedula = (((document.getElementById('pct-cedula-' + id) || {}).value) || '').trim();
+    var wEl    = document.getElementById('pct-warn-' + id);
+    if (wEl) wEl.style.display = (cedula && !cedula.toUpperCase().includes('C')) ? 'inline' : 'none';
+  });
+  var label = document.getElementById('pct-suma');
+  if (!label) return;
+  label.textContent = 'Total: ' + suma.toFixed(1) + ' %';
+  var ok = Math.abs(suma - 100) < 0.5;
+  label.style.color = ok ? '#2e7d32' : (suma > 0 ? '#c62828' : '#888');
+}
+
+async function pctBuscarNombre(id) {
+  var cedula = (((document.getElementById('pct-cedula-' + id) || {}).value) || '').trim();
+  if (!cedula) { alert('Ingresa la cedula antes de buscar.'); return; }
+  var btns = document.querySelectorAll('#pct-fila-' + id + ' button');
+  var btn  = btns[0];
+  if (btn) btn.textContent = '...';
+  try {
+    var resp = await fetch('/buscar_partner_cedula', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({cedula: cedula}),
+    });
+    var data = await resp.json();
+    if (data.ok) {
+      var nEl = document.getElementById('pct-nombre-' + id);
+      if (nEl) nEl.value = data.nombre;
+      if (data.advertencia) alert('Aviso: ' + data.advertencia);
+    } else {
+      alert(data.error || 'No encontrado');
+    }
+  } catch(e) {
+    alert('Error de red: ' + e);
+  } finally {
+    if (btn) btn.textContent = 'Buscar en SGS';
+    pctActualizarSuma();
+  }
+}
+
+async function pctCalcular() {
+  var lideres = [];
+  document.querySelectorAll('.pct-fila').forEach(function(fila) {
+    var id     = fila.id.replace('pct-fila-', '');
+    var cedula = (((document.getElementById('pct-cedula-' + id) || {}).value) || '').trim();
+    var nombre = (((document.getElementById('pct-nombre-'  + id) || {}).value) || '').trim();
+    var pct    = parseFloat(((document.getElementById('pct-pct-' + id) || {}).value) || 0) || 0;
+    if (nombre && pct > 0) lideres.push({cedula: cedula, nombre: nombre, pct: pct});
+  });
+  if (lideres.length < 1) { alert('Agrega al menos un lider con nombre y porcentaje.'); return; }
+  var suma = lideres.reduce(function(s, l) { return s + l.pct; }, 0);
+  if (Math.abs(suma - 100) > 0.5) { alert('Los porcentajes suman ' + suma.toFixed(1) + '%, deben ser 100%.'); return; }
+
+  var spinEl  = document.getElementById('pct-spin');
+  var errEl   = document.getElementById('pct-error');
+  var btnCalc = document.getElementById('btn-calcular-pct');
+  if (spinEl)  spinEl.style.display  = 'inline';
+  if (errEl)   errEl.style.display   = 'none';
+  if (btnCalc) btnCalc.disabled      = true;
+
+  try {
+    var resp = await fetch('/calcular_distribucion_pct/{{ sid }}', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({lideres: lideres}),
+    });
+    var data = await resp.json();
+    if (!data.ok) {
+      if (errEl) { errEl.textContent = data.error || 'Error'; errEl.style.display = 'inline'; }
+      document.getElementById('form-liquidar-pct').style.display = 'none';
+      document.getElementById('pct-preview').style.display = 'none';
+      return;
+    }
+    pctMostrarPreview(data.distribucion, data.advertencias || []);
+    document.getElementById('form-liquidar-pct').style.display = 'block';
+  } catch(e) {
+    if (errEl) { errEl.textContent = 'Error de red: ' + e; errEl.style.display = 'inline'; }
+  } finally {
+    if (spinEl)  spinEl.style.display  = 'none';
+    if (btnCalc) btnCalc.disabled      = false;
+  }
+}
+
+function pctMostrarPreview(dist, advertencias) {
+  var box = document.getElementById('pct-preview');
+  if (!box) return;
+  var html = '';
+  if (advertencias && advertencias.length) {
+    html += '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:0.82rem;line-height:1.6;">';
+    advertencias.forEach(function(a) { html += '- ' + a + '<br>'; });
+    html += '</div>';
+  }
+  html += '<table style="width:100%;border-collapse:collapse;font-size:0.83rem;">';
+  html += '<thead><tr style="background:#e8f0fe;">';
+  html += '<th style="padding:7px 10px;text-align:left;border:1px solid #c8d8e8;">Lider</th>';
+  html += '<th style="padding:7px 10px;text-align:center;border:1px solid #c8d8e8;">% Obj.</th>';
+  html += '<th style="padding:7px 10px;text-align:center;border:1px solid #c8d8e8;">% Real</th>';
+  html += '<th style="padding:7px 10px;text-align:center;border:1px solid #c8d8e8;">Prestaciones</th>';
+  html += '</tr></thead><tbody>';
+  (dist.asignaciones || []).forEach(function(a) {
+    var diff = Math.abs(a.pct_real - a.pct_obj);
+    var clr  = diff > 5 ? '#c62828' : (diff > 2 ? '#e65100' : '#2e7d32');
+    html += '<tr style="border-bottom:1px solid #e8edf2;">';
+    html += '<td style="padding:7px 10px;border:1px solid #e8edf2;">' + (a.lider || '') + (a.cedula ? ' <span style="color:#888;font-size:0.75rem;">(' + a.cedula + ')</span>' : '') + '</td>';
+    html += '<td style="padding:7px 10px;text-align:center;border:1px solid #e8edf2;">' + (a.pct_obj || 0).toFixed(1) + '%</td>';
+    html += '<td style="padding:7px 10px;text-align:center;border:1px solid #e8edf2;color:' + clr + ';font-weight:700;">' + (a.pct_real || 0).toFixed(1) + '%</td>';
+    html += '<td style="padding:7px 10px;text-align:center;border:1px solid #e8edf2;">' + (a.n_items || 0) + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  box.innerHTML = html;
+  box.style.display = 'block';
+}
+</script>
+{% endif %}
+
+{# ── Tabla MAT ── #}
+{% if checks_mat %}
+{% set mat_liquidables = checks_mat | selectattr('ok') | selectattr('estado', 'in', ['ok','avance_parcial']) | list %}
+<div class="card">
+  <h2>Materiales ({{ checks_mat|length }} filas)</h2>
+
+  <form method="POST" action="{{ url_for('liquidar', sid=sid) }}" id="form-liquidar-mat">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:36px;">
+          {% if mat_liquidables %}
+          <input type="checkbox" id="chk-mat-all" title="Seleccionar todas"
+                 onchange="toggleAllMat(this)" style="cursor:pointer;">
+          {% endif %}
+        </th>
+        <th>Nodo</th><th>PRO SGS</th><th>Codigo</th><th>Descripcion</th><th>Lider a liquidar</th>
+        <th>SIP Cant.</th><th>SGS Excel</th><th>SGS Real</th><th>Devuelto</th>
+        <th>Avance UI</th><th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for mc in checks_mat %}
+    {% set mat = mc.mat %}
+    {% set liquidable = mc.ok and mc.estado in ('ok', 'avance_parcial') and mc.pm_id %}
+    <tr {% if liquidable %}class="fila-liquidable"{% endif %}>
+      <td>
+        {% if liquidable %}
+        <input type="checkbox" name="idx_mat" value="{{ loop.index0 }}"
+               class="chk-mat" style="cursor:pointer;">
+        {% endif %}
+      </td>
+      <td>{{ mat.nodo }}</td>
+      <td>
+        {% if mc.pro_code %}
+          <span style="font-size:0.8rem;">{{ mc.pro_code }}</span><br>
+          <span style="color:#888;font-size:0.75rem;">{{ mc.pnombre[:40] if mc.pnombre else '' }}</span>
+        {% else %}—{% endif %}
+      </td>
+      <td><strong>{{ mat.codigo }}</strong></td>
+      <td style="font-size:0.8rem;">{{ mat.descripcion[:35] if mat.descripcion else '—' }}</td>
+      <td style="font-size:0.8rem;">
+        {% if mc.partner_nombre %}
+          <strong>{{ mc.partner_nombre }}</strong><br>
+          <span style="color:#777;font-size:0.74rem;">desde bandeja de despacho</span>
+        {% elif mc.lideres_despacho and mc.lideres_despacho|length > 1 %}
+          <span class="badge badge-warn">Varios lideres</span>
+          <ul class="warns">
+            {% for lider in mc.lideres_despacho %}
+              <li>{{ lider }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <span class="badge badge-error">Sin lider</span><br>
+          <span style="color:#777;font-size:0.74rem;">no se liquida automatico</span>
+        {% endif %}
+      </td>
+      <td style="text-align:right">{{ mat.sip_cant if mat.sip_cant is not none else '—' }}</td>
+      <td style="text-align:right">{{ mat.sgs_neto_excel }}</td>
+      <td style="text-align:right">
+        {{ mc.sgs_neto if mc.sgs_neto is not none else '—' }}
+        {% if mc.diferencia and mc.diferencia != 0 %}
+          <br><span style="color:#e74c3c;font-size:0.75rem;">diff={{ mc.diferencia }}</span>
+        {% endif %}
+      </td>
+      <td style="text-align:right">{{ mc.sgs_devuelto if mc.sgs_devuelto is not none else '—' }}</td>
+      <td style="text-align:right">{{ mc.advance_real if mc.advance_real is not none else '—' }}</td>
+      <td>
+        {% if mc.estado == 'ya_liquidado' %}
+          <span class="badge badge-gray">Ya liquidado</span>
+        {% elif mc.estado == 'ok' %}
+          <span class="badge badge-ok">Pendiente</span>
+        {% elif mc.estado == 'avance_parcial' %}
+          <span class="badge badge-warn">Parcial</span>
+        {% elif mc.estado == 'descuadre' %}
+          <span class="badge badge-error">Descuadre</span>
+        {% elif mc.estado in ('sin_mov', 'sin_mov_ok') %}
+          <span class="badge badge-blue">Sin mov.</span>
+        {% elif mc.estado == 'devolucion' %}
+          <span class="badge badge-gray">Devolución</span>
+        {% elif mc.estado == 'devolucion_sgs' %}
+          <span class="badge badge-error">Bloqueado devolución SGS</span>
+        {% elif mc.estado == 'no_encontrado' %}
+          <span class="badge badge-error">No encontrado</span>
+        {% else %}
+          <span class="badge badge-gray">{{ mc.estado }}</span>
+        {% endif %}
+        {% if mc.errores %}
+          <ul class="errores">{% for e in mc.errores %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% endif %}
+        {% if mc.advertencias %}
+          <ul class="warns">{% for w in mc.advertencias %}<li>{{ w }}</li>{% endfor %}</ul>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  {% if mat_liquidables %}
+  <div style="margin-top:14px;display:flex;align-items:center;gap:14px;">
+    <span id="lbl-mat-sel" style="font-size:0.85rem;color:#555;">0 seleccionadas</span>
+    <button type="submit" id="btn-liquidar-mat" class="btn btn-success" disabled
+            onclick="return confirmarLiquidarMat()">
+      Liquidar materiales →
+    </button>
+  </div>
+  {% endif %}
+  </form>
+</div>
+
+<script>
+function toggleAllMat(master) {
+  document.querySelectorAll('.chk-mat').forEach(c => c.checked = master.checked);
+  actualizarContadorMat();
+}
+document.querySelectorAll('.chk-mat').forEach(c =>
+  c.addEventListener('change', actualizarContadorMat)
+);
+function actualizarContadorMat() {
+  const n = document.querySelectorAll('.chk-mat:checked').length;
+  document.getElementById('lbl-mat-sel').textContent = n + ' seleccionada' + (n !== 1 ? 's' : '');
+  document.getElementById('btn-liquidar-mat').disabled = n === 0;
+}
+function confirmarLiquidarMat() {
+  const n = document.querySelectorAll('.chk-mat:checked').length;
+  return confirm('Liquidar ' + n + ' material(es) en SGS?\n\nSe abrirá el navegador Playwright.');
+}
+</script>
+{% endif %}
+
+<div style="display:flex;gap:12px;margin-top:8px;">
+  <a href="{{ url_for('subir') }}" class="btn btn-light">Subir otro Excel</a>
+</div>
+
+{% endblock %}

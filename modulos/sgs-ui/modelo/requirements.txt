@@ -1,0 +1,6 @@
+# Liquidador Automático. Versiones de producción. Solo paquetes que el código importa (werkzeug llega con Flask).
+Flask==3.1.3
+gunicorn==26.2.0
+openpyxl==3.1.5
+playwright==1.63.0        # escrituras en el ERP por la interfaz web (browser_client.py); requiere `playwright install chromium`
+requests==2.34.2          # proveedor de IA para asignaciones nodo → líder (modulos/liquidador2/ia_lideres.py)

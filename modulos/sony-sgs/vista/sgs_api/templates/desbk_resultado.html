@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Balance ERP — Listo</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Calibri, Arial, sans-serif; background: #f0f2f5; min-height: 100vh;
+         display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .card { background: #fff; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,.12);
+          padding: 36px 44px; width: 560px; max-width: 98vw; }
+  .logo  { font-size: 20px; font-weight: 700; color: #1F3864; margin-bottom: 4px; }
+  .check { font-size: 48px; text-align: center; margin: 16px 0 8px; }
+  .titulo { font-size: 16px; font-weight: 700; color: #1F3864; text-align: center; margin-bottom: 4px; }
+  .sub    { font-size: 12px; color: #666; text-align: center; margin-bottom: 24px; }
+  .btn-download {
+    display: block; width: 100%; padding: 14px;
+    background: #375623; color: #fff; border: none; border-radius: 8px;
+    font-size: 15px; font-weight: 700; cursor: pointer; text-align: center;
+    text-decoration: none; margin-bottom: 12px; transition: background .2s;
+  }
+  .btn-download:hover { background: #2E75B6; }
+  .btn-nuevo {
+    display: block; width: 100%; padding: 10px;
+    background: #f0f2f5; color: #333; border: 1px solid #ccc; border-radius: 8px;
+    font-size: 13px; cursor: pointer; text-align: center; text-decoration: none;
+    transition: background .2s;
+  }
+  .btn-nuevo:hover { background: #dde; }
+  .resumen { margin: 20px 0; border-collapse: collapse; width: 100%; font-size: 12px; }
+  .resumen th { background: #1F3864; color: #fff; padding: 6px 10px; text-align: left; }
+  .resumen td { padding: 5px 10px; border-bottom: 1px solid #eee; }
+  .resumen tr:nth-child(even) td { background: #f7f9ff; }
+  .filename { font-size: 11px; color: #888; text-align: center; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">Balance ERP</div>
+  <div class="check">✅</div>
+  <div class="titulo">Balance generado correctamente</div>
+  <div class="sub">OdM {{ odm }} — {{ padre }}</div>
+
+  <table class="resumen">
+    <thead>
+      <tr><th>PRO</th><th>Nodo</th><th>Bandejas</th><th>Materiales</th></tr>
+    </thead>
+    <tbody>
+      {% for n in resumen %}
+      <tr>
+        <td>{{ n.pro }}</td>
+        <td>{{ n.nodo }}</td>
+        <td>{{ n.bandejas }}</td>
+        <td>{{ n.materiales }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <a href="/descargar/{{ token }}" class="btn-download">
+    ⬇ Descargar Excel
+  </a>
+  <a href="/" class="btn-nuevo">Consultar otro proyecto</a>
+  <div class="filename">{{ filename }}</div>
+</div>
+</body>
+</html>

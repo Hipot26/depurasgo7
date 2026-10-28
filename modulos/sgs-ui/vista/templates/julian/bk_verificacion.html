@@ -1,0 +1,1403 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Paso 3: Verificación — Presupuesto{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+  <h1 style="font-size:1.3rem;">Paso 3: Verificación General — {{ s.filename }}</h1>
+  <span style="color:#888;font-size:0.85rem;">{{ s.verificado_at }}</span>
+  {# ── Panel de sesión SGS ── #}
+  <div id="sesion-bloque" style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+
+    {# Indicador de estado #}
+    <span id="sesion-indicator"
+          style="display:inline-flex;align-items:center;gap:6px;
+                 font-size:0.8rem;padding:5px 12px;border-radius:20px;
+                 background:#f8f9fa;color:#888;font-weight:700;
+                 transition:background .3s,color .3s;"
+          title="Estado de sesión en el browser visible de SGS">
+      <span id="sesion-dot"
+            style="width:8px;height:8px;border-radius:50%;background:#bbb;flex-shrink:0;"></span>
+      <span id="sesion-label">Verificando…</span>
+    </span>
+
+    {# Botones de control — siempre visibles para no perder el estado al liquidar #}
+    <button id="btn-abrir"  onclick="browserCtrl('restart_browser')"
+            style="display:none;background:#27ae60;color:white;border:none;border-radius:20px;
+                   padding:5px 14px;font-size:0.78rem;font-weight:700;cursor:pointer;">
+      Abrir browser
+    </button>
+    <button id="btn-cerrar" onclick="browserCtrl('close_browser')"
+            style="display:none;background:#e74c3c;color:white;border:none;border-radius:20px;
+                   padding:5px 14px;font-size:0.78rem;font-weight:700;cursor:pointer;">
+      ✕ Cerrar
+    </button>
+    <button id="btn-recheck" onclick="browserCtrl('reverificar')"
+            style="display:none;background:#1565c0;color:white;border:none;border-radius:20px;
+                   padding:5px 14px;font-size:0.78rem;font-weight:700;cursor:pointer;">
+      ↻ Reverificar
+    </button>
+
+    {# Mensaje feedback inline #}
+    <span id="sesion-fb"
+          style="font-size:0.75rem;color:#27ae60;display:none;"></span>
+  </div>
+</div>
+
+<style>
+@keyframes sesionPulse {
+  0%,100% { opacity:1; transform:scale(1); }
+  50%      { opacity:0.4; transform:scale(1.4); }
+}
+</style>
+
+<script>
+/* ── Control del browser desde la página de verificación ── */
+async function browserCtrl(cmd) {
+  const fb = document.getElementById('sesion-fb');
+  fb.style.display = 'inline';
+  fb.style.color = '#888';
+  fb.textContent = 'Enviando…';
+  try {
+    const r = await fetch('/julian/browser_ctrl', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({cmd}),
+    });
+    const d = await r.json();
+    fb.style.color = d.ok !== false ? '#27ae60' : '#e74c3c';
+    fb.textContent = d.ok !== false
+      ? '✓ ' + (d.msg || 'OK')
+      : '✗ ' + (d.error || 'Error');
+  } catch(e) {
+    fb.style.color = '#e74c3c';
+    fb.textContent = '✗ Error de red';
+  }
+  setTimeout(() => { fb.style.display = 'none'; }, 4000);
+  setTimeout(pollSesion, 800);
+}
+
+/* ── Polling de sesión ── */
+async function pollSesion() {
+  try {
+    const r = await fetch('/julian/sesion_estado');
+    const d = await r.json();
+    const ind   = document.getElementById('sesion-indicator');
+    const dot   = document.getElementById('sesion-dot');
+    const lbl   = document.getElementById('sesion-label');
+    const bAbrir   = document.getElementById('btn-abrir');
+    const bCerrar  = document.getElementById('btn-cerrar');
+    const bRecheck = document.getElementById('btn-recheck');
+
+    if (d.activa) {
+      ind.style.background = '#e8f5e9'; ind.style.color = '#2e7d32';
+      dot.style.background = '#27ae60'; dot.style.animation = '';
+      lbl.textContent = 'SGS: sesión activa';
+      bAbrir.style.display   = 'none';
+      bCerrar.style.display  = 'inline-block';
+      bRecheck.style.display = 'inline-block';
+    } else if (d.iniciando) {
+      ind.style.background = '#fff8e1'; ind.style.color = '#856404';
+      dot.style.background = '#f39c12'; dot.style.animation = 'sesionPulse 0.9s infinite';
+      lbl.textContent = 'Browser abriendo…';
+      bAbrir.style.display   = 'inline-block';
+      bCerrar.style.display  = 'inline-block';
+      bRecheck.style.display = 'inline-block';
+    } else {
+      ind.style.background = '#fdecea'; ind.style.color = '#c0392b';
+      dot.style.background = '#e74c3c'; dot.style.animation = '';
+      lbl.textContent = 'Sin sesión activa';
+      bAbrir.style.display   = 'inline-block';
+      bCerrar.style.display  = 'none';
+      bRecheck.style.display = 'none';
+    }
+  } catch(e) {}
+  setTimeout(pollSesion, 5000);
+}
+
+pollSesion();
+</script>
+
+{# ── Resumen general ── #}
+<div class="stat-row">
+  <div class="stat {{ 'green' if resumen_mo.ok == resumen_mo.total else 'blue' }}">
+    <div class="num">{{ resumen_mo.ok }}</div>
+    <div class="lbl">MO OK</div>
+  </div>
+  <div class="stat {{ 'red' if resumen_mo.error else 'gray' }}">
+    <div class="num">{{ resumen_mo.error }}</div>
+    <div class="lbl">MO con error</div>
+  </div>
+  <div class="stat gray">
+    <div class="num">{{ resumen_mo.ya_liquidado }}</div>
+    <div class="lbl">MO ya liquidadas</div>
+  </div>
+  <div style="width:1px;background:#eee;margin:0 8px;"></div>
+  <div class="stat {{ 'green' if resumen_mat.ok == resumen_mat.total else 'blue' }}">
+    <div class="num">{{ resumen_mat.ok }}</div>
+    <div class="lbl">MAT OK</div>
+  </div>
+  <div class="stat {{ 'red' if resumen_mat.error else 'gray' }}">
+    <div class="num">{{ resumen_mat.error }}</div>
+    <div class="lbl">MAT con error</div>
+  </div>
+  <div class="stat gray">
+    <div class="num">{{ resumen_mat.ya_liquidado }}</div>
+    <div class="lbl">MAT ya liquidados</div>
+  </div>
+</div>
+
+{# ── Banner Balance SGS — visible si error MAT > 5% ── #}
+{% if resumen_mat.total > 0 %}
+{% set pct_error_mat = (resumen_mat.error / resumen_mat.total * 100) | round(1) %}
+{% if pct_error_mat >= 5 %}
+<div style="background:#fff3e0;border:2px solid #f39c12;border-radius:8px;
+            padding:16px 20px;margin-bottom:16px;
+            display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <strong style="color:#e65100;font-size:1rem;">⚠ {{ resumen_mat.error }} materiales con error ({{ pct_error_mat }}%)</strong><br>
+    <span style="color:#bf360c;font-size:0.87rem;">
+      Tasa de error superior al 5% — se recomienda verificar los movimientos reales bandeja por bandeja antes de liquidar.
+    </span>
+  </div>
+  <a href="{{ url_for('julian.balance_sgs', sid=sid) }}"
+     style="background:#e65100;color:white;padding:12px 22px;border-radius:6px;
+            font-weight:700;font-size:0.95rem;text-decoration:none;white-space:nowrap;flex-shrink:0;">
+    Ver Balance SGS por Bandeja →
+  </a>
+</div>
+{% endif %}
+{% endif %}
+
+{% if s.lcl_usado %}
+<div class="alert alert-info" style="display:flex;align-items:center;justify-content:space-between;">
+  <span>
+    Proyecto buscado en SGS:
+    <strong style="font-family:monospace;">{{ s.lcl_usado }}</strong>
+  </span>
+  <a href="{{ url_for('julian.confirmar', sid=sid) }}"
+     style="font-size:0.82rem;color:#004085;text-decoration:underline;">
+    Cambiar LCL y re-verificar
+  </a>
+</div>
+{% endif %}
+{% if s.total_mo %}
+<div class="alert alert-info">
+  Total MO en Presupuesto: <strong>${{ "{:,.0f}".format(s.total_mo) }}</strong>
+</div>
+{% endif %}
+
+{# ── Errores de parseo ── #}
+{% if es_programado %}
+<div id="pdl-global-panel"
+     style="background:{{ '#fff3e0' if pdl_requerido else '#e8f5e9' }};
+            border:2px solid {{ '#e65100' if pdl_requerido else '#a5d6a7' }};
+            border-radius:8px;padding:14px 18px;margin-bottom:16px;
+            display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+  <div style="min-width:240px;flex:1;">
+    <strong style="color:{{ '#bf360c' if pdl_requerido else '#2e7d32' }};">
+      PDL obligatorio para programado {{ s.lcl_usado or s.lcl_detectado }}
+    </strong><br>
+    <span style="font-size:0.82rem;color:#666;">
+      Se exige antes de liquidar MO o MAT. Tambien puedes ajustar PDL/fechas aunque todo ya este liquidado.
+    </span>
+  </div>
+  <label style="display:flex;align-items:center;gap:8px;font-size:0.86rem;font-weight:700;color:#555;">
+    PDL
+    <input type="text" id="pdl-global-input" value="{{ pdl_actual }}"
+           placeholder="CDOPPI..."
+           oninput="pdlGlobalActualizar()"
+           style="padding:8px 11px;border:2px solid {{ '#e65100' if pdl_requerido else '#a5d6a7' }};
+                  border-radius:6px;width:240px;font-size:0.9rem;">
+  </label>
+  <span id="pdl-global-status" style="font-size:0.82rem;color:#777;min-width:120px;"></span>
+  <a href="{{ url_for('julian.cierre_rapido', sid=sid, pdl=pdl_actual) }}"
+     class="btn btn-light" style="white-space:nowrap;">
+    Ajustar PDL / fechas
+  </a>
+</div>
+{% else %}
+<div style="margin-bottom:14px;display:flex;justify-content:flex-end;">
+  <a href="{{ url_for('julian.cierre_rapido', sid=sid) }}"
+     class="btn btn-light" style="font-size:0.82rem;">
+    Ajustar fechas / estado
+  </a>
+</div>
+{% endif %}
+
+<script>
+const PDL_ES_PROGRAMADO = {{ 'true' if es_programado else 'false' }};
+function pdlGlobalValor() {
+  const inp = document.getElementById('pdl-global-input');
+  return inp ? inp.value.trim() : '';
+}
+function pdlGlobalValido() {
+  return !PDL_ES_PROGRAMADO || pdlGlobalValor().length > 0;
+}
+function pdlGlobalSync() {
+  const val = pdlGlobalValor();
+  document.querySelectorAll('.pdl-hidden-field').forEach(function(el) {
+    el.value = val;
+  });
+  const link = document.querySelector('#pdl-global-panel a');
+  if (link) {
+    const base = "{{ url_for('julian.cierre_rapido', sid=sid) }}";
+    link.href = base + (val ? ('?pdl=' + encodeURIComponent(val)) : '');
+  }
+}
+function pdlGlobalActualizar() {
+  pdlGlobalSync();
+  const st = document.getElementById('pdl-global-status');
+  if (st) {
+    st.textContent = pdlGlobalValido() ? 'PDL listo' : 'Falta PDL';
+    st.style.color = pdlGlobalValido() ? '#2e7d32' : '#c62828';
+  }
+  if (typeof actualizarContador === 'function') actualizarContador();
+  if (typeof actualizarContadorMat === 'function') actualizarContadorMat();
+}
+function pdlGlobalConfirmar() {
+  pdlGlobalActualizar();
+  if (!pdlGlobalValido()) {
+    alert('Este proyecto programado requiere PDL antes de liquidar.');
+    return false;
+  }
+  return true;
+}
+document.addEventListener('DOMContentLoaded', pdlGlobalActualizar);
+</script>
+
+{% if s.errs_mo or s.errs_mat %}
+<div class="card">
+  <h2>Avisos del parser</h2>
+  {% for e in s.errs_mo %}
+    <div class="alert {{ 'alert-info' if '[INFO]' in e else 'alert-warning' }}">{{ e }}</div>
+  {% endfor %}
+  {% for e in s.errs_mat %}
+    <div class="alert {{ 'alert-info' if '[INFO]' in e else 'alert-warning' }}">{{ e }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Tabla MO ── #}
+{% if checks_mo %}
+{% set mo_liquidables = checks_mo | selectattr('ok') | rejectattr('ya_liquidada') | rejectattr('_nodo_cable') | list %}
+{# Bandera CABLE: hay checks con nodo rango detectado #}
+{% set mo_cable_checks = checks_mo | selectattr('_nodo_cable', 'defined') | selectattr('_nodo_cable') | list %}
+{% if mo_cable_checks %}
+<div style="background:#fce4ec;border:1.5px solid #e91e63;border-radius:8px;
+            padding:12px 16px;margin-bottom:14px;
+            display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+  <div>
+    <strong style="color:#880e4f;font-size:0.95rem;">
+      ⚠ {{ mo_cable_checks|length }} actividad(es) con nodo CABLE detectadas
+    </strong><br>
+    <span style="font-size:0.8rem;color:#ad1457;">
+      El Excel indica un rango de nodos (ej: 1AL4, N1_N4). Verifica que no hayan sido
+      liquidadas en un nodo individual incorrecto.
+    </span>
+  </div>
+  <a href="{{ url_for('julian.motoverificador', sid=sid) }}"
+     style="background:#880e4f;color:white;padding:9px 18px;border-radius:6px;
+            font-weight:700;font-size:0.85rem;text-decoration:none;white-space:nowrap;flex-shrink:0;">
+    Motoverificador →
+  </a>
+</div>
+{% endif %}
+<style>
+  .mo-lider-section { margin-bottom: 18px; }
+  .mo-lider-alerta-bar {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+    padding: 9px 14px; background: #fff3cd; border: 1px solid #ffc107;
+    border-radius: 7px; font-size: 0.88rem; color: #856404; font-weight: 600;
+  }
+  .mo-lider-card {
+    border: 2px solid #ffc107; border-radius: 8px; background: #fff;
+    overflow: hidden; margin-bottom: 12px;
+    transition: border-color 0.2s;
+  }
+  .mo-lider-card.configurado { border-color: #28a745; }
+  .mo-lider-card-top {
+    background: #fff8e1; padding: 11px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    transition: background 0.2s;
+  }
+  .mo-lider-card.configurado .mo-lider-card-top { background: #f0fff4; }
+  .mo-lider-pro  { font-weight: 700; font-size: 0.9rem; color: #333; }
+  .mo-lider-pnombre { font-size: 0.74rem; color: #777; margin-top: 2px; }
+  .mo-status-badge {
+    font-size: 0.76rem; font-weight: 700; padding: 3px 11px; border-radius: 12px;
+    background: #ffc107; color: #333; white-space: nowrap;
+    transition: background 0.2s, color 0.2s;
+  }
+  .mo-lider-card.configurado .mo-status-badge { background: #28a745; color: #fff; }
+  .mo-lider-card-body { padding: 13px 16px; }
+  .mo-lider-nombres {
+    background: #f8f9fa; border-radius: 6px; padding: 9px 13px; margin-bottom: 13px;
+    font-size: 0.84rem; line-height: 1.9;
+  }
+  .lider-n { display: flex; gap: 8px; align-items: baseline; }
+  .lider-num { font-weight: 700; color: #555; min-width: 18px; }
+  .lider-nombre { color: #111; }
+  .mo-opciones-label { font-size: 0.79rem; font-weight: 700; color: #555; margin-bottom: 8px; }
+  .mo-opciones { display: flex; flex-direction: column; gap: 7px; }
+  .mo-opcion-btn {
+    display: flex; align-items: center; gap: 10px; cursor: pointer;
+    padding: 10px 14px; border: 1.5px solid #dee2e6; border-radius: 7px;
+    background: #fafafa; font-size: 0.84rem; color: #333;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .mo-opcion-btn:hover { border-color: #999; background: #f0f0f0; }
+  .mo-opcion-btn.selected { border-color: #2e7d32; background: #e8f5e9; }
+  .mo-opcion-btn input[type="radio"] { accent-color: #2e7d32; width: 15px; height: 15px; flex-shrink: 0; cursor: pointer; }
+  .mo-split-panel {
+    margin-top: 10px; padding: 11px 14px; background: #f1f8f1;
+    border: 1px solid #c8e6c9; border-radius: 6px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    font-size: 0.83rem;
+  }
+  .mo-split-panel input[type="number"] {
+    width: 62px; padding: 5px 8px; border: 1.5px solid #81c784; border-radius: 5px;
+    font-size: 0.9rem; font-weight: 700; text-align: center;
+  }
+  .mo-split-lider2 { color: #2e7d32; font-weight: 700; }
+  .mo-split-error  { color: #c62828; font-size: 0.76rem; display: none; }
+  .mo-split-panel select {
+    padding: 5px 8px; border: 1.5px solid #81c784; border-radius: 5px;
+    font-size: 0.8rem; min-width: 160px;
+  }
+  .mo-global-box {
+    border: 1px solid #c8d8e8; border-radius: 8px; background: #f4f8fc;
+    padding: 14px 16px; margin-bottom: 14px;
+  }
+  .mo-global-title { font-weight: 700; font-size: 0.84rem; color: #1a3e6e; margin-bottom: 10px; }
+  .mo-global-row { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  .mo-global-sublabel { font-size: 0.73rem; color: #555; margin-bottom: 3px; }
+  .mo-global-row select { padding: 7px 8px; border: 1px solid #b0c4de; border-radius: 5px; font-size: 0.82rem; }
+  .btn-global-apply {
+    background: #1a3e2e; color: white; border: none; border-radius: 6px;
+    padding: 8px 16px; font-size: 0.82rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+  }
+  .btn-global-apply:hover { background: #245036; }
+  .mo-faltantes-box {
+    margin-top: 10px; padding: 8px 12px; border-radius: 6px; font-size: 0.82rem;
+    border: 1px solid #ffc107; background: #fff3cd; color: #856404;
+  }
+  .btn-reverificar {
+    background: #5c6bc0; color: white; border: none; border-radius: 6px;
+    padding: 9px 14px; font-size: 0.82rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+  }
+  .btn-reverificar:hover { background: #3949ab; }
+</style>
+<div class="card">
+  <h2>Mano de Obra ({{ checks_mo|length }} filas)</h2>
+
+  {# ── Proporción general por porcentajes ─────────────────────────────────── #}
+  <div id="pct-panel" style="margin-bottom:16px;border:1.5px solid #c8d8f8;border-radius:8px;
+                              background:#f4f8fc;padding:14px 16px;">
+
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;
+                  font-weight:700;font-size:0.88rem;color:#1a3e6e;">
+      <input type="checkbox" id="chk-pct-mode" onchange="pctToggle(this.checked)"
+             style="width:15px;height:15px;cursor:pointer;accent-color:#1a3e6e;">
+      Proporción general por porcentajes
+      <span style="font-weight:400;color:#666;font-size:0.8rem;">
+        — distribuye <strong>todas</strong> las prestaciones MO entre N líderes según % definido
+      </span>
+    </label>
+
+    <div id="pct-config" style="display:none;margin-top:14px;border-top:1px solid #d4e4f4;padding-top:14px;">
+
+      <p style="font-size:0.82rem;color:#555;margin:0 0 14px;line-height:1.5;">
+        Ingresa la cédula y nombre de cada líder junto con su porcentaje.
+        El sistema usará los precios de MDO&amp;MAT para repartir las prestaciones
+        de forma que el valor monetario asignado a cada líder se aproxime al % definido.
+        Las cantidades siempre serán enteras.
+      </p>
+
+      {# ── Filas de líderes (generadas por JS) ── #}
+      <div id="pct-lideres-box"></div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap;">
+        <button type="button" onclick="pctAgregarFila()"
+                style="background:#1a3e6e;color:white;border:none;border-radius:6px;
+                       padding:7px 16px;font-size:0.82rem;font-weight:700;cursor:pointer;">
+          + Agregar líder
+        </button>
+        <span id="pct-suma"
+              style="font-size:0.85rem;font-weight:700;color:#888;min-width:120px;">
+          Total: 0 %
+        </span>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap;">
+        <button type="button" id="btn-calcular-pct" onclick="pctCalcular()"
+                style="background:#27ae60;color:white;border:none;border-radius:6px;
+                       padding:9px 22px;font-size:0.85rem;font-weight:700;cursor:pointer;">
+          Calcular distribución
+        </button>
+        <span id="pct-spin" style="display:none;font-size:0.82rem;color:#888;">
+          Calculando…
+        </span>
+        <span id="pct-error"
+              style="display:none;color:#c62828;font-size:0.82rem;font-weight:600;"></span>
+      </div>
+
+      {# ── Resultado de la distribución (lo pinta JS) ── #}
+      <div id="pct-preview" style="display:none;margin-top:18px;"></div>
+
+      {# ── Formulario independiente → liquidar_pct (no anidado en form-liquidar-mo) ── #}
+      <form id="form-liquidar-pct" method="POST"
+            action="{{ url_for('julian.liquidar_pct', sid=sid) }}"
+            style="display:none;margin-top:14px;">
+        <input type="hidden" name="pdl_input" class="pdl-hidden-field" value="{{ pdl_actual }}">
+        <button type="submit"
+                style="background:#c62828;color:white;border:none;border-radius:6px;
+                       padding:11px 28px;font-size:0.9rem;font-weight:700;cursor:pointer;
+                       letter-spacing:0.02em;"
+                onclick="return pdlGlobalConfirmar() && confirm('¿Confirmas liquidar la distribución calculada?\nEsta acción escribirá en SGS y no se puede deshacer fácilmente.')">
+          ⚡ Liquidar distribución →
+        </button>
+        <span style="font-size:0.78rem;color:#888;margin-left:10px;">
+          Usa la misma ruta que la liquidación MO normal.
+        </span>
+      </form>
+
+    </div>{# /pct-config #}
+  </div>{# /pct-panel #}
+
+  <form method="POST" action="{{ url_for('julian.preview_liquidar', sid=sid) }}" id="form-liquidar-mo">
+  <input type="hidden" name="pdl_input" class="pdl-hidden-field" value="{{ pdl_actual }}">
+  {% if mo_lider_grupos %}
+  <script>const MO_GRUPOS = {{ mo_lider_grupos|tojson }};</script>
+  {# Campos ocultos que el backend lee (compatibilidad sin cambios en blueprint) #}
+  {% for grupo in mo_lider_grupos %}
+  <input type="hidden" name="mo_group_mode_{{ grupo.key }}" class="mo-group-mode" data-group="{{ grupo.key }}" value="uno">
+  <input type="hidden" name="mo_group_a_{{ grupo.key }}"    class="mo-group-a"    data-group="{{ grupo.key }}" value="{{ grupo.lideres[0].nombre if grupo.lideres else '' }}">
+  <input type="hidden" name="mo_group_b_{{ grupo.key }}"    class="mo-group-b"    data-group="{{ grupo.key }}" value="">
+  <input type="hidden" name="mo_group_pct_{{ grupo.key }}"  class="mo-group-pct"  data-group="{{ grupo.key }}" value="50">
+  {% endfor %}
+
+  <div class="mo-lider-section">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+      <div class="mo-lider-alerta-bar" style="flex:1;margin-bottom:0;">
+        {{ mo_lider_grupos|length }} proyecto(s) con múltiples líderes. Por defecto se usa control del proyecto; configura distribución solo si quieres repartir.
+      </div>
+      <a href="{{ url_for('julian.reverificar_lideres', sid=sid) }}" class="btn-reverificar"
+         style="text-decoration:none;display:inline-block;">↺ Reverificar líderes</a>
+    </div>
+    {% if mo_lider_grupos|length > 1 %}
+    <div class="mo-global-box" id="mo-global-box">
+      <div class="mo-global-title">⚙ Configuración global — aplicar a todos los proyectos a la vez</div>
+      <div class="mo-global-row">
+        <div>
+          <div class="mo-global-sublabel">Modo</div>
+          <select id="mo-global-mode" onchange="onGlobalMode()">
+            <option value="uno">100% a un líder</option>
+            <option value="dos">Dividir entre dos líderes</option>
+          </select>
+        </div>
+        <div>
+          <div class="mo-global-sublabel">Líder A</div>
+          <select id="mo-global-a" style="min-width:210px;"></select>
+        </div>
+        <div id="mo-global-b-wrap" style="display:none;">
+          <div class="mo-global-sublabel">Líder B</div>
+          <select id="mo-global-b" style="min-width:210px;"></select>
+        </div>
+        <div id="mo-global-pct-wrap" style="display:none;">
+          <div class="mo-global-sublabel">% Líder A</div>
+          <input type="number" id="mo-global-pct" min="1" max="99" value="50"
+                 style="width:64px;padding:6px 8px;border:1.5px solid #b0c4de;border-radius:5px;">
+        </div>
+        <div style="align-self:flex-end;">
+          <button type="button" class="btn-global-apply" onclick="aplicarGlobal()">Aplicar a todos ▸</button>
+        </div>
+      </div>
+      <div id="mo-faltantes" class="mo-faltantes-box" style="display:none;"></div>
+    </div>
+    {% endif %}
+    {% for grupo in mo_lider_grupos %}
+    <div class="mo-lider-card" id="mo-lider-card-{{ grupo.key }}" data-group="{{ grupo.key }}">
+      <div class="mo-lider-card-top">
+        <div>
+          <div class="mo-lider-pro">{{ grupo.pro_code }}</div>
+          {% if grupo.pnombre %}<div class="mo-lider-pnombre">{{ grupo.pnombre[:60] }}</div>{% endif %}
+        </div>
+        <span class="mo-status-badge" id="mo-status-badge-{{ grupo.key }}">Control del proyecto</span>
+      </div>
+      <div class="mo-lider-card-body">
+        <div class="mo-lider-nombres">
+          {% for lider in grupo.lideres %}
+          <div class="lider-n">
+            <span class="lider-num">{{ loop.index }}.</span>
+            <span class="lider-nombre">{{ lider.nombre }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="mo-opciones-label">Selecciona cómo distribuir las prestaciones de este proyecto:</div>
+        <div class="mo-opciones">
+          {% for lider in grupo.lideres %}
+          <label class="mo-opcion-btn{% if loop.first %} selected{% endif %}" id="mo-opt-idx{{ loop.index0 }}-{{ grupo.key }}">
+            <input type="radio" name="mo_radio_{{ grupo.key }}" value="idx{{ loop.index0 }}"
+                   {% if loop.first %}checked{% endif %}
+                   onchange="onLiderRadio('{{ grupo.key }}', {{ grupo.lideres|tojson }}, 'idx{{ loop.index0 }}')">
+            100% al líder {{ loop.index }} — <strong>{{ lider.nombre }}</strong>
+          </label>
+          {% endfor %}
+          {% if grupo.lideres|length > 1 %}
+          <label class="mo-opcion-btn" id="mo-opt-dividir-{{ grupo.key }}">
+            <input type="radio" name="mo_radio_{{ grupo.key }}" value="dividir"
+                   onchange="onLiderRadio('{{ grupo.key }}', {{ grupo.lideres|tojson }}, 'dividir')">
+            Dividir por porcentaje entre dos líderes
+          </label>
+          {% endif %}
+        </div>
+        <div class="mo-split-panel" id="mo-split-panel-{{ grupo.key }}" style="display:none;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.83rem;">Líder A:
+              <select id="mo-split-a-{{ grupo.key }}" onchange="onSplitSelect('{{ grupo.key }}')">
+                {% for lider in grupo.lideres %}
+                <option value="{{ lider.nombre }}">{{ loop.index }}. {{ lider.nombre }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:0.83rem;">
+              <input type="number" id="mo-split-input-{{ grupo.key }}"
+                     min="1" max="99" step="1" value="50"
+                     oninput="onSplitPct('{{ grupo.key }}', this.value)">
+              %
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.83rem;">Líder B:
+              <select id="mo-split-b-{{ grupo.key }}" onchange="onSplitSelect('{{ grupo.key }}')">
+                {% for lider in grupo.lideres %}
+                <option value="{{ lider.nombre }}" {% if loop.index == 2 %}selected{% endif %}>{{ loop.index }}. {{ lider.nombre }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <span style="font-size:0.83rem;">Líder B recibe: <span class="mo-split-lider2" id="mo-split-resto-{{ grupo.key }}">50%</span></span>
+            <span class="mo-split-error" id="mo-split-err-{{ grupo.key }}">El porcentaje debe estar entre 1 y 99.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <table>
+    <thead>
+      <tr>
+        <th style="width:36px;">
+          {% if mo_liquidables %}
+          <input type="checkbox" id="chk-all" title="Seleccionar todas"
+                 onchange="toggleAll(this)" style="cursor:pointer;">
+          {% endif %}
+        </th>
+        <th>Fila</th><th>Nodo</th><th>Código SGS (QP)</th><th>Baremo</th>
+        <th>Cantidad</th><th>PRO SGS</th><th>Lider</th><th>Estado</th><th>Errores / Avisos</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for ck in checks_mo %}
+    {% set row = ck.row %}
+    {% set liquidable = ck.ok and not ck.ya_liquidada and not ck._nodo_cable %}
+    {% set lideres = ck.lideres if ck.lideres is defined else [] %}
+    <tr {% if liquidable %}class="fila-liquidable"{% endif %}>
+      <td>
+        {% if liquidable %}
+        <input type="checkbox" name="idx_mo" value="{{ ck._real_idx if ck._real_idx is defined else loop.index0 }}"
+               class="chk-mo"
+               data-lider-group="{% if lideres|length > 1 %}{{ ck.pid or ck.pro_code }}{% endif %}"
+               style="cursor:pointer;">
+        {% endif %}
+      </td>
+      <td>{{ row.fila }}</td>
+      <td><strong>{{ row.pro or '—' }}</strong></td>
+      <td>
+        <strong style="color:#1a3e2e;">{{ row.codigo }}</strong>
+        {% if row.descripcion %}
+          <br><span style="color:#888;font-size:0.75rem;">{{ row.descripcion[:40] }}</span>
+        {% endif %}
+      </td>
+      <td style="font-size:0.82rem;color:#666;">{{ row.baremo or '—' }}</td>
+      <td style="text-align:right">{{ row.cantidad }}</td>
+      <td>
+        {% if ck.pro_code %}
+          <span style="font-size:0.8rem;">{{ ck.pro_code }}</span><br>
+          <span style="color:#888;font-size:0.75rem;">{{ ck.pnombre[:40] if ck.pnombre else '' }}</span>
+        {% else %}—{% endif %}
+      </td>
+      <td style="font-size:0.8rem;">
+        {% if lideres|length > 1 %}
+          {{ lideres|length }} lideres<br>
+          <span style="color:#777;font-size:0.74rem;">usar control del proyecto</span>
+        {% else %}
+          {{ ck.partner_nombre if ck.partner_nombre else '—' }}
+        {% endif %}
+      </td>
+      <td>
+        {% if ck.ya_liquidada %}
+          <span class="badge badge-gray">Ya liquidada</span>
+        {% elif ck._nodo_cable %}
+          <span class="badge" style="background:#e65100;color:white;border-radius:4px;padding:2px 8px;font-size:0.78rem;font-weight:700;">CABLE ⚠</span>
+          <br><a href="{{ url_for('julian.motoverificador', sid=sid) }}"
+                 style="font-size:0.72rem;color:#e65100;text-decoration:none;font-weight:600;">→ Motoverificador</a>
+        {% elif ck.ok %}
+          {% if ck.act_existente and ck.act_existente.advance > 0 %}
+            <span class="badge badge-warn">Avance parcial</span>
+          {% else %}
+            <span class="badge badge-ok">OK</span>
+          {% endif %}
+        {% else %}
+          <span class="badge badge-error">Error</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if ck.errores %}
+          <ul class="errores">{% for e in ck.errores %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% endif %}
+        {% if ck.advertencias %}
+          <ul class="warns">{% for w in ck.advertencias %}<li>{{ w }}</li>{% endfor %}</ul>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  {% if mo_liquidables %}
+  <div style="margin-top:14px;display:flex;align-items:center;gap:14px;">
+    <span id="lbl-seleccionadas" style="font-size:0.85rem;color:#555;">0 seleccionadas</span>
+    <button type="submit" id="btn-liquidar" class="btn btn-success" disabled
+            onclick="return confirmarLiquidar()">
+      Liquidar seleccionadas →
+    </button>
+  </div>
+  {% endif %}
+  </form>
+
+</div>{# /card MO #}
+
+<script>
+// ── Valida si el grupo está completamente configurado (lee campos ocultos) ──
+function _isGrupoConfigurado(group) {
+  var mode = document.querySelector('.mo-group-mode[data-group="' + group + '"]');
+  var a    = document.querySelector('.mo-group-a[data-group="'    + group + '"]');
+  var b    = document.querySelector('.mo-group-b[data-group="'    + group + '"]');
+  var pct  = document.querySelector('.mo-group-pct[data-group="'  + group + '"]');
+  if (!mode || !mode.value) return false;
+  if (!a || !a.value)       return false;
+  if (mode.value === 'dos') {
+    if (!b || !b.value || b.value === a.value) return false;
+    var pctNum = pct ? Number(pct.value) : 0;
+    if (pctNum <= 0 || pctNum >= 100) return false;
+  }
+  return true;
+}
+
+// ── Actualiza tarjeta + badge + checkboxes del grupo ──
+function updateLiderStatus(group) {
+  var ok    = _isGrupoConfigurado(group);
+  var card  = document.getElementById('mo-lider-card-' + group);
+  var badge = document.getElementById('mo-status-badge-' + group);
+  if (card)  card.classList.toggle('configurado', ok);
+  if (badge) badge.textContent = ok ? '✓ Configurado' : 'Pendiente de configuración';
+  document.querySelectorAll('.chk-mo[data-lider-group="' + group + '"]').forEach(function(chk) {
+    if (!ok) chk.checked = false;
+    chk.disabled = !ok;
+    var tr = chk.closest('tr');
+    if (tr) tr.style.opacity = ok ? '' : '0.45';
+  });
+}
+
+// ── Handler del radio (value = 'idxN' para 100% a líder N, o 'dividir') ──
+function onLiderRadio(group, lideres, value) {
+  var mode  = document.querySelector('.mo-group-mode[data-group="' + group + '"]');
+  var aEl   = document.querySelector('.mo-group-a[data-group="'    + group + '"]');
+  var bEl   = document.querySelector('.mo-group-b[data-group="'    + group + '"]');
+  var pct   = document.querySelector('.mo-group-pct[data-group="'  + group + '"]');
+  var split = document.getElementById('mo-split-panel-' + group);
+
+  if (value.indexOf('idx') === 0) {
+    var idx    = parseInt(value.replace('idx', ''), 10);
+    var nombre = (lideres[idx] || {}).nombre || '';
+    if (mode) mode.value = 'uno';
+    if (aEl)  aEl.value  = nombre;
+    if (bEl)  bEl.value  = '';
+    if (pct)  pct.value  = '50';
+    if (split) split.style.display = 'none';
+  } else { // dividir
+    var selA     = document.getElementById('mo-split-a-'     + group);
+    var selB     = document.getElementById('mo-split-b-'     + group);
+    var splitPct = document.getElementById('mo-split-input-' + group);
+    if (mode) mode.value = 'dos';
+    if (aEl && selA) aEl.value = selA.value;
+    if (bEl && selB) bEl.value = selB.value;
+    if (pct && splitPct) pct.value = splitPct.value;
+    if (split) split.style.display = '';
+  }
+
+  // Resaltar opción elegida
+  document.querySelectorAll('[id^="mo-opt-"][id$="-' + group + '"]').forEach(function(btn) {
+    btn.classList.remove('selected');
+  });
+  var selBtn = document.getElementById('mo-opt-' + value + '-' + group);
+  if (selBtn) selBtn.classList.add('selected');
+
+  updateLiderStatus(group);
+  actualizarContador();
+}
+
+// ── Handler cuando cambian los selects del panel de reparto ──
+function onSplitSelect(group) {
+  var radio = document.querySelector('input[name="mo_radio_' + group + '"]:checked');
+  if (!radio || radio.value !== 'dividir') return;
+  var aEl  = document.querySelector('.mo-group-a[data-group="' + group + '"]');
+  var bEl  = document.querySelector('.mo-group-b[data-group="' + group + '"]');
+  var selA = document.getElementById('mo-split-a-' + group);
+  var selB = document.getElementById('mo-split-b-' + group);
+  if (aEl && selA) aEl.value = selA.value;
+  if (bEl && selB) bEl.value = selB.value;
+  updateLiderStatus(group);
+  actualizarContador();
+}
+
+// ── Handler del porcentaje de reparto ──
+function onSplitPct(group, pctStr) {
+  var pctNum = parseInt(pctStr, 10);
+  var pct    = document.querySelector('.mo-group-pct[data-group="' + group + '"]');
+  var resto  = document.getElementById('mo-split-resto-' + group);
+  var errEl  = document.getElementById('mo-split-err-'   + group);
+  var valid  = !isNaN(pctNum) && pctNum >= 1 && pctNum <= 99;
+  if (pct && valid)  pct.value = pctNum;
+  if (resto) resto.textContent = valid ? (100 - pctNum) + '%' : '?%';
+  if (errEl) errEl.style.display = valid ? 'none' : '';
+  var selA = document.getElementById('mo-split-a-' + group);
+  var selB = document.getElementById('mo-split-b-' + group);
+  var aEl  = document.querySelector('.mo-group-a[data-group="' + group + '"]');
+  var bEl  = document.querySelector('.mo-group-b[data-group="' + group + '"]');
+  if (aEl && selA) aEl.value = selA.value;
+  if (bEl && selB) bEl.value = selB.value;
+  updateLiderStatus(group);
+  actualizarContador();
+}
+
+// ── Panel global ──────────────────────────────────────────────────────────────
+function initGlobalPanel() {
+  if (typeof MO_GRUPOS === 'undefined' || !MO_GRUPOS || !MO_GRUPOS.length) return;
+  var todosLideres = [];
+  var visto = {};
+  MO_GRUPOS.forEach(function(g) {
+    g.lideres.forEach(function(l) {
+      if (!visto[l.nombre]) { visto[l.nombre] = true; todosLideres.push(l.nombre); }
+    });
+  });
+  todosLideres.sort();
+  ['mo-global-a', 'mo-global-b'].forEach(function(selId) {
+    var sel = document.getElementById(selId);
+    if (!sel) return;
+    sel.innerHTML = '';
+    todosLideres.forEach(function(nombre) {
+      var opt = document.createElement('option');
+      opt.value = nombre; opt.textContent = nombre;
+      sel.appendChild(opt);
+    });
+  });
+  var selB = document.getElementById('mo-global-b');
+  if (selB && selB.options.length > 1) selB.selectedIndex = 1;
+}
+
+function onGlobalMode() {
+  var mode    = document.getElementById('mo-global-mode');
+  var bWrap   = document.getElementById('mo-global-b-wrap');
+  var pctWrap = document.getElementById('mo-global-pct-wrap');
+  var isDos   = mode && mode.value === 'dos';
+  if (bWrap)   bWrap.style.display   = isDos ? '' : 'none';
+  if (pctWrap) pctWrap.style.display = isDos ? '' : 'none';
+}
+
+function aplicarGlobal() {
+  if (typeof MO_GRUPOS === 'undefined' || !MO_GRUPOS) return;
+  var mode    = (document.getElementById('mo-global-mode') || {}).value || 'uno';
+  var nombreA = (document.getElementById('mo-global-a')    || {}).value || '';
+  var nombreB = mode === 'dos' ? ((document.getElementById('mo-global-b') || {}).value || '') : '';
+  var pctA    = mode === 'dos' ? parseInt((document.getElementById('mo-global-pct') || {}).value, 10) : 100;
+
+  if (!nombreA) { alert('Selecciona el Líder A.'); return; }
+  if (mode === 'dos' && nombreA === nombreB) { alert('El Líder A y el Líder B deben ser distintos.'); return; }
+  if (mode === 'dos' && (isNaN(pctA) || pctA <= 0 || pctA >= 100)) {
+    alert('El porcentaje del Líder A debe estar entre 1 y 99.'); return;
+  }
+
+  var aplicados = 0;
+  var faltantes = [];
+
+  MO_GRUPOS.forEach(function(grupo) {
+    var key          = grupo.key;
+    var nombresGrupo = grupo.lideres.map(function(l) { return l.nombre; });
+    var tieneA       = nombresGrupo.indexOf(nombreA) >= 0;
+    var tieneB       = mode !== 'dos' || nombresGrupo.indexOf(nombreB) >= 0;
+
+    if (!tieneA || !tieneB) { faltantes.push(grupo.pro_code || key); return; }
+
+    var modeEl = document.querySelector('.mo-group-mode[data-group="' + key + '"]');
+    var aEl    = document.querySelector('.mo-group-a[data-group="'    + key + '"]');
+    var bEl    = document.querySelector('.mo-group-b[data-group="'    + key + '"]');
+    var pctEl  = document.querySelector('.mo-group-pct[data-group="'  + key + '"]');
+    if (modeEl) modeEl.value = mode;
+    if (aEl)    aEl.value    = nombreA;
+    if (bEl)    bEl.value    = mode === 'dos' ? nombreB : '';
+    if (pctEl)  pctEl.value  = mode === 'dos' ? pctA : '50';
+
+    document.querySelectorAll('[id^="mo-opt-"][id$="-' + key + '"]').forEach(function(btn) {
+      btn.classList.remove('selected');
+      var r = btn.querySelector('input[type="radio"]');
+      if (r) r.checked = false;
+    });
+
+    if (mode === 'uno') {
+      var idxA   = nombresGrupo.indexOf(nombreA);
+      var optBtn = document.getElementById('mo-opt-idx' + idxA + '-' + key);
+      if (optBtn) {
+        optBtn.classList.add('selected');
+        var r = optBtn.querySelector('input[type="radio"]');
+        if (r) r.checked = true;
+      }
+      var sp = document.getElementById('mo-split-panel-' + key);
+      if (sp) sp.style.display = 'none';
+    } else {
+      var divBtn = document.getElementById('mo-opt-dividir-' + key);
+      if (divBtn) {
+        divBtn.classList.add('selected');
+        var r = divBtn.querySelector('input[type="radio"]');
+        if (r) r.checked = true;
+      }
+      var selA    = document.getElementById('mo-split-a-'     + key);
+      var selB    = document.getElementById('mo-split-b-'     + key);
+      var spInput = document.getElementById('mo-split-input-' + key);
+      var restoEl = document.getElementById('mo-split-resto-' + key);
+      var sp      = document.getElementById('mo-split-panel-' + key);
+      if (selA)    selA.value          = nombreA;
+      if (selB)    selB.value          = nombreB;
+      if (spInput) spInput.value       = pctA;
+      if (restoEl) restoEl.textContent = (100 - pctA) + '%';
+      if (sp)      sp.style.display    = '';
+    }
+
+    updateLiderStatus(key);
+    aplicados++;
+  });
+
+  actualizarContador();
+
+  var faltantesEl = document.getElementById('mo-faltantes');
+  if (faltantesEl) {
+    faltantesEl.style.display = '';
+    if (faltantes.length > 0) {
+      faltantesEl.style.background  = '#fff3cd';
+      faltantesEl.style.borderColor = '#ffc107';
+      faltantesEl.style.color       = '#856404';
+      faltantesEl.innerHTML = '<strong>⚠ Proyectos que requieren configuración manual:</strong> ' + faltantes.join(', ');
+    } else {
+      faltantesEl.style.background  = '#f0fff4';
+      faltantesEl.style.borderColor = '#28a745';
+      faltantesEl.style.color       = '#155724';
+      faltantesEl.innerHTML = '✓ Configuración global aplicada a todos los proyectos (' + aplicados + ').';
+    }
+  }
+}
+
+// ── Seleccionar todas (respeta disabled) ──
+function toggleAll(master) {
+  document.querySelectorAll('.chk-mo').forEach(function(c) {
+    if (!c.disabled) c.checked = master.checked;
+  });
+  actualizarContador();
+}
+
+document.querySelectorAll('.chk-mo').forEach(function(c) {
+  c.addEventListener('change', actualizarContador);
+});
+
+function validarLideresMO() {
+  var ok = true;
+  var requeridos = new Set();
+  document.querySelectorAll('.chk-mo:checked').forEach(function(chk) {
+    var g = chk.dataset.liderGroup;
+    if (g) requeridos.add(g);
+  });
+  requeridos.forEach(function(g) { if (!_isGrupoConfigurado(g)) ok = false; });
+  return ok;
+}
+
+function actualizarContador() {
+  var n = document.querySelectorAll('.chk-mo:checked:not(:disabled)').length;
+  var lbl = document.getElementById('lbl-seleccionadas');
+  var btn = document.getElementById('btn-liquidar');
+  if (lbl) lbl.textContent = n + ' seleccionada' + (n !== 1 ? 's' : '');
+  if (btn) btn.disabled = n === 0 || !validarLideresMO() || !pdlGlobalValido();
+}
+
+function confirmarLiquidar() {
+  var n = document.querySelectorAll('.chk-mo:checked:not(:disabled)').length;
+  if (!pdlGlobalConfirmar()) return false;
+  if (!validarLideresMO()) { alert('Completa la configuración de líderes antes de continuar.'); return false; }
+  return confirm('Liquidar ' + n + ' actividad(es) MO en SGS?\n\nSe abrirá el navegador Playwright. No cerrar hasta que termine.');
+}
+
+// ── Init: bloquear checkboxes sin grupo configurado + iniciar panel global ──
+document.addEventListener('DOMContentLoaded', function() {
+  initGlobalPanel();
+  document.querySelectorAll('.chk-mo[data-lider-group]').forEach(function(chk) {
+    var group = chk.dataset.liderGroup;
+    if (group && !_isGrupoConfigurado(group)) {
+      chk.disabled = true;
+      var tr = chk.closest('tr');
+      if (tr) tr.style.opacity = '0.45';
+    }
+  });
+});
+</script>
+{% endif %}
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   PROPORCIÓN GENERAL POR PORCENTAJES — lógica de UI
+   ═══════════════════════════════════════════════════════════ */
+
+var _pctFilaId = 0;   // contador para IDs únicos de filas
+
+function pctToggle(activo) {
+  var cfg = document.getElementById('pct-config');
+  if (!cfg) return;
+  cfg.style.display = activo ? 'block' : 'none';
+  if (activo && document.querySelectorAll('.pct-fila').length === 0) {
+    pctAgregarFila();
+    pctAgregarFila();
+  }
+}
+
+function pctAgregarFila() {
+  _pctFilaId++;
+  var id = _pctFilaId;
+  var fila = document.createElement('div');
+  fila.className = 'pct-fila';
+  fila.id = 'pct-fila-' + id;
+  fila.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;';
+  fila.innerHTML =
+    '<input type="text" id="pct-cedula-' + id + '" placeholder="Cédula (ej: C1234567890)" ' +
+    '  style="font-size:0.82rem;padding:7px 10px;border:1.5px solid #b0c4de;border-radius:5px;min-width:175px;" ' +
+    '  oninput="pctActualizarSuma()">' +
+    '<button type="button" onclick="pctBuscarNombre(' + id + ')" ' +
+    '  style="background:#5c6bc0;color:white;border:none;border-radius:5px;padding:7px 12px;' +
+    '         font-size:0.78rem;font-weight:700;cursor:pointer;white-space:nowrap;">' +
+    '  Buscar en SGS' +
+    '</button>' +
+    '<input type="text" id="pct-nombre-' + id + '" placeholder="Nombre del líder" ' +
+    '  style="font-size:0.82rem;padding:7px 10px;border:1.5px solid #b0c4de;border-radius:5px;min-width:200px;flex:1;" ' +
+    '  oninput="pctActualizarSuma()">' +
+    '<input type="number" id="pct-pct-' + id + '" placeholder="%" min="1" max="99" step="1" value="" ' +
+    '  style="font-size:0.82rem;padding:7px;border:1.5px solid #b0c4de;border-radius:5px;width:65px;" ' +
+    '  oninput="pctActualizarSuma()">' +
+    '<span id="pct-warn-' + id + '" ' +
+    '  style="display:none;font-size:0.75rem;color:#e65100;font-weight:700;white-space:nowrap;" ' +
+    '  title="La cédula no tiene \'C\' — puede seleccionar el registro incorrecto">⚠ Sin C</span>' +
+    '<button type="button" onclick="pctEliminarFila(' + id + ')" ' +
+    '  style="background:#eee;border:none;border-radius:5px;padding:7px 10px;cursor:pointer;color:#555;font-size:0.85rem;">✕</button>';
+  document.getElementById('pct-lideres-box').appendChild(fila);
+  pctActualizarSuma();
+}
+
+function pctEliminarFila(id) {
+  var el = document.getElementById('pct-fila-' + id);
+  if (el) el.remove();
+  pctActualizarSuma();
+}
+
+function pctActualizarSuma() {
+  var filas = document.querySelectorAll('.pct-fila');
+  var suma  = 0;
+  filas.forEach(function(fila) {
+    var id  = fila.id.replace('pct-fila-', '');
+    var pct = parseFloat((document.getElementById('pct-pct-' + id) || {}).value || 0) || 0;
+    suma   += pct;
+    var cedula  = ((document.getElementById('pct-cedula-' + id) || {}).value || '').trim();
+    var warnEl  = document.getElementById('pct-warn-' + id);
+    if (warnEl) {
+      warnEl.style.display = (cedula && !cedula.toUpperCase().includes('C')) ? 'inline' : 'none';
+    }
+  });
+  var label = document.getElementById('pct-suma');
+  if (!label) return;
+  label.textContent = 'Total: ' + suma.toFixed(1) + ' %';
+  var ok = Math.abs(suma - 100) < 0.5;
+  label.style.color = ok ? '#2e7d32' : (suma > 0 ? '#c62828' : '#888');
+}
+
+async function pctBuscarNombre(id) {
+  var cedula = ((document.getElementById('pct-cedula-' + id) || {}).value || '').trim();
+  if (!cedula) { alert('Ingresa la cédula antes de buscar.'); return; }
+  var btn = document.querySelector('#pct-fila-' + id + ' button');
+  if (btn) btn.textContent = '…';
+  try {
+    var resp = await fetch('/julian/buscar_partner_cedula', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({cedula: cedula}),
+    });
+    var data = await resp.json();
+    if (data.ok) {
+      var nEl = document.getElementById('pct-nombre-' + id);
+      if (nEl) nEl.value = data.nombre;
+      if (data.advertencia) alert('Aviso: ' + data.advertencia);
+    } else {
+      var msg = data.error || 'No encontrado';
+      if (data.advertencia) msg += '\n(' + data.advertencia + ')';
+      alert(msg);
+    }
+  } catch(e) {
+    alert('Error de red buscando en SGS: ' + e);
+  } finally {
+    if (btn) btn.textContent = 'Buscar en SGS';
+    pctActualizarSuma();
+  }
+}
+
+async function pctCalcular() {
+  var filas = document.querySelectorAll('.pct-fila');
+  var lideres = [];
+  filas.forEach(function(fila) {
+    var id     = fila.id.replace('pct-fila-', '');
+    var cedula = ((document.getElementById('pct-cedula-' + id) || {}).value || '').trim();
+    var nombre = ((document.getElementById('pct-nombre-'  + id) || {}).value || '').trim();
+    var pct    = parseFloat((document.getElementById('pct-pct-' + id) || {}).value || 0) || 0;
+    if (nombre && pct > 0) lideres.push({cedula: cedula, nombre: nombre, pct: pct});
+  });
+
+  if (lideres.length < 1) {
+    alert('Agrega al menos un líder con nombre y porcentaje.');
+    return;
+  }
+  var suma = lideres.reduce(function(s, l) { return s + l.pct; }, 0);
+  if (Math.abs(suma - 100) > 0.5) {
+    alert('Los porcentajes deben sumar 100 %. Actualmente suman ' + suma.toFixed(1) + ' %.');
+    return;
+  }
+
+  var spinEl  = document.getElementById('pct-spin');
+  var errEl   = document.getElementById('pct-error');
+  var btnCalc = document.getElementById('btn-calcular-pct');
+  spinEl.style.display  = 'inline';
+  errEl.style.display   = 'none';
+  btnCalc.disabled      = true;
+
+  try {
+    var resp = await fetch('/julian/calcular_distribucion_pct/{{ sid }}', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({lideres: lideres}),
+    });
+    var data = await resp.json();
+    if (!data.ok) {
+      errEl.textContent  = data.error || 'Error desconocido';
+      errEl.style.display = 'inline';
+      document.getElementById('form-liquidar-pct').style.display = 'none';
+      document.getElementById('pct-preview').style.display = 'none';
+      return;
+    }
+    pctMostrarPreview(data.distribucion, data.advertencias || []);
+    document.getElementById('form-liquidar-pct').style.display = 'block';
+  } catch(e) {
+    errEl.textContent  = 'Error de red: ' + e;
+    errEl.style.display = 'inline';
+  } finally {
+    spinEl.style.display = 'none';
+    btnCalc.disabled     = false;
+  }
+}
+
+function pctMostrarPreview(dist, advertencias) {
+  var box = document.getElementById('pct-preview');
+  if (!box) return;
+  var html = '';
+
+  if (advertencias && advertencias.length) {
+    html += '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;' +
+            'padding:10px 14px;margin-bottom:12px;font-size:0.82rem;line-height:1.6;">';
+    advertencias.forEach(function(a) { html += '⚠ ' + a + '<br>'; });
+    html += '</div>';
+  }
+
+  var total = (dist.total || 0).toLocaleString('es-CO', {maximumFractionDigits:0});
+  html += '<p style="font-size:0.83rem;color:#444;margin:0 0 10px;">' +
+          'Presupuesto total MO: <strong>$ ' + total + '</strong></p>';
+
+  html += '<table style="width:100%;border-collapse:collapse;font-size:0.83rem;margin-bottom:14px;">' +
+    '<thead><tr style="background:#f0f4fa;">' +
+    '<th style="padding:8px 10px;text-align:left;border-bottom:2px solid #c8d8e8;">Líder</th>' +
+    '<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #c8d8e8;">% Objetivo</th>' +
+    '<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #c8d8e8;">% Real</th>' +
+    '<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #c8d8e8;">Desv.</th>' +
+    '<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #c8d8e8;">Valor ($)</th>' +
+    '<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #c8d8e8;">Items</th>' +
+    '</tr></thead><tbody>';
+
+  (dist.asignaciones || []).forEach(function(a) {
+    var desv  = a.pct_real - a.pct_obj;
+    var color = Math.abs(desv) > 5 ? '#c62828' : (Math.abs(desv) > 2 ? '#e65100' : '#2e7d32');
+    var signo = desv >= 0 ? '+' : '';
+    html += '<tr style="border-bottom:1px solid #e8eef5;">' +
+      '<td style="padding:8px 10px;font-weight:600;">' + (a.lider || '—') + '</td>' +
+      '<td style="padding:8px 10px;text-align:right;">' + (a.pct_obj||0).toFixed(1) + ' %</td>' +
+      '<td style="padding:8px 10px;text-align:right;font-weight:700;color:' + color + ';">' +
+          (a.pct_real||0).toFixed(1) + ' %</td>' +
+      '<td style="padding:8px 10px;text-align:right;color:' + color + ';font-size:0.78rem;">' +
+          signo + desv.toFixed(1) + '%</td>' +
+      '<td style="padding:8px 10px;text-align:right;">$ ' +
+          (a.valor||0).toLocaleString('es-CO', {maximumFractionDigits:0}) + '</td>' +
+      '<td style="padding:8px 10px;text-align:right;">' + (a.n_items||0) + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+
+  // Detalle de prestaciones (primeras 30)
+  var preview = dist.preview || [];
+  if (preview.length) {
+    html += '<details style="margin-top:4px;">' +
+      '<summary style="cursor:pointer;font-size:0.82rem;color:#1a3e6e;font-weight:700;' +
+      'padding:6px 0;">Ver detalle de prestaciones (' + preview.length + ' items)</summary>' +
+      '<div style="margin-top:8px;max-height:320px;overflow-y:auto;">' +
+      '<table style="width:100%;border-collapse:collapse;font-size:0.79rem;">' +
+      '<thead><tr style="background:#f8f9fa;">' +
+      '<th style="padding:5px 8px;text-align:left;">QP</th>' +
+      '<th style="padding:5px 8px;text-align:left;">Nodo</th>' +
+      '<th style="padding:5px 8px;text-align:right;">Cant.</th>' +
+      '<th style="padding:5px 8px;text-align:right;">Valor total</th>' +
+      '<th style="padding:5px 8px;text-align:left;">Reparto</th>' +
+      '</tr></thead><tbody>';
+    preview.forEach(function(p) {
+      var reparto = (p.partes || []).map(function(pt) {
+        return pt.lider.split(' ')[0] + ': ' + pt.cantidad;
+      }).join(' | ');
+      html += '<tr style="border-bottom:1px solid #f0f0f0;">' +
+        '<td style="padding:5px 8px;font-family:monospace;">' + (p.qp||'') + '</td>' +
+        '<td style="padding:5px 8px;">' + (p.nodo||'') + '</td>' +
+        '<td style="padding:5px 8px;text-align:right;">' + (p.cantidad_total||0) + '</td>' +
+        '<td style="padding:5px 8px;text-align:right;">$ ' +
+            (p.valor_total||0).toLocaleString('es-CO',{maximumFractionDigits:0}) + '</td>' +
+        '<td style="padding:5px 8px;color:#555;">' + reparto + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table></div></details>';
+  }
+
+  box.innerHTML    = html;
+  box.style.display = 'block';
+}
+</script>
+
+{# ── Tabla MAT ── #}
+{% if checks_mat %}
+{% set mat_liquidables = checks_mat | selectattr('ok') | selectattr('estado', 'in', ['ok','avance_parcial']) | list %}
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;
+              border-bottom:2px solid #f0f2f5;padding-bottom:10px;margin-bottom:16px;">
+    <h2 style="margin:0;border:none;padding:0;">Materiales ({{ checks_mat|length }} filas)</h2>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <a href="{{ url_for('julian.cruce_sgs', sid=sid) }}"
+         style="background:#833C00;color:white;padding:8px 18px;border-radius:6px;
+                font-weight:700;font-size:0.85rem;text-decoration:none;white-space:nowrap;">
+        ↓ Descargar CRUCE_SGS
+      </a>
+      <a href="{{ url_for('julian.balance_sgs', sid=sid) }}"
+         style="background:#e65100;color:white;padding:8px 18px;border-radius:6px;
+                font-weight:700;font-size:0.85rem;text-decoration:none;white-space:nowrap;">
+        Ver Balance por Bandeja →
+      </a>
+    </div>
+  </div>
+
+  <form method="POST" action="{{ url_for('julian.preview_liquidar', sid=sid) }}" id="form-liquidar-mat">
+  <input type="hidden" name="pdl_input" class="pdl-hidden-field" value="{{ pdl_actual }}">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:36px;">
+          {% if mat_liquidables %}
+          <input type="checkbox" id="chk-mat-all" title="Seleccionar todas"
+                 onchange="toggleAllMat(this)" style="cursor:pointer;">
+          {% endif %}
+        </th>
+        <th>Nodo</th><th>PRO SGS</th><th>Código SAP</th><th>Descripcion</th>
+        <th>Tipo</th><th>Cant. Pres.</th><th>Avance SGS</th>
+        <th>Bandejas</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for mc in checks_mat %}
+    {% set mat = mc.mat %}
+    {% set liquidable = mc.ok and mc.estado in ('ok', 'avance_parcial') and mc.pm_id %}
+    {% set tiene_dev = mc.sgs_devuelto and mc.sgs_devuelto > 0 %}
+    <tr {% if liquidable %}class="fila-liquidable"{% endif %}
+        {% if tiene_dev %}style="background:#fff3e0;border-left:3px solid #e65100;"{% endif %}>
+      <td>
+        {% if liquidable %}
+        <input type="checkbox" name="idx_mat" value="{{ mc._real_idx if mc._real_idx is defined else loop.index0 }}"
+               class="chk-mat" style="cursor:pointer;">
+        {% endif %}
+      </td>
+      <td>{{ mat.nodo }}</td>
+      <td>
+        {% if mc.pro_code %}
+          <span style="font-size:0.8rem;">{{ mc.pro_code }}</span><br>
+          <span style="color:#888;font-size:0.75rem;">{{ mc.pnombre[:40] if mc.pnombre else '' }}</span>
+        {% else %}—{% endif %}
+      </td>
+      <td>
+        {% if mc.es_custodia %}
+          <strong>{{ mc.codigo_sgs or mat.codigo }}</strong>
+          <span style="display:inline-block;background:#fef3c7;color:#92400e;
+                       border:1px solid #fcd34d;border-radius:4px;
+                       font-size:0.65rem;font-weight:800;padding:1px 5px;
+                       margin-left:3px;vertical-align:middle;"
+                title="Variante custodia — Excel usa '{{ mat.codigo }}'">C</span>
+          <div style="font-size:0.68rem;color:#92400e;">Excel: {{ mat.codigo }}</div>
+        {% else %}
+          <strong>{{ mat.codigo }}</strong>
+        {% endif %}
+      </td>
+      <td style="font-size:0.8rem;">{{ mat.descripcion[:35] if mat.descripcion else '—' }}</td>
+      <td>
+        {% if mat.tipo_material %}
+          <span class="badge {{ 'badge-blue' if mat.tipo_material == 'PROPIO' else 'badge-gray' }}">
+            {{ mat.tipo_material }}
+          </span>
+        {% else %}—{% endif %}
+      </td>
+      <td style="text-align:right">{{ mat.sgs_neto_excel }}</td>
+      <td style="text-align:right">
+        {{ mc.advance_real if mc.advance_real is not none else '—' }}
+      </td>
+      <td style="font-size:0.75rem;min-width:130px;">
+        {% set ban_d = mc.ban_despacho  if mc.ban_despacho  is defined else [] %}
+        {% set ban_r = mc.ban_devolucion if mc.ban_devolucion is defined else [] %}
+        {% if ban_d or ban_r %}
+          {% for b in ban_d %}
+            <div style="display:inline-flex;align-items:center;gap:3px;
+                        background:#d4edda;color:#155724;border:1px solid #c3e6cb;
+                        border-radius:4px;padding:1px 6px;margin:1px 2px 1px 0;
+                        white-space:nowrap;font-size:0.7rem;">
+              ↑ {{ b }}
+            </div>
+          {% endfor %}
+          {% for b in ban_r %}
+            <div style="display:inline-flex;align-items:center;gap:3px;
+                        background:#ffe0b2;color:#bf360c;border:1px solid #ffcc80;
+                        border-radius:4px;padding:1px 6px;margin:1px 2px 1px 0;
+                        white-space:nowrap;font-size:0.7rem;font-weight:700;">
+              ↩ {{ b }}
+            </div>
+          {% endfor %}
+        {% else %}
+          <span style="color:#bbb;">—</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if mc.estado == 'ya_liquidado' %}
+          <span class="badge badge-gray">Ya liquidado</span>
+        {% elif mc.estado == 'ok' %}
+          <span class="badge badge-ok">Pendiente</span>
+        {% elif mc.estado == 'avance_parcial' %}
+          <span class="badge badge-warn">Parcial</span>
+        {% elif mc.estado == 'descuadre' %}
+          <span class="badge badge-error">Descuadre</span>
+        {% elif mc.estado in ('sin_mov', 'sin_mov_ok') %}
+          <span class="badge badge-blue">Sin mov.</span>
+        {% elif mc.estado == 'devolucion' %}
+          <span class="badge badge-gray">Devolución</span>
+        {% elif mc.estado == 'devolucion_sgs' %}
+          <span class="badge badge-error">Bloqueado devolución SGS</span>
+        {% elif mc.estado == 'no_encontrado' %}
+          <span class="badge badge-error">No encontrado</span>
+        {% else %}
+          <span class="badge badge-gray">{{ mc.estado }}</span>
+        {% endif %}
+        {% if mc.errores %}
+          <ul class="errores">{% for e in mc.errores %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  {% if mat_liquidables %}
+  <div style="margin-top:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+    <span id="lbl-mat-sel" style="font-size:0.85rem;color:#555;">0 seleccionadas</span>
+    <button type="submit" id="btn-liquidar-mat" class="btn btn-success" disabled
+            onclick="return confirmarLiquidarMat()">
+      Liquidar materiales →
+    </button>
+  </div>
+  {% endif %}
+  </form>
+
+
+</div>
+
+<script>
+function toggleAllMat(master) {
+  document.querySelectorAll('.chk-mat').forEach(c => c.checked = master.checked);
+  actualizarContadorMat();
+}
+document.querySelectorAll('.chk-mat').forEach(c =>
+  c.addEventListener('change', actualizarContadorMat)
+);
+function actualizarContadorMat() {
+  const n = document.querySelectorAll('.chk-mat:checked').length;
+  const lbl = document.getElementById('lbl-mat-sel');
+  const btn = document.getElementById('btn-liquidar-mat');
+  if (lbl) lbl.textContent = n + ' seleccionada' + (n !== 1 ? 's' : '');
+  if (btn) btn.disabled = n === 0 || !pdlGlobalValido();
+}
+function confirmarLiquidarMat() {
+  const n = document.querySelectorAll('.chk-mat:checked').length;
+  if (!pdlGlobalConfirmar()) return false;
+  return confirm('Liquidar ' + n + ' material(es) en SGS?\n\nSe abrirá el navegador Playwright.');
+}
+</script>
+{% endif %}
+
+<div style="display:flex;gap:12px;margin-top:8px;">
+  <a href="{{ url_for('julian.subir') }}" class="btn btn-light">Subir otro Presupuesto</a>
+</div>
+
+{# ── Continuar con otros nodos ── #}
+{% if nodos_pendientes %}
+<div style="background:#f0f7ff;border:2px solid #90caf9;border-radius:10px;
+            padding:20px 24px;margin-top:24px;">
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+    <div>
+      <strong style="font-size:1rem;color:#1565c0;">¿Liquidar otros nodos?</strong><br>
+      <span style="font-size:0.87rem;color:#555;">
+        Quedan <strong>{{ nodos_pendientes | length }}</strong> nodo(s) sin verificar:
+        {% for n in nodos_pendientes %}
+          <strong>{{ n }}</strong>{% if not loop.last %}, {% endif %}
+        {% endfor %}
+      </span>
+    </div>
+    <a href="{{ url_for('julian.balance_sgs', sid=sid) }}"
+       style="margin-left:auto;background:#1565c0;color:white;padding:12px 22px;
+              border-radius:6px;font-weight:700;font-size:0.95rem;text-decoration:none;
+              white-space:nowrap;flex-shrink:0;">
+      Verificar nodos restantes →
+    </a>
+  </div>
+</div>
+{% elif nodos_en_liquidacion %}
+<div style="background:#f1f8f4;border:2px solid #c3e6cb;border-radius:10px;
+            padding:16px 24px;margin-top:24px;font-size:0.9rem;color:#2e7d32;">
+  ✓ Todos los nodos del presupuesto han sido procesados.
+</div>
+{% endif %}
+
+{% endblock %}

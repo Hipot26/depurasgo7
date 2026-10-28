@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Motoverificador{% endblock %} — SGS UI</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a2e; }
+
+  .navbar {
+    background: #1a1a2e; color: white; padding: 12px 24px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .navbar .brand { font-size: 1.05rem; font-weight: 700; letter-spacing: 1px; }
+  .navbar .tag   { background: #e74c3c; color: white; padding: 2px 8px;
+                   border-radius: 4px; font-size: 0.7rem; font-weight: 700; }
+  .navbar .nav-link {
+    color: rgba(255,255,255,.7); text-decoration: none; font-size: 0.82rem;
+    padding: 4px 10px; border-radius: 4px; transition: background .15s;
+  }
+  .navbar .nav-link:hover { background: rgba(255,255,255,.1); color: white; }
+  .navbar .nav-link.active { color: white; background: rgba(255,255,255,.15); }
+
+  .container { max-width: 1100px; margin: 28px auto; padding: 0 16px; }
+
+  .card {
+    background: white; border-radius: 10px; padding: 24px 28px;
+    box-shadow: 0 2px 12px rgba(0,0,0,.08); margin-bottom: 20px;
+  }
+  .card-header {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 18px; padding-bottom: 12px;
+    border-bottom: 2px solid #f0f2f5;
+  }
+  .card-header h2 { font-size: 1.05rem; color: #1a1a2e; }
+  .card-header .step-badge {
+    background: #1a1a2e; color: white; border-radius: 50%;
+    width: 24px; height: 24px; display: flex; align-items: center;
+    justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 20px; border-radius: 6px; font-size: 0.88rem;
+    font-weight: 600; cursor: pointer; border: none;
+    text-decoration: none; transition: opacity .15s;
+  }
+  .btn:hover:not(:disabled) { opacity: .85; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-primary { background: #1a1a2e; color: white; }
+  .btn-success { background: #27ae60; color: white; }
+  .btn-danger  { background: #e74c3c; color: white; }
+  .btn-light   { background: #f0f2f5; color: #1a1a2e; border: 1px solid #ddd; }
+  .btn-blue    { background: #2980b9; color: white; }
+  .btn-sm      { padding: 5px 12px; font-size: 0.8rem; }
+
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 0.72rem; font-weight: 700;
+  }
+  .badge-ok    { background: #d4edda; color: #155724; }
+  .badge-error { background: #f8d7da; color: #721c24; }
+  .badge-warn  { background: #fff3cd; color: #856404; }
+  .badge-gray  { background: #e9ecef; color: #495057; }
+  .badge-blue  { background: #cce5ff; color: #004085; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+  th {
+    background: #f8f9fa; padding: 10px 12px; text-align: left;
+    border-bottom: 2px solid #dee2e6; font-weight: 600; font-size: 0.8rem;
+  }
+  td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+  tr:hover td { background: #fafbfc; }
+
+  .alert { padding: 12px 16px; border-radius: 6px; margin-bottom: 14px; font-size: 0.88rem; }
+  .alert-danger  { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+  .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+  .alert-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+  .alert-info    { background: #cce5ff; color: #004085; border: 1px solid #b8daff; }
+
+  .stat-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  .stat {
+    background: white; border-radius: 8px; padding: 14px 20px;
+    box-shadow: 0 1px 6px rgba(0,0,0,.07); text-align: center; min-width: 90px;
+  }
+  .stat .num { font-size: 1.7rem; font-weight: 700; }
+  .stat .lbl { font-size: 0.73rem; color: #888; margin-top: 2px; }
+  .stat.green .num { color: #27ae60; }
+  .stat.red   .num { color: #e74c3c; }
+  .stat.blue  .num { color: #2980b9; }
+
+  input[type=text], input[type=search] {
+    padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px;
+    font-size: 0.88rem; outline: none; transition: border-color .15s;
+  }
+  input[type=text]:focus, input[type=search]:focus { border-color: #1a1a2e; }
+
+  .spinner {
+    width: 18px; height: 18px; border: 2px solid #e0e0e0;
+    border-top-color: #1a1a2e; border-radius: 50%;
+    animation: spin .6s linear infinite; display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Barra de progreso */
+  .progress-wrap {
+    height: 8px; background: #e9ecef; border-radius: 4px; overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%; background: #27ae60; border-radius: 4px;
+    transition: width .4s ease;
+  }
+
+  /* Panel flotante de estado */
+  #status-panel {
+    display: none; position: fixed; bottom: 20px; right: 20px;
+    background: #1a1a2e; color: white; border-radius: 10px;
+    padding: 16px 20px; min-width: 280px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.3); z-index: 9999;
+  }
+  #status-title { font-weight: 700; margin-bottom: 4px; font-size: 0.95rem; }
+  #status-msg   { font-size: 0.82rem; opacity: .85; margin-bottom: 8px; }
+
+  .mono { font-family: 'Consolas', monospace; font-size: 0.82rem; }
+</style>
+{% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<div class="navbar">
+  <span class="brand">SGS UI</span>
+  <span class="tag">MOTOVERIFICADOR</span>
+  <a href="{{ url_for('motoverificador.inicio') }}"
+     class="nav-link {% if request.endpoint == 'motoverificador.inicio' %}active{% endif %}">
+    Inicio
+  </a>
+  <a href="{{ url_for('motoverificador.panel') }}"
+     class="nav-link {% if request.endpoint == 'motoverificador.panel' %}active{% endif %}">
+    Panel
+  </a>
+  <span style="flex:1"></span>
+  <a href="/" style="color:rgba(255,255,255,.5);font-size:0.78rem;text-decoration:none;">
+    ← App principal
+  </a>
+  <button onclick="reiniciarServidor()" id="btn-reiniciar"
+          style="background:rgba(231,76,60,.25);border:1px solid rgba(231,76,60,.5);
+                 color:rgba(255,255,255,.75);border-radius:5px;padding:4px 10px;
+                 font-size:0.72rem;font-weight:600;cursor:pointer;transition:background .15s;"
+          onmouseover="this.style.background='rgba(231,76,60,.5)'"
+          onmouseout="this.style.background='rgba(231,76,60,.25)'"
+          title="Reinicia el servidor Flask (os.execv)">
+    ↺ Reiniciar servidor
+  </button>
+</div>
+
+<script>
+async function reiniciarServidor() {
+  const btn = document.getElementById('btn-reiniciar');
+  if (!confirm('¿Reiniciar el servidor Flask?\nLa página se recargará en ~3 segundos.')) return;
+  btn.textContent = '↺ Reiniciando…';
+  btn.disabled = true;
+  try {
+    await fetch('/reiniciar_servidor', {method: 'POST'});
+  } catch(_) {}
+  // El servidor tarda ~0.5s en ejecutar execv — esperar y recargar
+  setTimeout(() => location.reload(), 3000);
+}
+</script>
+
+<div class="container">
+  {% with msgs = get_flashed_messages() %}
+    {% if msgs %}{% for m in msgs %}
+      <div class="alert alert-warning">{{ m }}</div>
+    {% endfor %}{% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</div>
+
+</body>
+</html>

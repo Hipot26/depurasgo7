@@ -1,0 +1,7 @@
+# Agentes de Outlook (PC con Windows). Versiones del PC de operación; pillow subido por aviso de seguridad (CVE-2026-112396).
+pywin32==312
+requests==2.33.1
+openpyxl==3.1.5
+playwright==1.58.0
+pillow==13.0.0
+pandas==3.0.5             # cargadores de exportes de Gestión General (Excel y CSV)

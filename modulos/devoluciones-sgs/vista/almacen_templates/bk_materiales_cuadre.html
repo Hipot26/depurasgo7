@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Almacén — Cuadre</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+    background: #f0f2f5; min-height: 100vh;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 40px 16px;
+  }
+  .card {
+    background: #fff; border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.12);
+    padding: 36px 44px; width: 1150px; max-width: 99vw;
+  }
+  .logo-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .logo-icon {
+    width: 40px; height: 40px; background: #0F5E75; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 15px; font-weight: bold;
+  }
+  .logo-title { font-size: 17px; font-weight: 700; color: #0F5E75; }
+  .subtitle { font-size: 12px; color: #888; margin-bottom: 24px; }
+  .step-bar { display:flex; gap:6px; font-size:11px; color:#999; margin-bottom:18px; }
+  .step { padding:3px 10px; border-radius:10px; background:#f0f2f5; }
+  .step.on { background:#0F5E75; color:#fff; font-weight:600; }
+
+  label { display:block; font-size:11px; font-weight:700; color:#456; margin-bottom:3px; }
+  input[type=text], input[type=date], input[type=email] {
+    width: 100%; padding: 7px 10px; border: 1.5px solid #ccd;
+    border-radius: 5px; font-size: 13px;
+  }
+  input:focus { outline: none; border-color: #0F5E75; }
+  input.num {
+    width: 72px; padding: 5px 7px; text-align: center;
+    border: 1.5px solid #ccd; border-radius: 5px; font-size: 13px;
+  }
+  input.num.dev { border-color: #d9b8b8; background: #fff8f8; }
+  input.num.dev.changed { border-color: #c00; background: #ffefef; font-weight: 700; }
+
+  .global-box {
+    display: grid; grid-template-columns: 1fr 200px; gap: 14px;
+    background: #f2f8fa; border: 1.5px solid #cfe3ea; border-radius: 8px;
+    padding: 14px 16px; margin-bottom: 18px;
+  }
+
+  .adv {
+    margin: 12px 0; padding: 10px 14px; background: #fff8e6;
+    border-left: 4px solid #e6a817; border-radius: 4px; font-size: 12px; color: #7a5c00;
+  }
+  .adv div { margin: 2px 0; }
+
+  .nodo-card { border: 1.5px solid #cfe3ea; border-radius: 8px; margin-top: 20px; overflow: hidden; }
+  .nodo-hdr {
+    background: #0F5E75; color: #fff; padding: 9px 14px;
+    font-size: 13px; font-weight: 700; display: flex; gap: 14px; align-items: baseline;
+  }
+  .nodo-hdr .sub { font-weight: 400; font-size: 11px; opacity: .85; }
+  .nodo-inputs {
+    display: grid; grid-template-columns: 130px 150px 160px 1fr; gap: 12px;
+    padding: 12px 14px; background: #f8fbfc; border-bottom: 1px solid #e4edf1;
+  }
+
+  .ban-hdr {
+    background: #e6f1f5; padding: 7px 14px; font-size: 12px; font-weight: 700; color: #0F5E75;
+    display: flex; gap: 16px; align-items: center; border-top: 1px solid #d5e5eb;
+  }
+  .ban-hdr .meta { font-weight: 400; color: #567; font-size: 11px; }
+  .ban-hdr input[type=date] { width: 140px; padding: 4px 7px; font-size: 12px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: #fff; color: #444; padding: 7px 9px; text-align: left;
+       border-bottom: 2px solid #e4edf1; font-size: 11px; white-space: nowrap; }
+  td { padding: 6px 9px; border-bottom: 1px solid #f0f4f6; vertical-align: middle; }
+  tr.excluida td { opacity: .35; }
+  td.center, th.center { text-align: center; }
+  input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; accent-color: #0F5E75; }
+
+  .k-btn {
+    border: none; border-radius: 4px; padding: 3px 10px; font-size: 11px;
+    font-weight: 700; cursor: pointer; white-space: nowrap;
+  }
+  .k-1 { background: #FFE699; color: #7a5c00; }
+  .k-0 { background: #ededed; color: #666; }
+  .via { font-size: 9px; color: #999; display: block; }
+  .chip-cli {
+    display:inline-block; font-size:9px; font-weight:700; color:#1F4E79;
+    background:#DEEBF7; border-radius:6px; padding:1px 5px; margin-left:4px; vertical-align:middle;
+  }
+  .devsgs { font-weight: 700; color: #9C0006; }
+  .devsgs.cero { color: #bbb; font-weight: 400; }
+  .devhoja { font-weight: 700; color: #0F5E75; }
+  .devhoja.cero { color: #bbb; font-weight: 400; }
+  .devhoja.rojo { color: #c00; }
+  .devhoja.amarillo { color: #a06a00; }
+  .hoja-chip { display:inline-block; font-size:10px; font-weight:700; border-radius:6px; padding:2px 7px; }
+  .hoja-chip.val { background:#dff3e7; color:#1d7a4b; }
+  .hoja-chip.sinval { background:#fff1d6; color:#9a5b00; }
+  .hoja-chip.no { background:#eee; color:#888; font-weight:400; }
+  .hojas-info { padding: 8px 14px; font-size: 12px; color: #345; background: #eef6f8;
+                border: 1px solid #d5e5eb; border-radius: 6px; margin-bottom: 12px; }
+
+  .dev-info {
+    padding: 8px 14px; font-size: 11px; color: #667; background: #fcf6f6;
+    border-top: 1px dashed #e5cccc;
+  }
+
+  .totales {
+    position: sticky; bottom: 0; background: #1F3864; color: #fff;
+    border-radius: 8px; margin-top: 20px; padding: 12px 18px;
+    display: flex; gap: 28px; font-size: 13px; align-items: center;
+    box-shadow: 0 -2px 12px rgba(0,0,0,.15);
+  }
+  .totales b { font-size: 16px; }
+  .totales .apor { color: #FFE699; }
+
+  .btn-generar {
+    margin-left: auto; padding: 11px 26px; background: #2e9e5b; color: #fff;
+    border: none; border-radius: 6px; font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  .btn-generar:hover { background: #37b96b; }
+  .btn-generar:disabled { background: #aaa; cursor: not-allowed; }
+  .btn-back {
+    display: block; margin-top: 14px; padding: 10px;
+    background: #f0f2f5; color: #555; text-align: center;
+    border-radius: 6px; font-size: 13px; text-decoration: none;
+  }
+  .btn-back:hover { background: #e0e4e8; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="logo-bar">
+    <div class="logo-icon">MAT</div>
+    <div class="logo-title">Materiales Sony — Cuadre</div>
+  </div>
+  <div class="subtitle">
+    {{ padre.get('name','') }} — ajusta cantidades, devoluciones y aportaciones antes de generar el cargue
+  </div>
+
+  <div class="step-bar">
+    <div class="step">1 · Nodos</div>
+    <div class="step">2 · Bandejas</div>
+    <div class="step on">3 · Cuadre</div>
+    <div class="step">4 · Cargue</div>
+  </div>
+
+  {% if cuadre.advertencias %}
+  <div class="adv">
+    <strong>⚠ Advertencias del cruce:</strong>
+    {% for a in cuadre.advertencias %}<div>• {{ a }}</div>{% endfor %}
+  </div>
+  {% endif %}
+
+  <form method="POST" action="/almacen/generar/{{ sid }}" id="frm-cuadre">
+
+    <div class="global-box">
+      <div>
+        <label for="usuario">Usuario del cargue (columna B)</label>
+        <input type="email" id="usuario" name="usuario" placeholder="ej: cesar.castro@sonny.com"
+               value="{{ usuario_def }}">
+      </div>
+      <div>
+        <label>Fecha asignación (columna C)</label>
+        <input type="text" value="{{ hoy }} (automática)" disabled
+               style="background:#eef2f4;color:#889">
+      </div>
+    </div>
+
+    {% if info_hojas %}
+    <div class="hojas-info">
+      📷 <b>Hojas de bandeja:</b> {{ info_hojas.con_hoja }} de {{ info_hojas.total }} despachos tienen foto en el módulo de devoluciones
+      ({{ info_hojas.validadas }} validadas por almacén). La columna <em>Dev. hoja</em> muestra lo que la cuadrilla escribió;
+      <em>Devolución final</em> arranca con la bandeja real de SGS si ya existe, si no con la hoja. Recarga esta página si almacén acaba de validar.
+      {% if info_hojas.error %}<br><span style="color:#c00">⚠ {{ info_hojas.error }}</span>{% endif %}
+    </div>
+    {% endif %}
+    {% for nc in cuadre.nodos_cuadre %}
+    <div class="nodo-card">
+      <div class="nodo-hdr">
+        <span>NODO {{ nc.nodo_num }}</span>
+        <span class="sub">{{ nc.pro }} — {{ nc.name }}</span>
+      </div>
+
+      <div class="nodo-inputs">
+        <div>
+          <label>Id_nodo (col. A)</label>
+          <input type="text" name="idnodo_{{ nc.pro }}" value="{{ nc.id_nodo_sug }}"
+                 placeholder="ej: 220532">
+        </div>
+        <div>
+          <label>Pdi (col. H)</label>
+          <input type="text" name="pdi_{{ nc.pro }}" value="{{ nc.pdi_sug or '' }}" placeholder="ej: DX20125222">
+        </div>
+        <div>
+          <label>Fecha reintegro (col. L)</label>
+          <input type="date" name="reintegro_{{ nc.pro }}" value="{{ hoy }}">
+        </div>
+        <div>
+          <label>Observaciones (col. J)</label>
+          <input type="text" name="obs_{{ nc.pro }}" placeholder="opcional">
+        </div>
+      </div>
+
+      {% for d in nc.despachos %}
+      <div class="ban-hdr">
+        <span>{{ d.ban_name }}</span>
+        <span class="meta">{{ d.picking }} · {{ d.equipo }}</span>
+        {% if d.hoja and d.hoja.validada %}
+          <span class="hoja-chip val" title="Hoja fotografiada y validada en el módulo de devoluciones (sesión {{ d.hoja.sesion }}, foto #{{ d.hoja.foto_n }})">📷 hoja validada por {{ d.hoja.validada.por }} · {{ (d.hoja.validada.ts or '')[:16]|replace('T',' ') }}</span>
+        {% elif d.hoja %}
+          <span class="hoja-chip sinval" title="Hoja fotografiada pero aún sin validar (sesión {{ d.hoja.sesion }}, foto #{{ d.hoja.foto_n }})">📷 hoja leída, sin validar</span>
+        {% else %}
+          <span class="hoja-chip no" title="Ninguna foto de esta bandeja en el módulo de devoluciones">sin hoja</span>
+        {% endif %}
+        <span class="meta" style="margin-left:auto">Fecha entrega (col. G):</span>
+        <input type="date" name="fban_{{ d.ban_id }}" value="{{ d.fecha }}">
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th class="center" style="width:34px">✓</th>
+            <th class="center">Código (col. D)</th>
+            <th>Descripción</th>
+            <th class="center">Entregado (E)</th>
+            <th class="center">Dev. SGS</th>
+            <th class="center" title="Lo que la cuadrilla escribió en la hoja (leído por OCR y validado por almacén)">Dev. hoja 📷</th>
+            <th class="center">Devolución final (F)</th>
+            <th class="center">Aportación (K)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in d.filas %}
+          <tr id="tr{{ f.idx }}">
+            <td class="center">
+              <input type="checkbox" name="r{{ f.idx }}_incl" value="1" checked
+                     onchange="filaToggle({{ f.idx }})">
+            </td>
+            <td class="center" style="font-weight:600">
+              {{ f.cod or '?' }}
+              {% if f.es_cliente %}<span class="chip-cli" title="SGS lo marca como material del cliente">cli</span>{% endif %}
+              {% if not f.cod %}<span class="via" style="color:#c00">sin E4E ({{ f.dom }})</span>{% endif %}
+            </td>
+            <td>{{ f.desc }}</td>
+            <td class="center">
+              <input type="number" class="num" name="r{{ f.idx }}_qty" value="{{ '%g' % f.qty }}"
+                     min="0" step="any" oninput="totales()"
+                     title="Atendido en SGS: {{ '%g' % f.qty }} · Solicitado en la BAN: {{ '%g' % f.qty_sol }}">
+              {% if f.qty_sol > f.qty %}<span class="via" title="La BAN pidió {{ '%g' % f.qty_sol }} pero el almacén atendió {{ '%g' % f.qty }}">sol. {{ '%g' % f.qty_sol }}</span>{% endif %}
+            </td>
+            <td class="center">
+              <span class="devsgs {{ 'cero' if not f.dev_auto }}">{{ '%g' % f.dev_auto }}</span>
+            </td>
+            <td class="center">
+              {% if f.dev_hoja is not none %}
+                <span class="devhoja {{ 'cero' if not f.dev_hoja }} {{ f.dev_hoja_color }}" title="Semáforo de la lectura: {{ f.dev_hoja_color or 'sin dato' }}">{{ '%g' % f.dev_hoja }}</span>
+              {% else %}
+                <span class="devhoja cero">—</span>
+              {% endif %}
+            </td>
+            <td class="center">
+              <input type="number" class="num dev" name="r{{ f.idx }}_dev" value="{{ '%g' % (f.dev_final if f.dev_final is defined else f.dev_auto) }}"
+                     data-auto="{{ '%g' % (f.dev_final if f.dev_final is defined else f.dev_auto) }}" min="0" step="any"
+                     oninput="devChanged(this); totales()">
+            </td>
+            <td class="center">
+              <input type="hidden" name="r{{ f.idx }}_k" id="k{{ f.idx }}" value="{{ f.k }}">
+              <button type="button" class="k-btn {{ 'k-1' if f.k == 1 else 'k-0' }}"
+                      id="kb{{ f.idx }}" onclick="toggleK({{ f.idx }})">
+                {{ 'APORTACIÓN · 1' if f.k == 1 else 'ENEL · 0' }}
+              </button>
+              {% if f.k_via == 'e4e' %}<span class="via">match E4E anexo</span>
+              {% elif f.k_via == 'desc' %}<span class="via">match descripción</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endfor %}
+
+      {% if nc.devoluciones_sel %}
+      <div class="dev-info">
+        <strong>Devoluciones SGS cruzadas:</strong>
+        {% for dv in nc.devoluciones_sel %}
+          {{ dv.ban_name }} ({{ dv.fecha }}, {{ dv.n_mats }} materiales){{ ', ' if not loop.last }}
+        {% endfor %}
+        — sus cantidades ya están en la columna <em>Dev. SGS</em>. Edita <em>Devolución final</em> para sumar devoluciones manuales.
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="totales">
+      <span>Filas: <b id="t-filas">0</b></span>
+      <span>Entregado: <b id="t-ent">0</b></span>
+      <span>Devolución: <b id="t-dev">0</b></span>
+      <span class="apor">Aportaciones: <b id="t-apor">0</b></span>
+      <button type="submit" class="btn-generar" id="btn-gen">Generar cargue ↓</button>
+    </div>
+  </form>
+
+  <a class="btn-back" href="/almacen/bandejas/{{ sid }}">← Volver a bandejas</a>
+</div>
+
+<script>
+  function toggleK(i) {
+    var h = document.getElementById('k' + i);
+    var b = document.getElementById('kb' + i);
+    if (h.value === '1') {
+      h.value = '0'; b.textContent = 'ENEL · 0';
+      b.classList.remove('k-1'); b.classList.add('k-0');
+    } else {
+      h.value = '1'; b.textContent = 'APORTACIÓN · 1';
+      b.classList.remove('k-0'); b.classList.add('k-1');
+    }
+    totales();
+  }
+
+  function filaToggle(i) {
+    var tr = document.getElementById('tr' + i);
+    var cb = tr.querySelector('input[type=checkbox]');
+    tr.classList.toggle('excluida', !cb.checked);
+    totales();
+  }
+
+  function devChanged(inp) {
+    inp.classList.toggle('changed', inp.value !== inp.dataset.auto);
+  }
+
+  function totales() {
+    var filas = 0, ent = 0, dev = 0, apor = 0;
+    document.querySelectorAll('tr[id^="tr"]').forEach(function(tr) {
+      var cb = tr.querySelector('input[type=checkbox]');
+      if (!cb || !cb.checked) return;
+      filas++;
+      ent += parseFloat(tr.querySelector('input[name$="_qty"]').value) || 0;
+      dev += parseFloat(tr.querySelector('input[name$="_dev"]').value) || 0;
+      if (tr.querySelector('input[name$="_k"]').value === '1') apor++;
+    });
+    document.getElementById('t-filas').textContent = filas;
+    document.getElementById('t-ent').textContent = (+ent.toFixed(2)).toString();
+    document.getElementById('t-dev').textContent = (+dev.toFixed(2)).toString();
+    document.getElementById('t-apor').textContent = apor;
+  }
+  totales();
+
+  document.getElementById('frm-cuadre').addEventListener('submit', function(e) {
+    // Validar devolución > entregado (solo advertir, no bloquear)
+    var excesos = [];
+    document.querySelectorAll('tr[id^="tr"]').forEach(function(tr) {
+      var cb = tr.querySelector('input[type=checkbox]');
+      if (!cb || !cb.checked) return;
+      var q = parseFloat(tr.querySelector('input[name$="_qty"]').value) || 0;
+      var d = parseFloat(tr.querySelector('input[name$="_dev"]').value) || 0;
+      if (d > q) excesos.push(tr.querySelector('td:nth-child(2)').textContent.trim().split('\n')[0]);
+    });
+    if (excesos.length &&
+        !confirm('Hay devoluciones mayores que lo entregado en: ' + excesos.join(', ') + '\n¿Generar de todas formas?')) {
+      e.preventDefault(); return false;
+    }
+    document.getElementById('btn-gen').disabled = true;
+  });
+</script>
+</body>
+</html>

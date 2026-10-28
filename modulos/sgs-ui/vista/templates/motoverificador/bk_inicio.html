@@ -1,0 +1,534 @@
+{% extends "motoverificador/base.html" %}
+{% block title %}Cambio de Líder{% endblock %}
+
+{% block content %}
+
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:22px;">
+  <div>
+    <h1 style="font-size:1.3rem;font-weight:700;">Motoverificador — Cambio de Líder MO</h1>
+    <p style="color:#666;font-size:0.85rem;margin-top:4px;">
+      Elige el proyecto, busca el nuevo líder y selecciona los nodos a corregir.
+    </p>
+  </div>
+</div>
+
+{# ── PASO 1: Buscar proyecto ─────────────────────────────────────────────── #}
+<div class="card" id="card-buscar">
+  <div class="card-header">
+    <span class="step-badge">1</span>
+    <h2>Proyecto padre</h2>
+  </div>
+  <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;">
+    <input id="inp-pro" type="text" placeholder="PRO-054384  ó  6300985782"
+           style="min-width:240px;flex:1;max-width:340px;"
+           onkeydown="if(event.key==='Enter') buscarPro()">
+    <button class="btn btn-primary" onclick="buscarPro()" id="btn-buscar-pro">
+      <span id="spin-pro" class="spinner" style="display:none;"></span>
+      Buscar
+    </button>
+  </div>
+  <div id="pro-error" style="color:#e74c3c;font-size:0.83rem;margin-top:8px;display:none;"></div>
+  <div id="pro-info"  style="color:#27ae60;font-size:0.83rem;margin-top:8px;display:none;"></div>
+</div>
+
+{# ── PASO 2: Nuevo líder + Selección de nodos ────────────────────────────── #}
+<div id="card-paso2" style="display:none;">
+
+  {# Buscador de nuevo líder #}
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-header">
+      <span class="step-badge">2</span>
+      <h2>Nuevo líder</h2>
+      <span style="color:#888;font-size:0.8rem;margin-left:6px;">
+        Se aplicará a todos los nodos seleccionados
+      </span>
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-bottom:4px;">
+      <div style="flex:1;min-width:240px;max-width:420px;position:relative;">
+        <label style="font-size:0.78rem;font-weight:600;color:#555;display:block;margin-bottom:4px;">
+          Cédula o nombre del nuevo líder
+        </label>
+        <input id="inp-cedula" type="text" placeholder="Escribe cédula (C1076...) o nombre (RUIZ LUNA)…"
+               style="width:100%;" autocomplete="off"
+               oninput="onLiderInput()"
+               onkeydown="onLiderKeydown(event)">
+        <div style="font-size:0.72rem;color:#888;margin-top:3px;">
+          Mínimo 2 caracteres · cédula con "C" al inicio
+        </div>
+        {# Dropdown de sugerencias #}
+        <div id="lider-dropdown"
+             style="display:none;position:absolute;top:100%;left:0;right:0;
+                    background:white;border:1px solid #ddd;border-radius:0 0 6px 6px;
+                    box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:1000;
+                    max-height:260px;overflow-y:auto;margin-top:2px;">
+        </div>
+      </div>
+      <div style="padding-top:22px;">
+        <span id="spin-lider" class="spinner" style="display:none;"></span>
+      </div>
+    </div>
+
+    <div id="lider-error" style="color:#e74c3c;font-size:0.83rem;margin-bottom:8px;
+         margin-top:4px;display:none;"></div>
+
+    {# Resultado del líder — aparece cuando se confirma #}
+    <div id="lider-result" style="display:none;background:#f0fff4;border:1px solid #c3e6cb;
+         border-radius:8px;padding:14px 18px;margin-top:10px;display:none;">
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <div style="width:36px;height:36px;background:#27ae60;border-radius:50%;
+             display:flex;align-items:center;justify-content:center;
+             color:white;font-weight:700;font-size:1rem;flex-shrink:0;">
+          ✓
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:1rem;color:#155724;" id="lider-nombre"></div>
+          <div class="mono" style="font-size:0.8rem;color:#555;margin-top:2px;" id="lider-vat"></div>
+        </div>
+        <button class="btn btn-light btn-sm" style="margin-left:auto;"
+                onclick="limpiarLider()">
+          Cambiar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  {# Selección de nodos #}
+  <div class="card" id="card-nodos">
+    <div class="card-header">
+      <span class="step-badge">3</span>
+      <h2>Seleccionar nodos</h2>
+      <span id="nodos-subtitle" style="color:#888;font-size:0.82rem;margin-left:auto;"></span>
+    </div>
+    <div id="nodos-lista"></div>
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <button class="btn btn-light btn-sm" onclick="selTodosNodos(true)">Seleccionar todos</button>
+      <button class="btn btn-light btn-sm" onclick="selTodosNodos(false)">Deseleccionar todos</button>
+    </div>
+  </div>
+
+  {# Botón de acción principal #}
+  <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:4px;flex-wrap:wrap;">
+    <div id="preparar-error" style="color:#e74c3c;font-size:0.83rem;
+         align-self:center;display:none;"></div>
+    <button class="btn btn-danger" onclick="analizarYPreparar()" id="btn-preparar">
+      <span id="spin-preparar" class="spinner" style="display:none;"></span>
+      Preparar correcciones →
+    </button>
+  </div>
+</div>
+
+{# Formulario oculto para enviar correcciones #}
+<form id="form-correcciones" method="POST" action="{{ url_for('motoverificador.preparar') }}">
+  <input type="hidden" name="correcciones_json" id="inp-correcciones-json">
+</form>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// Estado global
+// ─────────────────────────────────────────────────────────────────────────────
+let G_NODOS    = [];    // [{pid, nombre, code, advance_count}]
+let G_LIDER    = null;  // {nombre, vat} — líder seleccionado globalmente
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Paso 1 — Buscar PRO
+// ─────────────────────────────────────────────────────────────────────────────
+async function buscarPro() {
+  const inp  = document.getElementById('inp-pro');
+  const spin = document.getElementById('spin-pro');
+  const err  = document.getElementById('pro-error');
+  const info = document.getElementById('pro-info');
+  const btn  = document.getElementById('btn-buscar-pro');
+
+  const pro = inp.value.trim().toUpperCase();
+  if (!pro) { showErr(err, 'Ingresa un código de proyecto.'); return; }
+
+  err.style.display  = 'none';
+  info.style.display = 'none';
+  spin.style.display = 'inline-block';
+  btn.disabled = true;
+
+  try {
+    const r = await fetch('/motoverificador/api/buscar_pro', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({pro_code: pro}),
+    });
+    const d = await r.json();
+    if (!d.ok) { showErr(err, d.error); return; }
+
+    G_NODOS = d.nodos || [];
+    const vagMsg = d.es_vagabundo
+      ? ' — nodo directo (sin hijos, el PRO es el nodo)'
+      : '';
+    info.textContent  = `✓ ${d.nombre_padre} — ${G_NODOS.length} nodo(s)${vagMsg}`;
+    info.style.display = 'block';
+
+    renderNodos(d);
+
+    const paso2 = document.getElementById('card-paso2');
+    paso2.style.display = 'block';
+    paso2.scrollIntoView({behavior:'smooth', block:'nearest'});
+    setTimeout(() => document.getElementById('inp-cedula').focus(), 400);
+  } catch(e) {
+    showErr(err, 'Error de red: ' + e);
+  } finally {
+    spin.style.display = 'none';
+    btn.disabled = false;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Paso 2a — Autocomplete de líder
+// ─────────────────────────────────────────────────────────────────────────────
+let _liderTimer  = null;
+let _ddFocusIdx  = -1;   // índice resaltado en el dropdown con teclado
+
+function onLiderInput() {
+  // Si ya hay líder confirmado, limpiar al volver a escribir
+  if (G_LIDER) {
+    G_LIDER = null;
+    document.getElementById('lider-result').style.display = 'none';
+  }
+  document.getElementById('lider-error').style.display = 'none';
+
+  clearTimeout(_liderTimer);
+  const q = document.getElementById('inp-cedula').value.trim();
+  if (q.length < 2) { cerrarDropdown(); return; }
+  _liderTimer = setTimeout(() => fetchSugerencias(q), 260);
+}
+
+function onLiderKeydown(e) {
+  const dd    = document.getElementById('lider-dropdown');
+  const items = [...dd.querySelectorAll('.dd-item')];
+  if (!items.length) return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _ddFocusIdx = Math.min(_ddFocusIdx + 1, items.length - 1);
+    resaltarItem(items);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _ddFocusIdx = Math.max(_ddFocusIdx - 1, 0);
+    resaltarItem(items);
+  } else if (e.key === 'Enter' && _ddFocusIdx >= 0) {
+    e.preventDefault();
+    items[_ddFocusIdx].click();
+  } else if (e.key === 'Escape') {
+    cerrarDropdown();
+  }
+}
+
+function resaltarItem(items) {
+  items.forEach((it, i) => {
+    it.style.background = i === _ddFocusIdx ? '#e8f4fd' : '';
+  });
+}
+
+async function fetchSugerencias(q) {
+  const spin  = document.getElementById('spin-lider');
+  const errEl = document.getElementById('lider-error');
+  spin.style.display  = 'inline-block';
+  errEl.style.display = 'none';
+  try {
+    const r = await fetch('/motoverificador/api/buscar_partner?q=' + encodeURIComponent(q));
+    if (!r.ok) {
+      cerrarDropdown();
+      showErr(errEl, `Error ${r.status} — reinicia el servidor Flask e intenta de nuevo.`);
+      return;
+    }
+    const lista = await r.json();
+    renderDropdown(lista);
+  } catch(e) {
+    cerrarDropdown();
+    showErr(errEl, 'Error de red: ' + e);
+  } finally {
+    spin.style.display = 'none';
+  }
+}
+
+function renderDropdown(lista) {
+  const dd = document.getElementById('lider-dropdown');
+  _ddFocusIdx = -1;
+  dd.innerHTML = '';
+
+  if (!lista.length) {
+    const vacio = document.createElement('div');
+    vacio.style.cssText = 'padding:10px 14px;color:#888;font-size:0.83rem;';
+    vacio.textContent   = 'Sin resultados';
+    dd.appendChild(vacio);
+    dd.style.display = 'block';
+    return;
+  }
+
+  for (const p of lista) {
+    const item = document.createElement('div');
+    item.className  = 'dd-item';
+    item.style.cssText = 'padding:9px 14px;cursor:pointer;border-bottom:1px solid #f0f0f0;' +
+                         'display:flex;align-items:center;gap:10px;';
+    item.dataset.nombre  = p.nombre;
+    item.dataset.cedula  = p.cedula || '';
+
+    const inner = document.createElement('div');
+    inner.style.flex = '1';
+
+    const nombre = document.createElement('div');
+    nombre.style.cssText = 'font-weight:600;font-size:0.88rem;';
+    nombre.textContent   = p.nombre;
+    inner.appendChild(nombre);
+
+    if (p.cedula) {
+      const ced = document.createElement('div');
+      ced.style.marginTop = '1px';
+      const cedSpan = document.createElement('span');
+      cedSpan.className   = 'mono';
+      cedSpan.style.cssText = 'color:#2980b9;font-size:0.75rem;';
+      cedSpan.textContent = p.cedula;
+      ced.appendChild(cedSpan);
+      inner.appendChild(ced);
+    }
+
+    const hint = document.createElement('span');
+    hint.style.cssText = 'color:#aaa;font-size:0.75rem;';
+    hint.textContent   = '↵ seleccionar';
+
+    item.appendChild(inner);
+    item.appendChild(hint);
+
+    item.addEventListener('mousedown', function(e) {
+      // mousedown en lugar de click para que se ejecute antes de que el input
+      // pierda el foco y el document-click cierre el dropdown
+      e.preventDefault();
+      confirmarLider(this.dataset.nombre, this.dataset.cedula);
+    });
+    item.addEventListener('mouseover', function() { this.style.background = '#e8f4fd'; });
+    item.addEventListener('mouseout',  function() { this.style.background = ''; });
+
+    dd.appendChild(item);
+  }
+  dd.style.display = 'block';
+}
+
+function cerrarDropdown() {
+  const dd = document.getElementById('lider-dropdown');
+  dd.style.display = 'none';
+  dd.innerHTML = '';
+  _ddFocusIdx = -1;
+}
+
+function confirmarLider(nombre, cedula) {
+  G_LIDER = {nombre, vat: cedula};
+  cerrarDropdown();
+  document.getElementById('inp-cedula').value = nombre + (cedula ? '  ·  ' + cedula : '');
+  document.getElementById('lider-nombre').textContent = nombre;
+  document.getElementById('lider-vat').textContent    = cedula || '(sin cédula registrada)';
+  document.getElementById('lider-result').style.display = 'flex';
+  document.getElementById('lider-error').style.display  = 'none';
+  document.getElementById('card-nodos').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function limpiarLider() {
+  G_LIDER = null;
+  document.getElementById('lider-result').style.display = 'none';
+  document.getElementById('inp-cedula').value = '';
+  cerrarDropdown();
+  document.getElementById('inp-cedula').focus();
+}
+
+// Cerrar dropdown al hacer clic fuera
+document.addEventListener('click', function(e) {
+  if (!document.getElementById('inp-cedula').contains(e.target) &&
+      !document.getElementById('lider-dropdown').contains(e.target)) {
+    cerrarDropdown();
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Paso 2b — Renderizar nodos
+// ─────────────────────────────────────────────────────────────────────────────
+function renderNodos(data) {
+  const sub = document.getElementById('nodos-subtitle');
+  sub.textContent = data.nombre_padre + ' (' + data.pro_code + ')';
+
+  const lista = document.getElementById('nodos-lista');
+  if (!G_NODOS.length) {
+    lista.innerHTML = '<div style="color:#888;font-size:0.85rem;">Sin nodos hijos.</div>';
+    return;
+  }
+
+  let html = '';
+
+  if (data.es_vagabundo) {
+    html += `<div class="alert alert-info" style="margin-bottom:12px;font-size:0.83rem;">
+      <strong>Nodo directo:</strong> este PRO no tiene proyectos hijos — él mismo es el nodo a corregir.
+    </div>`;
+  }
+
+  html += '<table><thead><tr>'
+    + '<th style="width:36px;"></th>'
+    + '<th>Nodo</th><th>Código</th>'
+    + (data.es_vagabundo ? '' : '<th>LCL</th>')
+    + '<th style="text-align:center;">Act. con avance</th>'
+    + '</tr></thead><tbody>';
+
+  for (const n of G_NODOS) {
+    const checked    = n.advance_count > 0 ? 'checked' : '';
+    const badgeColor = n.advance_count > 0
+      ? '#cce5ff;color:#004085'
+      : '#e9ecef;color:#888';
+    const vagBadge   = data.es_vagabundo
+      ? '<span class="badge badge-blue" style="margin-left:6px;font-size:0.68rem;">Nodo directo</span>'
+      : '';
+    html += `<tr>
+      <td><input type="checkbox" data-pid="${n.pid}" ${checked}
+                 style="width:16px;height:16px;cursor:pointer;"></td>
+      <td style="font-weight:600;">${esc(n.nombre)}${vagBadge}</td>
+      <td class="mono">${esc(n.code)}</td>
+      ${data.es_vagabundo ? '' : `<td style="color:#888;font-size:0.8rem;">${esc(n.order_number)}</td>`}
+      <td style="text-align:center;">
+        <span class="badge" style="background:${badgeColor};">${n.advance_count}</span>
+      </td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  lista.innerHTML = html;
+}
+
+function selTodosNodos(val) {
+  document.querySelectorAll('#nodos-lista input[type=checkbox]')
+    .forEach(cb => cb.checked = val);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Paso 3 — Analizar y preparar correcciones
+// ─────────────────────────────────────────────────────────────────────────────
+async function analizarYPreparar() {
+  const errEl = document.getElementById('preparar-error');
+  errEl.style.display = 'none';
+  errEl.style.color   = '#e74c3c';
+
+  // Validar líder
+  if (!G_LIDER) {
+    showErr(errEl, 'Busca y confirma el nuevo líder antes de preparar.');
+    document.getElementById('inp-cedula').focus();
+    return;
+  }
+
+  // Validar nodos seleccionados
+  const pids = [...document.querySelectorAll('#nodos-lista input[type=checkbox]:checked')]
+    .map(cb => parseInt(cb.dataset.pid));
+  if (!pids.length) {
+    showErr(errEl, 'Selecciona al menos un nodo.');
+    return;
+  }
+
+  const spin = document.getElementById('spin-preparar');
+  const btn  = document.getElementById('btn-preparar');
+  spin.style.display = 'inline-block';
+  btn.disabled = true;
+  btn.childNodes[btn.childNodes.length - 1].textContent = ' Analizando…';
+
+  try {
+    const r = await fetch('/motoverificador/api/analizar_nodos', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({pids}),
+    });
+    const d = await r.json();
+    if (!d.ok) { showErr(errEl, d.error || 'Error al analizar nodos.'); return; }
+
+    const analisis = d.analisis || [];
+    if (!analisis.length) {
+      showErr(errEl, 'Sin actividades con avance en los nodos seleccionados.');
+      return;
+    }
+
+    // Construir correcciones: excluir líneas donde el líder ya es el correcto
+    const liderNorm = G_LIDER.nombre.trim().toUpperCase();
+    let   yaCorrectas = 0;
+    const correcciones = [];
+    for (const nodo of analisis) {
+      for (const act of nodo.actividades) {
+        const lineas = act.detalles
+          .filter(det => {
+            const esCorrecta = det.partner_nombre.trim().toUpperCase() === liderNorm;
+            if (esCorrecta) yaCorrectas++;
+            return !esCorrecta;
+          })
+          .map(det => ({
+          detail_id:            det.id,
+          partner_incorrecto:   det.partner_nombre,
+          cantidad:             det.amount,
+          fecha_pw:             det.fecha_pw,
+          partner_nuevo_nombre: G_LIDER.nombre,
+          partner_nuevo_cedula: G_LIDER.vat,
+        }));
+        if (lineas.length) {
+          correcciones.push({
+            pid:               nodo.pid,
+            act_id:            act.act_id,
+            act_code:          act.act_code,
+            pro_code:          nodo.pro_code,
+            nombre_nodo:       nodo.nombre,
+            amount_proyectado: act.amount_proyectado,
+            lineas,
+          });
+        }
+      }
+    }
+
+    if (!correcciones.length) {
+      btn.disabled = false;
+      btn.childNodes[btn.childNodes.length - 1].textContent = ' Preparar correcciones →';
+      if (yaCorrectas > 0) {
+        errEl.style.color = '#27ae60';
+        showErr(errEl,
+          `✓ Todos los nodos ya están correctamente liquidados con ${G_LIDER.nombre}` +
+          ` — ${yaCorrectas} línea(s) ya tienen este líder. No hay nada que corregir.`);
+      } else {
+        showErr(errEl, 'No se encontraron líneas de avance en los nodos seleccionados.');
+      }
+      return;
+    }
+
+    const totalLineas = correcciones.reduce((s, c) => s + c.lineas.length, 0);
+    const resumen = correcciones.map(c =>
+      `• ${c.act_code} en ${c.nombre_nodo}: ${c.lineas.length} línea(s)`
+    ).join('\n');
+
+    const yaMsg = yaCorrectas > 0
+      ? `\n(${yaCorrectas} línea(s) ya tienen este líder — se omiten automáticamente)`
+      : '';
+    if (!confirm(
+      `Nuevo líder: ${G_LIDER.nombre} (${G_LIDER.vat})\n\n` +
+      `${correcciones.length} actividad(es) — ${totalLineas} línea(s) a corregir:${yaMsg}\n\n` +
+      resumen + '\n\n¿Continuar?'
+    )) return;
+
+    document.getElementById('inp-correcciones-json').value = JSON.stringify(correcciones);
+    document.getElementById('form-correcciones').submit();
+
+  } catch(e) {
+    showErr(errEl, 'Error de red: ' + e);
+    btn.disabled = false;
+    btn.childNodes[btn.childNodes.length - 1].textContent = ' Preparar correcciones →';
+  } finally {
+    spin.style.display = 'none';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+function showErr(el, msg) {
+  el.textContent    = msg;
+  el.style.display  = 'block';
+}
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                        .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+                        .replace(/'/g,'&#39;');
+}
+</script>
+
+{% endblock %}

@@ -1,0 +1,80 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Paso 2: Confirmar proyecto — Presupuesto{% endblock %}
+{% block content %}
+
+<div class="card" style="max-width:580px;margin:40px auto;">
+  <h2>Paso 2: Confirmar antes de verificar</h2>
+
+  {# ── Resumen del archivo ── #}
+  <div style="background:#f1f8f4;border:1px solid #c3e6cb;border-radius:6px;
+              padding:12px 16px;margin-bottom:20px;font-size:0.88rem;">
+    <strong>Archivo:</strong> {{ s.filename }}<br>
+    <strong>Mano de Obra:</strong> {{ s.rows_mo | length }} filas detectadas<br>
+    <strong>Materiales:</strong>   {{ s.rows_mat | length }} filas detectadas
+    {% if s.total_mo %}
+      <br><strong>Total MO:</strong> ${{ "{:,.0f}".format(s.total_mo) }}
+    {% endif %}
+  </div>
+
+  {# ── Errores de parseo ── #}
+  {% for e in s.errs_mo if not '[INFO]' in e %}
+    <div class="alert alert-warning">{{ e }}</div>
+  {% endfor %}
+
+  {# ── Formulario LCL ── #}
+  <form method="post">
+    <label style="font-weight:600;font-size:0.9rem;display:block;margin-bottom:6px;">
+      Código del proyecto en SGS (LCL / ODM / DF)
+    </label>
+    <p style="color:#666;font-size:0.82rem;margin-bottom:10px;">
+      Este código se usa para buscar los proyectos en SGS.<br>
+      Si el campo queda vacío se usa el detectado automáticamente.
+    </p>
+
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px;">
+      <input type="text" name="lcl_manual"
+             value="{{ s.lcl_detectado }}"
+             placeholder="Ej: LCL6300985782"
+             style="flex:1;padding:10px 14px;border:1.5px solid #c3e6cb;border-radius:6px;
+                    font-size:0.95rem;font-family:monospace;text-transform:uppercase;"
+             autocomplete="off"
+             oninput="this.value=this.value.toUpperCase()">
+    </div>
+
+    {% if s.lcl_detectado %}
+    <p style="color:#888;font-size:0.8rem;margin-bottom:18px;">
+      Detectado del archivo: <code>{{ s.lcl_detectado }}</code>
+    </p>
+    {% else %}
+    <p style="color:#e74c3c;font-size:0.8rem;margin-bottom:18px;">
+      No se detectó código LCL en el archivo — ingresa el código manualmente.
+    </p>
+    {% endif %}
+
+    {# ── Primer nodo como referencia ── #}
+    {% if s.rows_mo %}
+    <div style="background:#fff9e6;border:1px solid #ffd600;border-radius:6px;
+                padding:10px 14px;margin-bottom:18px;font-size:0.82rem;">
+      <strong>Primera fila MO del archivo:</strong><br>
+      Nodo <strong>{{ s.rows_mo[0].pro }}</strong>
+      — Actividad <strong>{{ s.rows_mo[0].codigo }}</strong>
+      — QP <strong>{{ s.rows_mo[0].qp_code }}</strong>
+    </div>
+    {% endif %}
+
+    <div style="display:flex;gap:12px;margin-top:20px;">
+      <a href="{{ url_for('julian.subir') }}" class="btn btn-light">&larr; Subir otro archivo</a>
+      <button type="submit" name="accion" value="verificar" style="flex:1; background:#1976d2; color:white; border:none; padding:12px; border-radius:6px; font-weight:700; font-size:0.95rem; text-align:center; cursor:pointer;">
+        Verificar MO →
+      </button>
+      {% if s.rows_mat | length > 0 %}
+      <button type="submit" name="accion" value="balance" style="flex:1; background:#e65100; color:white; border:none; padding:12px; border-radius:6px; font-weight:700; font-size:0.95rem; text-align:center; cursor:pointer;">
+        Ver Balance SGS por Bandeja →
+      </button>
+      {% endif %}
+    </div>
+  </form>
+
+</div>
+
+{% endblock %}

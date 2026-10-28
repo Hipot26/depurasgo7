@@ -1,0 +1,6 @@
+{
+  "supervisores_equipo": ["SUPERVISOR_1", "SUPERVISOR_2", "SUPERVISOR_3"],
+  "mapa_supervisor": {
+    "FRAGMENTO_NOMBRE_SGS": "SUPERVISOR_1"
+  }
+}

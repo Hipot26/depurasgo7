@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MO + Materiales — Balance SGS</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+  background: #f0f2f5; min-height: 100vh;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 32px 16px;
+}
+.card {
+  background: #fff; border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.12);
+  padding: 32px 44px; width: 940px; max-width: 98vw;
+}
+/* Steps */
+.steps { display: flex; align-items: center; margin-bottom: 24px; }
+.step { display: flex; flex-direction: column; align-items: center; flex: 1; }
+.step-circle {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+}
+.step-circle.done   { background: #375623; color: #fff; }
+.step-circle.active { background: #375623; color: #fff; }
+.step-circle.pending{ background: #e0e0e0; color: #999; }
+.step-label { font-size: 10px; color: #666; margin-top: 4px; text-align: center; }
+.step-label.active { color: #375623; font-weight: 700; }
+.step-line { flex: 1; height: 2px; }
+.step-line.done { background: #375623; }
+.step-line.pend { background: #e0e0e0; }
+
+/* Meta */
+.meta-bar {
+  display: flex; gap: 8px; align-items: center;
+  background: #f8f9fb; border-radius: 6px; padding: 8px 14px;
+  margin-bottom: 14px; font-size: 12px;
+}
+.tag { padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+.tag-lcl { background: #1F3864; color: #fff; }
+.tag-pro  { background: #E2EFDA; color: #375623; }
+
+/* SGS global bar */
+.sgs-global-bar {
+  display: flex; align-items: center; gap: 10px;
+  background: #fffbf0; border: 1.5px solid #ffe083; border-radius: 6px;
+  padding: 9px 14px; margin-bottom: 14px; font-size: 12px;
+  transition: background .3s, border-color .3s;
+}
+.sgs-global-bar.ok  { background: #f4f7f2; border-color: #d4e6cc; }
+.sgs-global-bar.err { background: #ffeaea; border-color: #f5a0a0; }
+.sgs-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.sgs-dot.loading { background: #f59e0b; animation: pulse .9s ease-in-out infinite alternate; }
+.sgs-dot.ok  { background: #375623; }
+.sgs-bar-body { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.sgs-prog-bg {
+  height: 5px; border-radius: 3px; background: #ffe083; overflow: hidden;
+  display: none;
+}
+.sgs-prog-fill {
+  height: 100%; border-radius: 3px; background: #f59e0b;
+  width: 0%; transition: width .6s ease;
+}
+.sgs-global-bar.ok .sgs-prog-fill { background: #375623; }
+.btn-next:disabled, .btn-omit:disabled,
+.btn-next[disabled], .btn-omit[disabled] {
+  opacity: .38 !important; cursor: not-allowed !important;
+  pointer-events: none !important; background: #9ab !important;
+  border-color: #9ab !important; color: #fff !important;
+}
+.btn-next-hint {
+  font-size: 10px; color: #c07000; font-weight: 600; margin-left: 8px;
+}
+.sgs-dot.err { background: #e53; }
+@keyframes pulse { from { opacity:.4; } to { opacity:1; } }
+
+/* Tabs */
+.tab-bar { display: flex; border-bottom: 2px solid #e0e0e0; }
+.tab-btn {
+  flex: 1; padding: 11px 16px; border: none; background: #f8f9fb;
+  font-size: 13px; font-weight: 700; cursor: pointer; color: #888;
+  border-bottom: 3px solid transparent; margin-bottom: -2px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: all .15s;
+}
+.tab-btn:first-child { border-radius: 8px 0 0 0; }
+.tab-btn:last-child  { border-radius: 0 8px 0 0; }
+.tab-btn.active { background: #fff; color: #375623; border-bottom-color: #375623; }
+.tab-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 700; }
+.b-ok   { background: #C6EFCE; color: #375623; }
+.b-pend { background: #f0f2f5; color: #999; }
+.b-load { background: #FFEB9C; color: #7a5800; }
+.b-warn { background: #FFC7CE; color: #9b1c1c; }
+.b-unsaved { background: #FFEB9C; color: #7a5800; }
+
+/* Panel */
+.tab-panel { padding: 18px 0 0; }
+
+/* Hints */
+.hint-box {
+  background: #f4f7f2; border: 1.5px solid #d4e6cc; border-radius: 6px;
+  padding: 10px 14px; font-size: 12px; color: #375623; margin-bottom: 10px;
+}
+.col-tag {
+  background: #E2EFDA; color: #375623; font-weight: 700;
+  padding: 1px 6px; border-radius: 4px; font-size: 11px;
+}
+textarea {
+  width: 100%; padding: 10px 14px;
+  border: 1.5px solid #d4e6cc; border-radius: 6px;
+  font-size: 13px; font-family: 'Courier New', monospace;
+  resize: vertical; transition: border .2s;
+}
+textarea:focus { outline: none; border-color: #375623; }
+.preview-box {
+  background: #f8f9fb; border-radius: 6px;
+  padding: 10px 12px; margin: 10px 0;
+  font-size: 12px; color: #666; min-height: 32px;
+}
+.error-box {
+  padding: 10px 14px; background: #ffeaea;
+  border-left: 4px solid #e53; border-radius: 4px;
+  font-size: 12px; color: #c00; margin: 8px 0;
+}
+.info-box {
+  padding: 8px 14px; background: #f4f7f2;
+  border-left: 4px solid #375623; border-radius: 4px;
+  font-size: 12px; color: #375623; margin: 8px 0;
+}
+.section-title { font-size: 13px; font-weight: 700; color: #375623; margin: 14px 0 7px; }
+.section-sub   { font-size: 11px; color: #888; margin-bottom: 8px; }
+
+/* Tables */
+.tbl { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+.tbl th { background: #375623; color: #fff; padding: 6px 8px; text-align: center; }
+.tbl td { padding: 6px 8px; border-bottom: 1px solid #eee; vertical-align: middle; }
+.tbl tr:nth-child(even) td { background: #f8f9fb; }
+.tbl td.c { text-align: center; }
+.tbl td.r { text-align: right; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+.badge-ok    { background: #C6EFCE; color: #375623; }
+.badge-miss  { background: #FFC7CE; color: #9b1c1c; }
+.badge-cable { background: #DEEBF7; color: #1e40af; }
+
+/* Unresolved / Pendiente rows */
+.unresolved-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 7px 0; border-bottom: 1px solid #eee; font-size: 12px;
+}
+.unresolved-row:last-child { border-bottom: none; }
+.nodo-label { min-width: 100px; font-weight: 700; color: #555; }
+.pro-input {
+  flex: 1; min-width: 140px; padding: 5px 10px;
+  border: 1.5px solid #d4e6cc; border-radius: 5px;
+  font-size: 12px; font-family: monospace; text-transform: uppercase;
+  transition: border .2s;
+}
+.pro-input:focus { outline: none; border-color: #375623; }
+.pro-status { font-size: 11px; min-width: 120px; }
+.pro-ok   { color: #375623; font-weight: 700; }
+.pro-err  { color: #c00; }
+.pro-wait { color: #888; }
+.pendiente-label {
+  display: flex; align-items: center; gap: 6px; cursor: pointer;
+  font-size: 11px; color: #7a5800; background: #FFEB9C;
+  padding: 3px 10px; border-radius: 10px; font-weight: 700;
+  border: 1.5px solid #ffe083; transition: background .15s;
+}
+.pendiente-label:hover { background: #ffd84a; }
+.pendiente-label input { margin: 0; cursor: pointer; }
+.btn-del-nodo {
+  margin-left: auto; background: none; border: none; cursor: pointer;
+  color: #c00; font-size: 16px; line-height: 1; padding: 0 4px;
+  opacity: .6; transition: opacity .15s;
+}
+.btn-del-nodo:hover { opacity: 1; }
+
+/* Líderes */
+.lider-search-wrap { position: relative; }
+.lider-dropdown {
+  position: absolute; left: 0; right: 0; top: calc(100% + 2px); z-index: 100;
+  background: #fff; border: 1.5px solid #d4e6cc; border-radius: 6px;
+  max-height: 220px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,.14);
+}
+.lider-option {
+  padding: 9px 14px; cursor: pointer; font-size: 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.lider-option:last-child { border-bottom: none; }
+.lider-option:hover { background: #f4f7f2; }
+.lider-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border: 1.5px solid #e0e4e8; border-radius: 6px; margin: 4px 0;
+}
+.lider-cedula { font-family: monospace; min-width: 90px; color: #666; font-size: 11px; }
+.lider-nombre { flex: 1; font-size: 12px; }
+.lider-pct    { font-weight: 700; min-width: 48px; text-align: right; color: #375623; font-size: 12px; }
+.lider-del    { background: none; border: none; cursor: pointer; color: #bbb; font-size: 18px; padding: 0 2px; line-height: 1; }
+.lider-del:hover { color: #c00; }
+
+/* Extras */
+.add-row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+.add-input {
+  flex: 1; padding: 6px 10px; border: 1.5px solid #d4e6cc;
+  border-radius: 5px; font-size: 12px; font-family: monospace; text-transform: uppercase;
+}
+.add-input:focus { outline: none; border-color: #375623; }
+.extras-list { margin-top: 8px; }
+.extra-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #E2EFDA; color: #375623; font-size: 11px; font-weight: 700;
+  padding: 3px 10px; border-radius: 10px; margin: 3px 3px 0 0;
+}
+.extra-chip button { background: none; border: none; cursor: pointer; color: #375623; font-size: 13px; padding: 0; }
+
+/* Buttons */
+.btn-row { display: flex; gap: 10px; margin-top: 20px; }
+.btn {
+  padding: 11px 18px; font-size: 13px; font-weight: 700;
+  border: none; border-radius: 6px; cursor: pointer; transition: background .15s;
+}
+.btn-back { background: #f0f2f5; color: #555; flex: 0 0 auto; border: 1.5px solid #ccc; }
+.btn-back:hover { background: #e0e4e8; }
+.btn-save { background: #f4f7f2; color: #375623; flex: 0 0 auto; border: 1.5px solid #d4e6cc; }
+.btn-save:hover { background: #e8f1e4; }
+.btn-omit { background: #f4f7f2; color: #375623; flex: 0 0 auto; border: 1.5px solid #d4e6cc; }
+.btn-omit:hover { background: #e8f1e4; }
+.btn-next { background: #375623; color: #fff; flex: 1; }
+.btn-next:hover { background: #4a7230; }
+.btn-next:disabled { background: #aaa; cursor: not-allowed; }
+.btn-sm {
+  padding: 5px 12px; font-size: 11px; font-weight: 700;
+  border: 1.5px solid #d4e6cc; border-radius: 5px;
+  background: #f4f7f2; color: #375623; cursor: pointer;
+}
+.btn-sm:hover { background: #e8f1e4; }
+.btn-add { padding: 6px 14px; font-size: 12px; font-weight: 700; border: none; border-radius: 5px; background: #375623; color: #fff; cursor: pointer; }
+.btn-add:hover { background: #4a7230; }
+
+/* Modal */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.45); z-index: 9999;
+  align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: #fff; border-radius: 10px; padding: 28px 32px;
+  width: 460px; max-width: 96vw;
+  box-shadow: 0 10px 48px rgba(0,0,0,.3);
+}
+.modal-title { font-size: 15px; font-weight: 700; color: #375623; margin-bottom: 14px; }
+.modal-summary { font-size: 13px; line-height: 1.7; background: #f8f9fb; border-radius: 6px; padding: 12px 14px; margin-bottom: 16px; }
+.modal-warn { font-size: 12px; color: #7a5800; background: #fffbf0; border: 1.5px solid #ffe083; border-radius: 6px; padding: 8px 12px; margin-bottom: 14px; }
+.modal-btns { display: flex; gap: 10px; }
+.modal-btns .btn-cancel { background: #f0f2f5; color: #555; flex: 0 0 auto; border: 1.5px solid #ccc; padding: 10px 20px; border-radius: 6px; font-weight: 700; cursor: pointer; }
+.modal-btns .btn-confirm { background: #375623; color: #fff; flex: 1; padding: 10px; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; }
+.modal-btns .btn-confirm:hover { background: #4a7230; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-circle done">✓</div>
+      <div class="step-label">Datos del proyecto</div>
+    </div>
+    <div class="step-line done"></div>
+    <div class="step">
+      <div class="step-circle active">2</div>
+      <div class="step-label active">MO + Materiales</div>
+    </div>
+    <div class="step-line pend"></div>
+    <div class="step">
+      <div class="step-circle pending">3</div>
+      <div class="step-label">Vista previa</div>
+    </div>
+  </div>
+
+  <div class="meta-bar">
+    <span class="tag tag-lcl">{{ sesion.lcl_odm }}</span>
+    <span class="tag tag-pro">{{ sesion.padre.get('code', '—') }}</span>
+    <a href="/?tab=sgs" style="margin-left:auto;font-size:11px;color:#888;text-decoration:none">← Cambiar proyecto</a>
+  </div>
+
+  <!-- SGS status (global, visible en ambos tabs) -->
+  <div class="sgs-global-bar" id="sgs-bar">
+    <div class="sgs-dot loading" id="sgs-dot"></div>
+    <div class="sgs-bar-body">
+      <span id="sgs-bar-txt">Consultando SGS en segundo plano…</span>
+      <div class="sgs-prog-bg" id="sgs-prog-bg">
+        <div class="sgs-prog-fill" id="sgs-prog-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn active" id="btn-tab-mo" onclick="switchTab('mo')">
+      📋 Mano de Obra
+      <span class="tab-badge" id="badge-mo">
+        {% if sesion.rows_mo|length > 0 %}
+          <span class="b-ok">{{ sesion.rows_mo|length }} actividades</span>
+        {% else %}
+          <span class="b-pend">pendiente</span>
+        {% endif %}
+      </span>
+    </button>
+    <button class="tab-btn" id="btn-tab-mat" onclick="switchTab('mat')">
+      📦 Materiales
+      <span class="tab-badge" id="badge-mat">
+        {% if sesion.nodos_sel %}
+          <span class="b-ok">{{ sesion.nodos_sel|length }} nodo(s)</span>
+        {% else %}
+          <span class="b-pend">pendiente</span>
+        {% endif %}
+      </span>
+    </button>
+    <button class="tab-btn" id="btn-tab-lid" onclick="switchTab('lid')">
+      👤 Líderes
+      <span class="tab-badge" id="badge-lid">
+        {% if sesion.get('lideres') %}
+          <span class="b-ok">{{ sesion.lideres|length }} líder(es)</span>
+        {% else %}
+          <span class="b-warn">requerido</span>
+        {% endif %}
+      </span>
+    </button>
+  </div>
+
+  <!-- ═══════════════ TAB MO ═══════════════ -->
+  <div class="tab-panel" id="tab-mo">
+
+    <div class="hint-box">
+      Copia desde el Excel del supervisor las columnas
+      <span class="col-tag">Nodo</span>
+      <span class="col-tag">Prestación</span>
+      <span class="col-tag">Cantidad</span>
+      y pégalas aquí (separado por Tab).
+      <div style="color:#888;font-size:11px;margin-top:3px">Ej: &nbsp; 74 &nbsp;&Tab; QP1630 &nbsp;&Tab; 1</div>
+    </div>
+
+    <div class="error-box" id="mo-errors" style="display:none"></div>
+    <div class="info-box" id="mo-save-ok" style="display:none">✓ MO guardada</div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;background:#f4f7f2;border:1.5px solid #d4e6cc;border-radius:6px;padding:8px 14px;font-size:12px">
+      <span style="color:#375623;font-weight:700;min-width:90px">Supervisor:</span>
+      <input type="text" id="inp-supervisor" value="{{ supervisor }}"
+             style="flex:1;padding:5px 10px;border:1.5px solid #d4e6cc;border-radius:5px;font-size:12px"
+             placeholder="Escribe el nombre del supervisor (ej: MEDIORREAL SANCHEZ NELSON ARMANDO)">
+      <span style="font-size:10px;color:#999">SGS no expone este dato automáticamente — ingrésalo manualmente</span>
+    </div>
+    <textarea id="txt-mo" rows="6"
+      placeholder="Nodo&#9;Prestación&#9;Cantidad&#10;74&#9;QP1630&#9;1&#10;74&#9;QP1916&#9;1"
+    >{{ texto_mo or '' }}</textarea>
+
+    <div class="preview-box" id="mo-preview">
+      <span style="color:#aaa">Pega las filas de MO para ver la vista previa con precios</span>
+    </div>
+
+    <!-- Verificación SGS de nodos de la MO -->
+    <div id="mo-sgs-panel" style="{% if not sesion.rows_mo %}display:none{% endif %}">
+      <div class="section-title">Verificación de nodos en SGS</div>
+      <div id="mo-sgs-content">
+        {% if sgs_ready is true and nodos_resueltos %}
+          {% if nodos_resueltos.encontrados %}
+          <div class="info-box" style="margin-bottom:8px">
+            ✓ {{ nodos_resueltos.encontrados|length }} nodo(s) de la MO encontrados en SGS:
+            <span style="font-family:monospace">
+              {{ nodos_resueltos.encontrados|map(attribute='num')|join(', ') }}
+            </span>
+          </div>
+          {% endif %}
+          {% if nodos_resueltos.no_encontrados %}
+          <div style="font-size:12px;color:#7a5800;background:#fffbf0;border:1.5px solid #ffe083;border-radius:6px;padding:8px 12px;margin-bottom:8px">
+            ⚠ {{ nodos_resueltos.no_encontrados|length }} nodo(s) sin proyecto en SGS.
+            Puede ser una prestación de retiro u otro motivo.
+          </div>
+          {% for nid in nodos_resueltos.no_encontrados %}
+          <div class="unresolved-row" data-nid="{{ nid }}">
+            <div class="nodo-label">
+              {% if 'AL' in nid %}<span class="badge badge-cable">Cable</span>
+              {% else %}<span class="badge badge-miss">sin match</span>{% endif %}
+              &nbsp;{{ nid }}
+            </div>
+            <label class="pendiente-label">
+              <input type="checkbox" class="chk-pendiente" name="pendiente_sgs" value="{{ nid }}"
+                {% if nid in (sesion.nodos_pendientes_sgs or []) %}checked{% endif %}>
+              Pendiente crear SGS
+            </label>
+            <button type="button" class="btn-del-nodo" title="Quitar este nodo de la lista"
+              onclick="eliminarNodoPend(this)">×</button>
+          </div>
+          {% endfor %}
+          {% endif %}
+        {% else %}
+          {% if sgs_ready is none or sgs_ready == false %}
+          <div id="mo-sgs-waiting" style="font-size:12px;color:#7a5800;background:#fffbf0;border:1.5px solid #ffe083;border-radius:6px;padding:12px 14px;margin-top:4px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <span id="mo-prog-txt" style="font-weight:700">Consultando SGS… <span id="mo-prog-secs">0</span>s</span>
+              <span id="mo-prog-pct" style="margin-left:auto;font-size:11px;color:#c07000;font-weight:700">0%</span>
+            </div>
+            <div style="height:8px;border-radius:4px;background:#ffe083;overflow:hidden">
+              <div id="mo-prog-fill" style="height:100%;border-radius:4px;background:#f59e0b;width:0%;transition:width .5s ease"></div>
+            </div>
+            <div style="font-size:10px;color:#999;margin-top:6px">
+              Verificando nodos de la MO contra SGS — no cierres esta página
+            </div>
+          </div>
+          {% else %}
+          <div id="mo-sgs-waiting" style="font-size:12px;color:#888">
+            Sin datos de SGS para verificar.
+          </div>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:14px;align-items:center">
+      <button type="button" class="btn btn-save" onclick="guardarMO()">Guardar MO ✓</button>
+      <span style="font-size:11px;color:#aaa">Cambia de tab para guardar automáticamente</span>
+    </div>
+  </div>
+
+  <!-- ═══════════════ TAB MATERIALES ═══════════════ -->
+  <div class="tab-panel" id="tab-mat" style="display:none">
+
+    {% if sesion.nodos_sel %}
+    <div class="info-box" style="margin-bottom:12px">
+      ✅ Nodos confirmados: {{ sesion.nodos_sel|join(', ') }}
+      <a href="#" onclick="limpiarNodos();return false;" style="margin-left:8px;font-size:11px;color:#888">Cambiar</a>
+    </div>
+    {% endif %}
+
+    {% if pros_importados %}
+    <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:7px;padding:10px 14px;margin-bottom:12px;font-size:12px">
+      <strong style="color:#166534">↑ Excel importado:</strong>
+      {{ pros_importados|length }} PRO(s) de materiales cargados automáticamente.
+      Puedes quitar los que no apliquen con la ×, o agregar más abajo.
+    </div>
+    {% endif %}
+
+    <div id="mat-results">
+      <div style="color:#aaa;font-size:12px;padding:8px 0">
+        Pega los nodos de materiales abajo o agrega un PRO directamente. Los materiales son independientes de la MO.
+      </div>
+    </div>
+
+    <!-- Lista de nodos -->
+    <div class="section-title" style="margin-top:18px">
+      Pegar lista de nodos para Materiales
+    </div>
+    <div class="hint-box" style="margin-bottom:8px;font-size:11px">
+      Un nodo por línea (numérico o cable). El sistema busca en los datos ya cargados de SGS.
+    </div>
+    <textarea id="txt-nodos" rows="5"
+      placeholder="133&#10;132&#10;129&#10;N127_N126&#10;N119_N123"
+    >{{ texto_nodos or '' }}</textarea>
+    <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+      <button type="button" class="btn btn-save" id="btn-buscar" onclick="buscarNodos()">Buscar en SGS</button>
+      <span id="buscar-status" style="font-size:11px;color:#888"></span>
+    </div>
+
+    <!-- Agregar PRO extra -->
+    <div class="section-title" style="margin-top:18px">Agregar nodo por código PRO</div>
+    <div class="add-row">
+      <input type="text" class="add-input" id="inp-add-pro"
+             placeholder="PRO-XXXXXX"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();agregarExtra();}">
+      <button type="button" class="btn-add" onclick="agregarExtra()">+ Agregar</button>
+    </div>
+    <div class="extras-list" id="extras-list"></div>
+  </div>
+
+  <!-- ═══════════════ TAB LÍDERES ═══════════════ -->
+  <div class="tab-panel" id="tab-lid" style="display:none">
+
+    <!-- Sugerencias automáticas de SGS -->
+    <div id="lid-sugeridos-section" style="display:none;margin-bottom:14px;background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:7px;padding:10px 14px">
+      <div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:4px">⟲ Líderes detectados en los nodos SGS</div>
+      <div style="font-size:11px;color:#60a5fa;margin-bottom:8px">Haz clic en "Agregar →" para pre-llenar los campos, luego asigna el porcentaje y confirma.</div>
+      <div id="lid-sugeridos-list"></div>
+    </div>
+
+    <div class="hint-box">
+      Busca cada líder por <strong>nombre o cédula</strong> (C11111 ó 11111).
+      Asigna el porcentaje del total que corresponde a cada uno. Puedes agregar varios.
+      Este campo es <strong>obligatorio</strong> antes de continuar.
+    </div>
+
+    <div class="section-title">Buscar y agregar líder</div>
+    <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
+      <div class="lider-search-wrap" style="flex:2;min-width:180px">
+        <label style="display:block;font-size:11px;color:#555;margin-bottom:3px">Nombre</label>
+        <input type="text" class="add-input" id="lid-search"
+               placeholder="Buscar nombre en SGS…"
+               autocomplete="off" style="width:100%"
+               oninput="buscarLider(this.value)"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();agregarLider();}">
+        <div class="lider-dropdown" id="lid-dropdown" style="display:none"></div>
+      </div>
+      <div style="flex:1;min-width:140px">
+        <label style="display:block;font-size:11px;color:#555;margin-bottom:3px">Cédula (C + número)</label>
+        <input type="text" class="add-input" id="lid-cedula"
+               placeholder="C1076647031" style="width:100%;text-transform:uppercase"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();agregarLider();}">
+      </div>
+      <div style="flex:0 0 auto">
+        <label style="display:block;font-size:11px;color:#555;margin-bottom:3px">%</label>
+        <input type="number" class="add-input" id="lid-pct"
+               placeholder="0" min="0" max="100" style="width:72px"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();agregarLider();}">
+      </div>
+      <button type="button" class="btn-add" style="margin-bottom:1px" onclick="agregarLider()">+ Agregar</button>
+    </div>
+    <div id="lid-error" class="error-box" style="display:none;margin-bottom:8px"></div>
+
+    <div class="section-title">
+      Líderes asignados
+      <span id="lid-total-txt" style="font-size:11px;font-weight:400;margin-left:8px"></span>
+    </div>
+    <div id="lid-list">
+      <div style="color:#aaa;font-size:12px;padding:6px 0">Sin líderes agregados aún.</div>
+    </div>
+  </div>
+
+  <!-- Botones finales -->
+  <div class="error-box" id="confirm-error" style="display:none;margin-top:14px"></div>
+  <div class="btn-row">
+    <a class="btn btn-back" href="/?tab=sgs">← Volver</a>
+    <button type="button" class="btn btn-omit" id="btn-omit" onclick="abrirModal(true)">Solo MO</button>
+    <button type="button" class="btn btn-next" id="btn-preview" onclick="abrirModal(false)">Ver vista previa →</button>
+  </div>
+
+</div>
+
+<!-- ═══ MODAL DE CONFIRMACIÓN ═══ -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal-box">
+    <div class="modal-title">¿Listo para ver la vista previa?</div>
+    <div class="modal-warn" id="modal-warn" style="display:none"></div>
+    <div class="modal-summary" id="modal-summary"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="cerrarModal()">← Volver a revisar</button>
+      <button class="btn-confirm" onclick="submitConfirmar()">Confirmar y ver vista previa →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Form oculto para submit final -->
+<form method="POST" action="/manual/paso2/{{ sid }}/confirmar" id="frm-confirm" style="display:none">
+  <div id="form-hiddens"></div>
+</form>
+
+<script>
+var PRECIOS = {{ precios_json | safe }};
+var _sid = "{{ sid }}";
+var _moGuardada = {{ 'true' if sesion.rows_mo|length > 0 else 'false' }};
+var _moCount    = {{ sesion.rows_mo|length }};
+var _sgsReady   = {{ 'true' if sgs_ready is true else ('false' if sgs_ready is false else 'null') }};
+var _extras     = {{ pros_importados | tojson | safe }};
+var _pollTimer  = null;
+var _soloMO     = false;
+var _lideres    = {{ sesion.get('lideres', []) | tojson | safe }};
+var _lidTimer   = null;
+var _lidSel     = null;
+var _lidDropRes = [];
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  var fromMO = document.getElementById('tab-mo').style.display !== 'none';
+  if (tab !== 'mo' && fromMO) {
+    var txt = document.getElementById('txt-mo').value.trim();
+    if (txt && !_moGuardada) guardarMO(true);
+  }
+  ['mo', 'mat', 'lid'].forEach(function(t) {
+    document.getElementById('tab-' + t).style.display = (tab === t) ? '' : 'none';
+    document.getElementById('btn-tab-' + t).className = 'tab-btn' + (tab === t ? ' active' : '');
+  });
+  if (tab === 'mat' && !_sgsReady) startPolling();
+  if (tab === 'lid') cargarLideresSugeridos();
+}
+
+// ── Guardar MO (AJAX) ─────────────────────────────────────────────────────────
+function guardarMO(silent) {
+  var texto = document.getElementById('txt-mo').value.trim();
+  if (!texto) return;
+  fetch('/api/guardar-mo/' + _sid, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({texto: texto})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.ok) {
+      _moGuardada = true;
+      _moCount    = d.count;
+      document.getElementById('badge-mo').innerHTML = '<span class="b-ok">' + d.count + ' actividades</span>';
+      if (!silent) {
+        var box = document.getElementById('mo-save-ok');
+        box.style.display = 'block';
+        setTimeout(function(){ box.style.display = 'none'; }, 3000);
+      }
+      document.getElementById('mo-errors').style.display = 'none';
+      // Mostrar verificación SGS si ya está lista
+      if (d.resueltos) renderMOVerificacion(d.resueltos);
+      else if (_sgsReady !== true) {
+        document.getElementById('mo-sgs-panel').style.display = '';
+        document.getElementById('mo-sgs-content').innerHTML =
+          '<div style="font-size:12px;color:#888">⟳ SGS cargando — la verificación aparecerá al terminar.</div>';
+      }
+    } else {
+      var errHtml = (d.errors || ['Error desconocido']).map(function(e){ return '• '+e; }).join('<br>');
+      var box = document.getElementById('mo-errors');
+      box.innerHTML = errHtml; box.style.display = 'block';
+    }
+  }).catch(function(){
+    if (!silent) alert('Error de red al guardar MO.');
+  });
+}
+
+// ── Render MO verification (SGS) ─────────────────────────────────────────────
+function renderMOVerificacion(resueltos) {
+  try {
+    var enc   = (resueltos && resueltos.encontrados)   || [];
+    var noEnc = (resueltos && resueltos.no_encontrados) || [];
+    var html  = '';
+
+    if (enc.length) {
+      html += '<div class="info-box" style="margin-bottom:8px">✓ ' + enc.length +
+              ' nodo(s) encontrados en SGS: <span style="font-family:monospace">' +
+              enc.map(function(n){ return String(n.num || n); }).join(', ') + '</span></div>';
+    }
+    if (noEnc.length) {
+      html += '<div style="font-size:12px;color:#7a5800;background:#fffbf0;border:1.5px solid #ffe083;' +
+              'border-radius:6px;padding:8px 12px;margin-bottom:8px">⚠ ' + noEnc.length +
+              ' nodo(s) sin proyecto en SGS. Puede ser una prestación de retiro u otro motivo.</div>';
+      noEnc.forEach(function(nid) {
+        var s = String(nid);
+        var isCable = s.indexOf('AL') !== -1;
+        html += '<div class="unresolved-row" data-nid="' + s + '">' +
+          '<div class="nodo-label"><span class="badge ' + (isCable ? 'badge-cable' : 'badge-miss') + '">' +
+          (isCable ? 'Cable' : 'sin match') + '</span>&nbsp;' + s + '</div>' +
+          '<label class="pendiente-label"><input type="checkbox" class="chk-pendiente" name="pendiente_sgs" value="' + s + '"> Pendiente crear SGS</label>' +
+          '<button type="button" class="btn-del-nodo" title="Quitar este nodo de la lista" onclick="eliminarNodoPend(this)">×</button>' +
+          '</div>';
+      });
+    }
+    if (!enc.length && !noEnc.length) {
+      html = '<div class="info-box">✓ Todos los nodos de la MO están en SGS o no hay nodos para verificar.</div>';
+    }
+
+    var cont  = document.getElementById('mo-sgs-content');
+    var panel = document.getElementById('mo-sgs-panel');
+    if (cont)  cont.innerHTML = html;
+    if (panel) panel.style.display = '';
+  } catch(e) {
+    var cont = document.getElementById('mo-sgs-content');
+    if (cont) cont.innerHTML = '<div style="color:#c00;font-size:12px">Error al mostrar verificación: ' + e.message + '</div>';
+  }
+}
+
+// ── SGS Polling ───────────────────────────────────────────────────────────────
+var _fetchStart   = null;
+var _progTimer    = null;
+var _ESTIMATED_MS = 35000;
+var _matBuscado   = false;
+
+function _setBotonPrevia(habilitado) {
+  var btn  = document.getElementById('btn-preview');
+  var btnO = document.getElementById('btn-omit');
+  if (!btn) return;
+  if (habilitado) {
+    btn.removeAttribute('disabled');
+    if (btnO) btnO.removeAttribute('disabled');
+    var hint = document.getElementById('sgs-btn-hint');
+    if (hint) hint.remove();
+  } else {
+    btn.setAttribute('disabled', 'disabled');
+    if (btnO) btnO.setAttribute('disabled', 'disabled');
+    if (!document.getElementById('sgs-btn-hint')) {
+      var sp = document.createElement('span');
+      sp.id = 'sgs-btn-hint';
+      sp.className = 'btn-next-hint';
+      sp.textContent = 'Esperando que SGS termine…';
+      btn.parentNode.appendChild(sp);
+    }
+  }
+}
+
+function _tickProgress() {
+  if (!_fetchStart) return;
+  var elapsed = Date.now() - _fetchStart;
+  var pct  = Math.min(93, Math.round((elapsed / _ESTIMATED_MS) * 93));
+  var secs = Math.round(elapsed / 1000);
+  // Barra inline en el panel MO
+  var inFill = document.getElementById('mo-prog-fill');
+  if (inFill) inFill.style.width = pct + '%';
+  var inPct = document.getElementById('mo-prog-pct');
+  if (inPct) inPct.textContent = pct + '%';
+  var inSecs = document.getElementById('mo-prog-secs');
+  if (inSecs) inSecs.textContent = secs;
+  // Barra global (top)
+  var fill = document.getElementById('sgs-prog-fill');
+  if (fill) fill.style.width = pct + '%';
+  var txt = document.getElementById('sgs-bar-txt');
+  if (txt && _sgsReady !== true)
+    txt.textContent = 'Consultando SGS… ' + secs + 's';
+}
+
+function startPolling() {
+  if (_sgsReady === true) return;
+  if (_pollTimer) return;
+  _fetchStart = Date.now();
+  // Mostrar barra de progreso
+  var bg = document.getElementById('sgs-prog-bg');
+  if (bg) bg.style.display = 'block';
+  _setBotonPrevia(false);
+  // Tick de progreso cada segundo
+  _progTimer = setInterval(_tickProgress, 1000);
+  _tickProgress();
+  _pollTimer = setInterval(checkSGSStatus, 3000);
+  checkSGSStatus();
+}
+
+function checkSGSStatus() {
+  fetch('/api/sgs-status/' + _sid)
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ready === true) {
+        clearInterval(_pollTimer); _pollTimer = null;
+        clearInterval(_progTimer); _progTimer = null;
+        _sgsReady = true;
+        actualizarBarraSGS(true, null, d.nodos_count);
+        _setBotonPrevia(true);
+        // Habilitar botón de búsqueda de materiales
+        var btnB = document.getElementById('btn-buscar');
+        if (btnB) { btnB.disabled = false; btnB.title = ''; }
+        // Completar barra inline al 100%
+        var inFill = document.getElementById('mo-prog-fill');
+        if (inFill) inFill.style.width = '100%';
+        var inPct = document.getElementById('mo-prog-pct');
+        if (inPct) inPct.textContent = '100%';
+        // Mostrar resultados si hay MO guardada o el panel ya está visible
+        if (d.resueltos && (_moGuardada || document.getElementById('mo-sgs-panel').style.display !== 'none')) {
+          setTimeout(function(){ renderMOVerificacion(d.resueltos); }, 350);
+        }
+        // Auto-buscar nodos de materiales si el textarea ya tiene contenido
+        var txtN = document.getElementById('txt-nodos');
+        if (txtN && txtN.value.trim() && !_matBuscado) {
+          setTimeout(buscarNodos, 500);
+        }
+        cargarLideresSugeridos();
+      } else if (d.error) {
+        clearInterval(_pollTimer); _pollTimer = null;
+        clearInterval(_progTimer); _progTimer = null;
+        _sgsReady = true;
+        actualizarBarraSGS(null, d.error, 0);
+        _setBotonPrevia(true); // en error dejamos pasar (Solo MO sigue siendo útil)
+      }
+      // else: still loading, keep polling
+    }).catch(function(){});
+}
+
+function actualizarBarraSGS(ok, error, count) {
+  var bar  = document.getElementById('sgs-bar');
+  var dot  = document.getElementById('sgs-dot');
+  var txt  = document.getElementById('sgs-bar-txt');
+  var fill = document.getElementById('sgs-prog-fill');
+  var bg   = document.getElementById('sgs-prog-bg');
+  if (ok === true) {
+    bar.className = 'sgs-global-bar ok';
+    dot.className = 'sgs-dot ok';
+    txt.textContent = '✓ SGS listo — ' + count + ' nodo(s) cargados';
+    if (fill) fill.style.width = '100%';
+    if (bg) { bg.style.display = 'block'; setTimeout(function(){ bg.style.display = 'none'; }, 1500); }
+  } else if (error) {
+    bar.className = 'sgs-global-bar err';
+    dot.className = 'sgs-dot err';
+    txt.textContent = '✗ Error SGS: ' + error;
+    if (bg) bg.style.display = 'none';
+  } else {
+    bar.className = 'sgs-global-bar';
+    dot.className = 'sgs-dot loading';
+    txt.textContent = 'Consultando SGS en segundo plano…';
+  }
+}
+
+// ── Render nodos Materiales (AJAX/polling) ────────────────────────────────────
+function renderNodosResueltos(res) {
+  var enc = res.encontrados || [];
+  var noEnc = res.no_encontrados || [];
+  var html = '';
+  if (enc.length) {
+    html += '<div class="section-title">Nodos encontrados en SGS</div>';
+    html += '<div class="section-sub">Desmarca los que no apliquen.</div>';
+    html += '<table class="tbl"><tr><th style="width:36px">✓</th><th>Nodo</th><th>PRO SGS</th><th>Nombre</th></tr>';
+    enc.forEach(function(n){
+      html += '<tr><td class="c"><input type="checkbox" class="chk-pro" value="' + n.pro + '" checked></td>' +
+              '<td class="c"><strong>' + n.num + '</strong></td>' +
+              '<td class="c" style="font-family:monospace;font-size:11px">' + n.pro + '</td>' +
+              '<td style="font-size:11px">' + n.nodo_raw + '</td></tr>';
+    });
+    html += '</table>';
+  }
+  if (noEnc.length) {
+    html += '<div class="section-title" style="margin-top:16px">Sin coincidencia automática</div>';
+    html += '<div class="section-sub">Ingresa el PRO manualmente si aplica.</div>';
+    noEnc.forEach(function(nid, i){
+      var isCable = nid.indexOf('AL') !== -1;
+      var idx = 'dyn' + i;
+      html += '<div class="unresolved-row">' +
+        '<div class="nodo-label"><span class="badge ' + (isCable ? 'badge-cable' : 'badge-miss') + '">' +
+        (isCable ? 'Cable' : 'sin match') + '</span>&nbsp;' + nid + '</div>' +
+        '<input type="text" class="pro-input" id="' + idx + '-inp" placeholder="PRO-XXXXXX (opcional)">' +
+        '<button type="button" class="btn-sm" onclick="validarProInput(\'' + idx + '-inp\',\'' + idx + '-st\',\'' + idx + '-hid\')">Verificar</button>' +
+        '<div class="pro-status" id="' + idx + '-st"></div>' +
+        '<input type="hidden" id="' + idx + '-hid" value=""></div>';
+    });
+  }
+  document.getElementById('mat-results').innerHTML = html;
+  document.getElementById('badge-mat').innerHTML = enc.length ?
+    '<span class="b-ok">' + enc.length + ' nodo(s)</span>' :
+    '<span class="b-pend">pendiente</span>';
+}
+
+// ── Verificar PRO ─────────────────────────────────────────────────────────────
+function validarProInput(inpId, stId, hidId) {
+  var inp = document.getElementById(inpId);
+  var st  = document.getElementById(stId);
+  var hid = document.getElementById(hidId);
+  if (!inp || !inp.value.trim()) return;
+  var pro = inp.value.trim().toUpperCase();
+  st.className = 'pro-status pro-wait'; st.textContent = 'Verificando…';
+  fetch('/api/validar-pro?pro=' + encodeURIComponent(pro))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        st.className = 'pro-status pro-ok';
+        st.textContent = '✓ ' + (d.name || d.code);
+        hid.value = d.code || pro;
+      } else {
+        st.className = 'pro-status pro-err';
+        st.textContent = '✗ ' + (d.error || 'No encontrado');
+        hid.value = '';
+      }
+    }).catch(function(){ st.className = 'pro-status pro-err'; st.textContent = '✗ Error de red'; });
+}
+
+// ── Buscar nodos personalizado ────────────────────────────────────────────────
+function buscarNodos() {
+  var texto = document.getElementById('txt-nodos').value.trim();
+  if (!texto) return;
+  if (!_sgsReady) {
+    document.getElementById('buscar-status').textContent = 'SGS aún cargando — se buscará automáticamente al terminar.';
+    return;
+  }
+  document.getElementById('buscar-status').textContent = 'Buscando…';
+  fetch('/api/buscar-nodos/' + _sid, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({texto: texto})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.ok && d.resueltos) {
+      _matBuscado = true;
+      renderNodosResueltos(d.resueltos);
+      document.getElementById('buscar-status').textContent = '✓ ' + d.resueltos.encontrados.length + ' encontrados';
+    } else {
+      document.getElementById('buscar-status').textContent = d.error || 'Error';
+    }
+  }).catch(function(){ document.getElementById('buscar-status').textContent = 'Error de red'; });
+}
+
+// ── Extras (PRO adicional) ────────────────────────────────────────────────────
+function agregarExtra() {
+  var inp = document.getElementById('inp-add-pro');
+  var pro = inp.value.trim().toUpperCase();
+  if (!pro || _extras.indexOf(pro) !== -1) return;
+  inp.disabled = true;
+  fetch('/api/validar-pro?pro=' + encodeURIComponent(pro))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      inp.disabled = false;
+      if (d.ok) {
+        var code = d.code || pro;
+        if (_extras.indexOf(code) !== -1) { inp.value = ''; return; }
+        _extras.push(code);
+        renderExtras(); inp.value = '';
+      } else { alert((d.error || 'No encontrado') + '\n\nVerifica el código PRO.'); }
+    }).catch(function(){ inp.disabled = false; });
+}
+function quitarExtra(code) {
+  _extras = _extras.filter(function(x){ return x !== code; });
+  renderExtras();
+}
+function renderExtras() {
+  document.getElementById('extras-list').innerHTML = _extras.map(function(c){
+    return '<span class="extra-chip">' + c +
+      '<button type="button" onclick="quitarExtra(\'' + c + '\')">×</button></span>';
+  }).join('');
+}
+function limpiarNodos() {
+  document.getElementById('mat-results').innerHTML =
+    '<div style="color:#aaa;font-size:12px;padding:8px 0">Busca o espera que SGS cargue.</div>';
+  document.getElementById('badge-mat').innerHTML = '<span class="b-pend">pendiente</span>';
+}
+
+// ── Eliminar nodo sin resolver de la lista MO ───────────────────────────────
+function eliminarNodoPend(btn) {
+  var row = btn.closest('.unresolved-row');
+  if (!row) return;
+  row.remove();
+  // Si ya no quedan filas sin resolver, ocultar el warning padre
+  var panel = document.getElementById('mo-sgs-content');
+  if (panel && !panel.querySelectorAll('.unresolved-row').length) {
+    var warn = panel.querySelector('[style*="fffbf0"]');
+    if (warn) warn.style.display = 'none';
+  }
+}
+
+// ── Modal de confirmación ────────────────────────────────────────────────────
+function abrirModal(soloMO) {
+  var errEl = document.getElementById('confirm-error');
+  if (!_moGuardada) {
+    errEl.textContent = 'Primero guarda la Mano de Obra.';
+    errEl.style.display = 'block';
+    switchTab('mo');
+    return;
+  }
+  // Validar nodos sin resolver en MO — sólo bloquea si la verificación ya terminó y quedan sin definir
+  if (_sgsReady === true) {
+    var moContent = document.getElementById('mo-sgs-content');
+    if (moContent) {
+      var sinResolver = Array.from(moContent.querySelectorAll('.unresolved-row')).filter(function(row) {
+        var chk = row.querySelector('.chk-pendiente');
+        return chk && !chk.checked;
+      });
+      if (sinResolver.length) {
+        errEl.textContent = sinResolver.length + ' nodo(s) sin match en SGS requieren acción: marca "Pendiente crear SGS" o usa × para quitarlos.';
+        errEl.style.display = 'block';
+        // Mostrar panel MO pero sin redirigir — el usuario ya sabe dónde está
+        document.getElementById('mo-sgs-panel').style.display = '';
+        return;
+      }
+    }
+  }
+  if (!_lideres.length) {
+    errEl.textContent = 'Agrega al menos un líder responsable en la pestaña Líderes.';
+    errEl.style.display = 'block';
+    switchTab('lid');
+    return;
+  }
+  var _pctTotal = _lideres.reduce(function(s, l) { return s + (parseFloat(l.pct) || 0); }, 0);
+  var _pctDiff  = Math.round((_pctTotal - 100) * 100) / 100;
+  if (Math.abs(_pctDiff) >= 0.01) {
+    errEl.textContent = 'Los porcentajes de líderes deben sumar exactamente 100%. Actualmente: ' + _pctTotal + '% (' + Math.abs(_pctDiff) + '% ' + (_pctDiff > 0 ? 'de exceso' : 'pendientes') + ').';
+    errEl.style.display = 'block';
+    switchTab('lid');
+    return;
+  }
+  errEl.style.display = 'none';
+  _soloMO = soloMO;
+
+  // Contar nodos confirmados (solo los del tab Materiales, no los de MO)
+  var matContainer = document.getElementById('mat-results');
+  var pros = Array.from(matContainer ? matContainer.querySelectorAll('input.chk-pro:checked') : []);
+  var pendientes = Array.from(document.querySelectorAll('.chk-pendiente:checked')).map(function(c){ return c.value; });
+  var totalNodos = pros.length + _extras.length;
+
+  // Bloquear "Ver vista previa" si no hay materiales seleccionados (usar "Solo MO" explícitamente)
+  if (!soloMO && totalNodos === 0) {
+    errEl.textContent = 'No has seleccionado materiales SGS. Busca nodos en la pestaña Materiales, agrega un PRO, o usa "Solo MO" si no aplica.';
+    errEl.style.display = 'block';
+    switchTab('mat');
+    return;
+  }
+
+  // Calcular total MO
+  var totalMO = 0;
+  var res = parsearMO(document.getElementById('txt-mo').value);
+  res.rows.forEach(function(r){
+    var info = PRECIOS[r.qp] || {};
+    totalMO += (info.precio || 0) * r.cant;
+  });
+
+  var sum = '<strong>MO:</strong> ' + _moCount + ' actividades — ' + fmtPesos(totalMO) + '<br>';
+  if (soloMO) {
+    sum += '<em style="color:#888">Materiales: omitidos</em>';
+  } else {
+    sum += '<strong>Materiales:</strong> ' + totalNodos + ' nodo(s) seleccionado(s)';
+    if (_extras.length) sum += ' + ' + _extras.length + ' PRO(s) extra';
+    sum += '<br>';
+  }
+  if (pendientes.length) {
+    sum += '<strong style="color:#7a5800">Pendiente crear SGS:</strong> ' + pendientes.join(', ') + '<br>';
+  }
+  var supMod = (document.getElementById('inp-supervisor') || {}).value || '—';
+  sum += '<strong>Supervisor:</strong> ' + supMod + '<br>';
+  sum += '<strong>Líderes:</strong> ' + _lideres.map(function(l){
+    return l.nombre + ' (' + l.pct + '%)';
+  }).join(', ');
+
+  document.getElementById('modal-summary').innerHTML = sum;
+
+  var warnEl = document.getElementById('modal-warn');
+  if (pendientes.length) {
+    warnEl.innerHTML = '⚠ ' + pendientes.length + ' nodo(s) marcado(s) como "Pendiente crear SGS" serán incluidos en el Excel con esa anotación.';
+    warnEl.style.display = '';
+  } else {
+    warnEl.style.display = 'none';
+  }
+
+  document.getElementById('modal-confirm').className = 'modal-overlay open';
+}
+
+function cerrarModal() {
+  document.getElementById('modal-confirm').className = 'modal-overlay';
+}
+
+function _esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function submitConfirmar() {
+  var hids = document.getElementById('form-hiddens');
+  hids.innerHTML = '';
+
+  // Supervisor
+  var supEl = document.getElementById('inp-supervisor');
+  if (supEl && supEl.value.trim()) {
+    hids.innerHTML += '<input type="hidden" name="supervisor" value="' + _esc(supEl.value.trim()) + '">';
+  }
+
+  // Pendientes SGS
+  Array.from(document.querySelectorAll('.chk-pendiente:checked')).forEach(function(c){
+    hids.innerHTML += '<input type="hidden" name="pendiente_sgs" value="' + _esc(c.value) + '">';
+  });
+
+  // Líderes
+  _lideres.forEach(function(l) {
+    hids.innerHTML += '<input type="hidden" name="lider_cedula" value="' + _esc(l.cedula || '') + '">';
+    hids.innerHTML += '<input type="hidden" name="lider_nombre" value="' + _esc(l.nombre || '') + '">';
+    hids.innerHTML += '<input type="hidden" name="lider_pct"    value="' + _esc(String(l.pct || 0)) + '">';
+  });
+
+  // Siempre incluir texto_mo como red de seguridad contra pérdida de sesión
+  var txtMo = document.getElementById('txt-mo');
+  if (txtMo && txtMo.value.trim()) {
+    hids.innerHTML += '<input type="hidden" name="texto_mo_form" value="' + _esc(txtMo.value.trim()) + '">';
+  }
+
+  if (_soloMO) {
+    hids.innerHTML += '<input type="hidden" name="omitir_mat" value="1">';
+  } else {
+    // Siempre enviar el texto del textarea para que el servidor pueda resolver si no hay checkboxes
+    var txtNodos = document.getElementById('txt-nodos');
+    if (txtNodos && txtNodos.value.trim()) {
+      hids.innerHTML += '<input type="hidden" name="texto_nodos" value="' + _esc(txtNodos.value.trim()) + '">';
+    }
+    var matEl = document.getElementById('mat-results');
+    Array.from(matEl ? matEl.querySelectorAll('input.chk-pro:checked') : []).forEach(function(c){
+      hids.innerHTML += '<input type="hidden" name="pro_sel" value="' + c.value + '">';
+    });
+    Array.from(matEl ? matEl.querySelectorAll('input[id$="-hid"]') : []).forEach(function(h){
+      if (h.value) hids.innerHTML += '<input type="hidden" name="pro_extra" value="' + h.value + '">';
+    });
+    _extras.forEach(function(p){
+      hids.innerHTML += '<input type="hidden" name="pro_extra" value="' + p + '">';
+    });
+  }
+
+  document.getElementById('frm-confirm').submit();
+}
+
+// ── Líderes ───────────────────────────────────────────────────────────────────
+var _lidSugerenciasCargadas = false;
+var _lidSugeridos = [];
+
+function _cedValida(c) { return /^C\d+$/i.test((c || '').trim()); }
+
+function cargarLideresSugeridos() {
+  if (_lidSugerenciasCargadas || !_sgsReady) return;
+  _lidSugerenciasCargadas = true;
+  fetch('/api/lideres-sugeridos/' + _sid)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok && d.lideres && d.lideres.length) {
+        _lidSugeridos = d.lideres;
+        renderLidSugeridos();
+      }
+    }).catch(function() {});
+}
+
+function renderLidSugeridos() {
+  var sect = document.getElementById('lid-sugeridos-section');
+  var list = document.getElementById('lid-sugeridos-list');
+  if (!sect || !list) return;
+  if (!_lidSugeridos.length) { sect.style.display = 'none'; return; }
+  sect.style.display = '';
+  list.innerHTML = _lidSugeridos.map(function(s, i) {
+    var yaAgregado = s.cedula && s.cedula_valida &&
+      _lideres.some(function(l) { return l.cedula === s.cedula; });
+    var cedBadge = s.cedula_valida
+      ? '<span class="lider-cedula" style="color:#1e40af">' + s.cedula + '</span>'
+      : '<span class="lider-cedula" style="color:#999;font-style:italic">sin cédula</span>';
+    var btn = yaAgregado
+      ? '<span style="color:#375623;font-size:11px;font-weight:700;flex:0 0 auto">✓ Agregado</span>'
+      : '<button type="button" class="btn-sm" style="flex:0 0 auto" onclick="selLiderSugerido(' + i + ')">' +
+        (s.cedula_valida ? 'Agregar →' : 'Completar →') + '</button>';
+    return '<div class="lider-row" style="background:#dbeafe;border-color:#93c5fd">' +
+      cedBadge + '<span class="lider-nombre">' + s.nombre + '</span>' + btn + '</div>';
+  }).join('');
+}
+
+function selLiderSugerido(i) {
+  var s = _lidSugeridos[i];
+  if (!s) return;
+  document.getElementById('lid-search').value = s.nombre;
+  document.getElementById('lid-cedula').value = (s.cedula || '').toUpperCase();
+  document.getElementById('lid-error').style.display = 'none';
+  document.getElementById('lid-pct').value = '';
+  // Si ya tiene cédula válida → ir al % directamente; si no → llenar cédula primero
+  if (s.cedula_valida) {
+    document.getElementById('lid-pct').focus();
+  } else {
+    document.getElementById('lid-cedula').focus();
+  }
+}
+
+function buscarLider(q) {
+  clearTimeout(_lidTimer);
+  var dd = document.getElementById('lid-dropdown');
+  if (!q || q.trim().length < 2) { dd.style.display = 'none'; _lidSel = null; return; }
+  _lidTimer = setTimeout(function() {
+    fetch('/api/buscar-lider?q=' + encodeURIComponent(q.trim()))
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (!d.ok || !d.results || !d.results.length) {
+          dd.innerHTML = '<div class="lider-option" style="color:#888;cursor:default">Sin resultados en SGS</div>';
+          dd.style.display = 'block';
+          _lidDropRes = [];
+          return;
+        }
+        _lidDropRes = d.results;
+        dd.innerHTML = d.results.map(function(r, i) {
+          var cedOk = _cedValida(r.cedula);
+          return '<div class="lider-option" onclick="selLider(' + i + ')" ' +
+            (cedOk ? '' : 'style="opacity:.5;cursor:not-allowed" title="Cédula sin formato C válido"') + '>' +
+            '<strong>' + r.nombre + '</strong>' +
+            (r.cedula ? ' <span style="color:' + (cedOk ? '#888' : '#c00') + ';font-size:11px">— ' + r.cedula + '</span>' : '') +
+            '</div>';
+        }).join('');
+        dd.style.display = 'block';
+      }).catch(function() { dd.style.display = 'none'; });
+  }, 320);
+}
+
+function selLider(i) {
+  var ldr = _lidDropRes[i];
+  if (!ldr) return;
+  if (!_cedValida(ldr.cedula)) {
+    mostrarLidError('Este líder no tiene cédula con formato C válido (ej: C1076647031). Verifica en SGS.');
+    return;
+  }
+  _lidSel = ldr;
+  document.getElementById('lid-search').value = ldr.nombre;
+  document.getElementById('lid-cedula').value = ldr.cedula.toUpperCase();
+  document.getElementById('lid-dropdown').style.display = 'none';
+  document.getElementById('lid-pct').focus();
+}
+
+function mostrarLidError(msg) {
+  var el = document.getElementById('lid-error');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(function() { el.style.display = 'none'; }, 5000);
+}
+
+function agregarLider() {
+  var nombre  = document.getElementById('lid-search').value.trim();
+  var cedula  = document.getElementById('lid-cedula').value.trim().toUpperCase();
+  var pct     = parseFloat(document.getElementById('lid-pct').value) || 0;
+
+  if (!nombre) { document.getElementById('lid-search').focus(); return; }
+
+  // Normalizar CC → C
+  cedula = cedula.replace(/^CC(\d)/, 'C$1');
+
+  if (!_cedValida(cedula)) {
+    mostrarLidError('La cédula debe tener formato C + número (ej: C1076647031). Sin cédula válida no se puede agregar el líder.');
+    document.getElementById('lid-cedula').focus();
+    return;
+  }
+
+  // No duplicar por cédula
+  if (_lideres.some(function(l) { return l.cedula === cedula; })) {
+    mostrarLidError('Este líder ya está en la lista.');
+    return;
+  }
+
+  _lideres.push({ cedula: cedula, nombre: nombre, pct: pct });
+  _lidSel = null;
+  document.getElementById('lid-search').value  = '';
+  document.getElementById('lid-cedula').value  = '';
+  document.getElementById('lid-pct').value     = '';
+  document.getElementById('lid-dropdown').style.display = 'none';
+  document.getElementById('lid-error').style.display = 'none';
+  renderLideres();
+}
+
+function quitarLider(i) {
+  _lideres.splice(i, 1);
+  renderLideres();
+}
+
+function renderLideres() {
+  var list     = document.getElementById('lid-list');
+  var totalTxt = document.getElementById('lid-total-txt');
+  var totalPct = _lideres.reduce(function(s, l) { return s + (parseFloat(l.pct) || 0); }, 0);
+  if (!_lideres.length) {
+    list.innerHTML = '<div style="color:#aaa;font-size:12px;padding:6px 0">Sin líderes agregados aún.</div>';
+    totalTxt.textContent = '';
+    document.getElementById('badge-lid').innerHTML = '<span class="b-warn">requerido</span>';
+    return;
+  }
+  list.innerHTML = _lideres.map(function(l, i) {
+    return '<div class="lider-row">' +
+      '<span class="lider-cedula">' + (l.cedula || '—') + '</span>' +
+      '<span class="lider-nombre">' + l.nombre + '</span>' +
+      '<span class="lider-pct">' + l.pct + '%</span>' +
+      '<button type="button" class="lider-del" onclick="quitarLider(' + i + ')">×</button>' +
+      '</div>';
+  }).join('');
+  var diff = Math.round((totalPct - 100) * 100) / 100;
+  if (Math.abs(diff) < 0.01) {
+    totalTxt.textContent = '✓ 100%'; totalTxt.style.color = '#375623';
+  } else {
+    totalTxt.textContent = 'Total: ' + totalPct + '% ' + (diff > 0 ? '(excede ' + Math.abs(diff) + '%)' : '(faltan ' + Math.abs(diff) + '%)');
+    totalTxt.style.color = diff > 0 ? '#c00' : '#7a5800';
+  }
+  document.getElementById('badge-lid').innerHTML = '<span class="b-ok">' + _lideres.length + ' líder(es)</span>';
+  renderLidSugeridos();
+}
+
+// Cerrar dropdown al hacer clic afuera
+document.addEventListener('click', function(e) {
+  var dd = document.getElementById('lid-dropdown');
+  if (dd && !dd.contains(e.target) && e.target.id !== 'lid-search') {
+    dd.style.display = 'none';
+  }
+});
+
+// ── Live MO preview ───────────────────────────────────────────────────────────
+function fmtPesos(v) {
+  if (!v) return '—';
+  return '$' + Math.round(v).toLocaleString('es-CO');
+}
+function parsearNodo(raw) {
+  var s = raw.replace(/\s+/g,'').toUpperCase();
+  s = s.replace(/^NODO/, '');
+  if (/^N\d/.test(s)) s = s.slice(1);
+  if (/^\d+[A-Za-z]?$/.test(s)) return s;
+  var m = s.match(/^(\d+[A-Z]?)(?:_|AL|-)N?(\d+[A-Z]?)$/);
+  return m ? m[1]+'AL'+m[2] : null;
+}
+function parsearMO(texto) {
+  var rows = [], errs = [], seen = {};
+  texto.trim().split('\n').forEach(function(linea, i){
+    var p = linea.trim().split(/\t| {2,}/);
+    p = p.map(function(x){ return x.trim(); }).filter(Boolean);
+    if (!p.length) return;
+    if (p.length < 2) { errs.push('Fila '+(i+1)+': necesitas Nodo y QP'); return; }
+    var nodo = parsearNodo(p[0]);
+    if (!nodo) { errs.push('Fila '+(i+1)+': nodo inválido "'+p[0]+'"'); return; }
+    var qp = p[1].toUpperCase();
+    if (!/^QP\d+/.test(qp)) { errs.push('Fila '+(i+1)+': QP inválido "'+qp+'"'); return; }
+    var cant = p.length >= 3 ? parseFloat(p[2].replace(',','.')) : 1;
+    if (isNaN(cant)) { errs.push('Fila '+(i+1)+': cantidad inválida'); return; }
+    var key = nodo+'|'+qp;
+    if (seen[key]) seen[key].cant += cant;
+    else { seen[key] = {nodo:nodo,qp:qp,cant:cant}; rows.push(seen[key]); }
+  });
+  return {rows:rows,errs:errs};
+}
+function actualizarPreviewMO() {
+  var val = document.getElementById('txt-mo').value;
+  var box = document.getElementById('mo-preview');
+  if (!val.trim()) {
+    box.innerHTML = '<span style="color:#aaa">Pega las filas de MO para ver la vista previa</span>';
+    return;
+  }
+  var res = parsearMO(val);
+  if (res.errs.length) {
+    box.innerHTML = '<span style="color:#c00">' + res.errs.map(function(e){ return '• '+e; }).join('<br>') + '</span>';
+    return;
+  }
+  var total = 0;
+  var html = '<table class="tbl"><tr><th>Nodo</th><th>QP</th><th>Descripción</th><th>UM</th><th>Precio</th><th>Cant.</th><th>Subtotal</th></tr>';
+  res.rows.forEach(function(r){
+    var info = PRECIOS[r.qp] || {};
+    var precio = info.precio || 0;
+    var sub = precio * r.cant;
+    total += sub;
+    html += '<tr><td class="c">'+r.nodo+'</td><td class="c">'+r.qp+'</td>' +
+            '<td style="font-size:11px">'+(info.descripcion||'—').substring(0,38)+'</td>' +
+            '<td class="c">'+(info.unidad||'C/U')+'</td>' +
+            '<td class="r">'+fmtPesos(precio)+'</td>' +
+            '<td class="c">'+r.cant+'</td>' +
+            '<td class="r" style="font-weight:700">'+fmtPesos(sub)+'</td></tr>';
+  });
+  html += '<tr style="background:#FFE699;font-weight:700"><td colspan="6" style="text-align:right;padding-right:8px">TOTAL MO</td>' +
+          '<td class="r">'+fmtPesos(total)+'</td></tr></table>';
+  box.innerHTML = '<span style="color:#375623;font-weight:700;display:block;margin-bottom:5px">✓ '+res.rows.length+' actividades — '+fmtPesos(total)+'</span>' + html;
+}
+document.getElementById('txt-mo').addEventListener('input', function(){
+  actualizarPreviewMO();
+  _moGuardada = false;
+  document.getElementById('badge-mo').innerHTML = '<span class="b-unsaved">sin guardar</span>';
+});
+actualizarPreviewMO();
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+if (_sgsReady === true) {
+  actualizarBarraSGS(true, null, {{ (sesion.sgs_data or {}).get('nodos', [])|length if sesion.sgs_data else 0 }});
+  cargarLideresSugeridos();
+} else {
+  // Deshabilitar botones hasta que SGS esté listo
+  _setBotonPrevia(false);
+  var _btnB = document.getElementById('btn-buscar');
+  if (_btnB) { _btnB.disabled = true; _btnB.title = 'Espera a que SGS cargue'; }
+  startPolling();
+}
+if (_lideres.length) renderLideres();
+// Si hay PROs importados del Excel, mostrar como chips en la sección de extras
+if (_extras.length) {
+  renderExtras();
+  document.getElementById('badge-mat').innerHTML =
+    '<span class="b-ok">' + _extras.length + ' PRO(s) del Excel</span>';
+}
+
+// Cerrar modal con Escape
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') cerrarModal(); });
+</script>
+</body>
+</html>

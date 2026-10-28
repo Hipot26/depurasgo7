@@ -1,0 +1,1870 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Balance Final SGS</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --surface2:  #22263a;
+      --border:    #2e3354;
+      --accent:    #4f7ef8;
+      --accent2:   #6ee7b7;
+      --danger:    #f87171;
+      --warn:      #fbbf24;
+      --text:      #e2e8f0;
+      --muted:     #94a3b8;
+      --mi-bg:     #1e293b;
+      --pg-bg:     #1a2235;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; font-size: 14px; }
+
+    /* ── Navbar ── */
+    .navbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex; align-items: center; gap: 16px;
+    }
+    .navbar .brand { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: .5px; }
+    .navbar .sub   { color: var(--muted); font-size: 12px; }
+
+    /* ── Layout ── */
+    .container { max-width: 1400px; margin: 0 auto; padding: 24px 20px; }
+
+    /* ── Modo tabs ── */
+    .mode-tabs {
+      display: flex; gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 6px;
+      margin-bottom: 16px;
+      width: fit-content;
+    }
+    .mode-tab {
+      padding: 8px 18px;
+      border-radius: 7px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .mode-tab.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    .mode-tab:hover:not(.active) { color: var(--text); background: var(--surface2); }
+
+    /* ── Panel de control ── */
+    .control-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 24px;
+      display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .field-group { display: flex; flex-direction: column; gap: 6px; }
+    .field-group label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    select, input[type=number] {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 14px;
+      min-width: 130px;
+    }
+    select:focus, input:focus { outline: none; border-color: var(--accent); }
+
+    /* ── Área de carga de reporte ── */
+    .reporte-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .reporte-panel.visible { display: block; }
+    .reporte-panel h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text); }
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .2s;
+      color: var(--muted);
+    }
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: #0d1426;
+      color: var(--text);
+    }
+    .drop-zone input[type=file] { display: none; }
+    .drop-zone .icon { font-size: 32px; margin-bottom: 8px; }
+    .drop-zone p { font-size: 13px; }
+    .drop-zone strong { color: var(--accent); }
+    .reporte-actual {
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: #052e16;
+      border: 1px solid #14532d;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #4ade80;
+      display: none;
+    }
+    .reporte-actual.visible { display: flex; align-items: center; gap: 8px; }
+
+    /* ── Botones ── */
+    .btn {
+      padding: 9px 20px;
+      border-radius: 7px;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s;
+      display: inline-flex; align-items: center; gap: 7px;
+    }
+    .btn:hover { opacity: .85; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary  { background: var(--accent);  color: #fff; }
+    .btn-success  { background: #16a34a;         color: #fff; }
+    .btn-green    { background: #059669;         color: #fff; }
+    .btn-outline  { background: transparent; border: 1px solid var(--border); color: var(--text); }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: none;
+      width: 18px; height: 18px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading .spinner { display: inline-block; }
+
+    /* ── Overlay de progreso de consulta ── */
+    #prog-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      display: none; align-items: center; justify-content: center;
+      background: rgba(10, 12, 20, .75);
+      backdrop-filter: blur(3px);
+    }
+    .prog-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 28px 32px;
+      width: min(440px, 90vw);
+      box-shadow: 0 20px 60px rgba(0,0,0,.5);
+      text-align: center;
+    }
+    .prog-card .prog-title {
+      font-size: 16px; font-weight: 700; color: var(--text);
+      margin-bottom: 6px;
+    }
+    .prog-card .prog-msg {
+      font-size: 13px; color: var(--muted);
+      min-height: 18px; margin-bottom: 18px;
+    }
+    .prog-track {
+      height: 10px; border-radius: 999px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .prog-fill {
+      height: 100%; width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width .6s ease;
+    }
+    .prog-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-top: 10px;
+    }
+    .prog-row #prog-pct   { font-size: 20px; font-weight: 700; color: var(--accent2); }
+    .prog-row #prog-tiempo { font-size: 12px; color: var(--muted); }
+
+    /* ── Fuente badge ── */
+    .fuente-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .fuente-api      { background: #1e3a5f; color: #7dd3fc; }
+    .fuente-reporte  { background: #1a3a2a; color: #6ee7b7; }
+
+    /* ── Cards totales ── */
+    .cards { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 14px 18px;
+      min-width: 160px;
+      flex: 1;
+    }
+    .card.total     { border-color: var(--accent); background: #0d1426; }
+    .card-label     { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .card-value     { font-size: 18px; font-weight: 700; color: var(--text); }
+    .card.total .card-value { color: var(--accent); }
+    .card-sub       { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+    /* ── Tabla ── */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .table-header {
+      padding: 14px 18px;
+      display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap; gap: 10px;
+    }
+    .table-header h2 { font-size: 15px; font-weight: 600; color: var(--text); }
+    .table-header .meta { font-size: 12px; color: var(--muted); }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      background: #1e2235;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    thead th.num { text-align: right; }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    tbody tr.mi-row { background: var(--mi-bg); }
+    tbody tr.pg-row { background: var(--pg-bg); }
+    td {
+      padding: 9px 12px;
+      vertical-align: middle;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.mo  { text-align: right; font-weight: 600; color: var(--accent2); font-variant-numeric: tabular-nums; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-mi  { background: #1e3a5f; color: #7dd3fc; }
+    .badge-pg  { background: #1a3a2a; color: #6ee7b7; }
+    .badge-sup { background: var(--surface2); color: var(--muted); }
+
+    .estado-ok      { color: #4ade80; }
+    .estado-parcial { color: var(--warn); }
+    .estado-pend    { color: var(--danger); }
+
+    /* ── Empty state ── */
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+    }
+    .empty .icon { font-size: 48px; margin-bottom: 12px; }
+    .empty p     { font-size: 15px; }
+
+    /* ── Alert ── */
+    .alert {
+      padding: 12px 16px;
+      border-radius: 7px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      display: none;
+    }
+    .alert-error   { background: #3b0f0f; border: 1px solid #7f1d1d; color: var(--danger); }
+    .alert-success { background: #052e16; border: 1px solid #14532d; color: #4ade80; }
+    .alert-info    { background: #0c1a33; border: 1px solid #1e3a5f; color: #7dd3fc; }
+
+    /* ── Footer ── */
+    .footer { text-align: center; color: var(--muted); font-size: 11px; padding: 20px 0 10px; }
+
+    @media (max-width: 900px) { .hide-sm { display: none; } }
+
+    /* ── Comparación SGS vs Presupuesto ── */
+    .cmp-section { display: none; }
+    .cmp-section.visible { display: block; }
+
+    .cmp-summary {
+      display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;
+    }
+    .cmp-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 14px 18px;
+      min-width: 160px; flex: 1;
+    }
+    .cmp-card.liq  { border-color: #16a34a; background: #052e16; }
+    .cmp-card.pend { border-color: #dc2626; background: #3b0f0f; }
+    .cmp-card.total-pres { border-color: var(--accent); background: #0d1426; }
+
+    tbody tr.cmp-liq   { background: #052e16 !important; }
+    tbody tr.cmp-pend  { background: #3b0f0f !important; }
+    tbody tr.cmp-extra { background: #2d2000 !important; }
+    tbody tr.cmp-liq:hover   { background: #064220 !important; }
+    tbody tr.cmp-pend:hover  { background: #4a1515 !important; }
+    tbody tr.cmp-extra:hover { background: #3d2e00 !important; }
+
+    .estado-liq   { color: #4ade80; font-weight: 700; }
+    .estado-pend  { color: #f87171; font-weight: 700; }
+    .estado-extra { color: #fbbf24; font-weight: 700; }
+
+    /* ── Barra de filtros de tabla ── */
+    .filter-bar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 10px 18px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .filter-bar.hidden { display: none; }
+    .filter-search {
+      flex: 1; min-width: 180px; max-width: 320px;
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); border-radius: 6px; padding: 7px 12px;
+      font-size: 13px;
+    }
+    .filter-search:focus { outline: none; border-color: var(--accent); }
+    .filter-select {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); border-radius: 6px; padding: 7px 10px;
+      font-size: 12px; cursor: pointer;
+    }
+    .filter-select:focus { outline: none; border-color: var(--accent); }
+    .filter-clear {
+      padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
+      background: transparent; color: var(--muted); font-size: 12px;
+      cursor: pointer; transition: all .15s;
+    }
+    .filter-clear:hover { border-color: var(--danger); color: var(--danger); }
+    .filter-count { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+    /* ── Sección Gráficas ── */
+    .charts-section { display: none; }
+    .charts-section.visible { display: block; }
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 18px 14px;
+    }
+    .chart-card h3 {
+      font-size: 13px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .5px;
+      margin-bottom: 14px;
+    }
+    .chart-card canvas { width: 100% !important; }
+
+    /* ── Análisis PDL badges ── */
+    .badge-pdl-single  { background: #1b4332; color: #6ee7b7; }
+    .badge-pdl-simult  { background: #3d2e00; color: #fbbf24; }
+    .badge-pdl-seq     { background: #4a1515; color: #f87171; }
+
+    /* ── Filtros liquidador ── */
+    .filtro-btn {
+      padding: 5px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .filtro-btn:hover { border-color: var(--accent); color: var(--text); }
+    .filtro-btn.active-yo  { background:#1e3a5f; border-color:#4f7ef8; color:#7dd3fc; }
+    .filtro-btn.active-otro { background:#2d1a00; border-color:#fbbf24; color:#fbbf24; }
+    .filtro-btn.active-all { background: var(--accent); border-color: var(--accent); color:#fff; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <span class="brand">⚡ BALANCE FINAL SGS</span>
+  <span class="sub">Zona Ubaté · Liquidador: <strong style="color:var(--accent2)">{{ liquidador }}</strong> · Solo lectura</span>
+  <a href="/verificador" style="margin-left:auto;background:rgba(79,126,248,.12);border:1px solid rgba(79,126,248,.3);color:var(--accent);border-radius:8px;padding:6px 16px;font-size:12px;font-weight:600;text-decoration:none;">🔍 Verificador</a>
+</nav>
+
+<div class="container">
+
+  <!-- ── Tabs de modo ── -->
+  <div class="mode-tabs">
+    <button class="mode-tab active" id="tab-api" onclick="setModo('api')">
+      🔌 Consultar API SGS
+    </button>
+    <button class="mode-tab" id="tab-reporte" onclick="setModo('reporte')">
+      📊 Informe de Producción
+    </button>
+    <button class="mode-tab" id="tab-comparar" onclick="setModo('comparar')">
+      📈 SGS vs Presupuesto
+    </button>
+  </div>
+
+  <!-- ── Panel de control (común: mes/año + botones) ── -->
+  <div class="control-panel">
+    <div class="field-group">
+      <label>Mes</label>
+      <select id="sel-mes">
+        {% for num, nombre in meses.items() %}
+        <option value="{{ num }}" {% if num == mes_actual %}selected{% endif %}>{{ nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field-group">
+      <label>Año</label>
+      <input type="number" id="inp-año" value="{{ año_actual }}" min="2024" max="2030" style="width:90px">
+    </div>
+
+    <!-- Botón modo API -->
+    <button class="btn btn-primary" id="btn-consultar" onclick="consultar()" style="display:inline-flex">
+      <span class="spinner" id="spin-consultar"></span>
+      <span id="txt-consultar">🔍 Consultar SGS</span>
+    </button>
+
+    <!-- Botón modo reporte -->
+    <button class="btn btn-green" id="btn-consultar-rep" onclick="consultarReporte()" style="display:none">
+      <span class="spinner" id="spin-consultar-rep"></span>
+      <span id="txt-consultar-rep">📊 Leer Reporte</span>
+    </button>
+
+    <!-- Botón modo comparar -->
+    <button class="btn" id="btn-comparar" onclick="comparar()" style="display:none; background:#7c3aed; color:#fff;">
+      <span class="spinner" id="spin-comparar"></span>
+      <span id="txt-comparar">📈 Comparar</span>
+    </button>
+
+    <button class="btn btn-success" id="btn-excel" onclick="generarExcel()" disabled>
+      <span class="spinner" id="spin-excel"></span>
+      <span id="txt-excel">📥 Generar Excel</span>
+    </button>
+    <div id="mes-label" style="color:var(--muted); font-size:13px; margin-left:auto;"></div>
+  </div>
+
+  <!-- ── Panel de carga de reporte (solo modo reporte) ── -->
+  <div class="reporte-panel{% if reporte_disponible %} visible{% endif %}" id="reporte-panel">
+    <h3>Informe de Producción SGS</h3>
+    <p style="font-size:12px; color:var(--muted); margin-bottom:12px">
+      Descarga desde SGS: <em>Reporte → Informe de Producción → Filtrar Ubaté → Exportar Excel</em>.
+      Luego arrastra el archivo aquí o haz clic para seleccionarlo.
+    </p>
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()"
+         ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+      <input type="file" id="file-input" accept=".xlsx,.xls" onchange="handleFileSelect(event)">
+      <div class="icon">📂</div>
+      <p>Arrastra el Excel aquí o <strong>haz clic para seleccionar</strong></p>
+      <p style="font-size:11px; margin-top:6px; color:var(--muted)">Solo .xlsx o .xls</p>
+    </div>
+    <div class="reporte-actual {% if reporte_disponible %}visible{% endif %}" id="reporte-actual">
+      <span>✅</span>
+      <span id="reporte-nombre">{{ reporte_nombre }}</span>
+      <span style="color:var(--muted); margin-left:auto">listo para usar</span>
+    </div>
+  </div>
+
+  <!-- ── Panel de carga del presupuesto (solo modo comparar) ── -->
+  <div class="reporte-panel" id="presup-panel">
+    <h3>Excel de Presupuesto — Resumen Trabajos</h3>
+    <p style="font-size:12px; color:var(--muted); margin-bottom:12px">
+      Sube el Excel <em>"Resumen Trabajos &lt;Mes&gt; &lt;Año&gt;.xlsx"</em> preparado por el Ing. Wilerson.
+      Solo necesitas subirlo una vez por mes.
+    </p>
+    <div class="drop-zone" id="drop-zone-presup"
+         onclick="document.getElementById('file-input-presup').click()"
+         ondrop="handleDropPresup(event)" ondragover="handleDragOverPresup(event)" ondragleave="handleDragLeavePresup(event)">
+      <input type="file" id="file-input-presup" accept=".xlsx,.xls" onchange="handleFileSelectPresup(event)">
+      <div class="icon">📂</div>
+      <p>Arrastra el Excel aquí o <strong>haz clic para seleccionar</strong></p>
+      <p style="font-size:11px; margin-top:6px; color:var(--muted)">Solo .xlsx o .xls</p>
+    </div>
+    <div class="reporte-actual" id="presup-actual">
+      <span>✅</span>
+      <span id="presup-nombre"></span>
+      <span style="color:var(--muted); margin-left:auto">listo para comparar</span>
+    </div>
+  </div>
+
+  <!-- ── Alerts ── -->
+  <div class="alert alert-error"   id="alert-error"></div>
+  <div class="alert alert-success" id="alert-success"></div>
+  <div class="alert alert-info"    id="alert-info"></div>
+
+  <!-- ── Cards totales ── -->
+  <div class="cards" id="cards" style="display:none"></div>
+
+  <!-- ── Tabs de vista ── -->
+  <div id="vista-tabs" style="display:none; margin-bottom:12px;">
+    <div class="mode-tabs">
+      <button class="mode-tab active" id="tab-consolidado" onclick="setVista('consolidado')">📊 Consolidado</button>
+      <button class="mode-tab" id="tab-detalle"      onclick="setVista('detalle')">🔍 Prestaciones</button>
+      <button class="mode-tab" id="tab-pdl"          onclick="setVista('pdl')">📋 Análisis PDL</button>
+      <button class="mode-tab" id="tab-graficas"     onclick="setVista('graficas')">📈 Gráficas</button>
+    </div>
+  </div>
+
+  <!-- ── Filtros por liquidador ── -->
+  <div id="filtro-liq-panel" style="display:none; margin-bottom:12px;">
+    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <span style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px;">Liquidado por:</span>
+      <div id="filtro-liq-btns" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+      <span id="filtro-liq-total" style="margin-left:auto; font-size:13px; font-weight:700; color:var(--accent2);"></span>
+    </div>
+  </div>
+
+  <!-- ── Tabla ── -->
+  <div class="table-wrap" id="table-wrap-main">
+    <div class="table-header">
+      <div>
+        <h2 id="tabla-titulo">Proyectos liquidados</h2>
+        <span class="meta" id="meta-tabla">Selecciona el mes y consulta</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:12px">
+        <span id="fuente-badge"></span>
+        <button id="btn-exportar-detalle" onclick="exportarDetalle()" style="display:none;
+          padding:6px 14px; border-radius:6px; border:none; cursor:pointer;
+          background:#16a34a; color:#fff; font-size:13px; font-weight:600; gap:6px;">
+          <span class="spinner" id="spin-exp-det"></span>
+          <span id="txt-exp-det">&#8659; Exportar Excel</span>
+        </button>
+        <span id="total-mo" style="font-size:20px; font-weight:700; color:var(--accent2);"></span>
+      </div>
+    </div>
+
+    <!-- Barra de filtros dinámica -->
+    <div class="filter-bar hidden" id="filter-bar">
+      <input class="filter-search" id="filter-search" type="text"
+             placeholder="🔍 Buscar PDL, líder, código SGS..."
+             oninput="_applyFilters()">
+      <select class="filter-select" id="filter-supervisor" onchange="_applyFilters()">
+        <option value="">Supervisor (todos)</option>
+      </select>
+      <select class="filter-select" id="filter-proceso" onchange="_applyFilters()">
+        <option value="">Proceso (todos)</option>
+        <option value="MI">MI — Mayor Impacto</option>
+        <option value="PG">PG — Programado</option>
+      </select>
+      <select class="filter-select" id="filter-lider" onchange="_applyFilters()">
+        <option value="">Líder (todos)</option>
+      </select>
+      <button class="filter-clear" onclick="_clearFilters()">✕ Limpiar</button>
+      <span class="filter-count" id="filter-count"></span>
+    </div>
+
+    <div id="tabla-container">
+      <div class="empty">
+        <div class="icon">📋</div>
+        <p>Selecciona el mes y presiona <strong>Consultar</strong></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Sección Gráficas ── -->
+  <div class="charts-section" id="charts-section">
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>MO por Supervisor</h3>
+        <canvas id="chart-supervisor" height="220"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>MI vs PG</h3>
+        <canvas id="chart-proceso" height="220"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Top Líderes</h3>
+        <canvas id="chart-lideres" height="220"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Evolución por Fecha</h3>
+        <canvas id="chart-fechas" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Sección de comparación SGS vs Presupuesto ── -->
+  <div class="cmp-section" id="cmp-section">
+    <div class="cmp-summary" id="cmp-summary"></div>
+    <div class="table-wrap">
+      <div class="table-header">
+        <div>
+          <h2 id="cmp-titulo">SGS vs Presupuesto</h2>
+          <span class="meta" id="cmp-meta"></span>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px">
+          <span style="font-size:12px; color:var(--muted)">
+            <span style="display:inline-block;width:12px;height:12px;background:#052e16;border:1px solid #16a34a;border-radius:2px;margin-right:4px"></span>Liquidado
+            <span style="display:inline-block;width:12px;height:12px;background:#3b0f0f;border:1px solid #dc2626;border-radius:2px;margin:0 4px 0 12px"></span>Pendiente
+            <span style="display:inline-block;width:12px;height:12px;background:#2d2000;border:1px solid #fbbf24;border-radius:2px;margin:0 4px 0 12px"></span>Solo SGS
+          </span>
+          <button id="btn-exportar-cmp" onclick="exportarComparacion()"
+            style="display:none; padding:6px 14px; border-radius:6px; border:none; cursor:pointer;
+                   background:#16a34a; color:#fff; font-size:13px; font-weight:600;">
+            <span class="spinner" id="spin-exp-cmp"></span>
+            <span id="txt-exp-cmp">&#8659; Exportar Excel</span>
+          </button>
+        </div>
+      </div>
+      <div id="cmp-container">
+        <div class="empty">
+          <div class="icon">📈</div>
+          <p>Sube el Excel de presupuesto y presiona <strong>Comparar</strong></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">BALANCE FINAL SGS · Solo lectura · SGS Dominion Colombia · Zona Ubaté</div>
+</div>
+
+<div id="prog-overlay">
+  <div class="prog-card">
+    <div class="prog-title">🔎 Consultando prestaciones</div>
+    <div class="prog-msg" id="prog-msg">Iniciando…</div>
+    <div class="prog-track"><div class="prog-fill" id="prog-bar"></div></div>
+    <div class="prog-row">
+      <span id="prog-pct">0%</span>
+      <span id="prog-tiempo"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+const LIQUIDADOR = "{{ liquidador }}";
+const LIQUIDADORES_EQUIPO = {{ liquidadores_equipo | tojson }};
+let _modo = 'api';
+let _filtroLiq = null;   // null = todos, string = nombre del liquidador filtrado
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function fmtPesos(n) {
+  return '$' + Number(n).toLocaleString('es-CO', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function setLoading(id, on) {
+  const btn = document.getElementById('btn-' + id);
+  const sp  = document.getElementById('spin-' + id);
+  if (!btn) return;
+  if (on) { btn.classList.add('loading'); btn.disabled = true; sp.style.display = 'inline-block'; }
+  else    { btn.classList.remove('loading'); btn.disabled = false; sp.style.display = 'none'; }
+}
+
+// ── Overlay de progreso de consulta ──────────────────────────────────────────
+let _progT0 = 0, _progPct = 0, _progUiTimer = null;
+
+function _abrirProgreso() {
+  _progT0 = Date.now();
+  _progPct = 0;
+  document.getElementById('prog-bar').style.width = '0%';
+  document.getElementById('prog-pct').textContent = '0%';
+  document.getElementById('prog-msg').textContent = 'Iniciando…';
+  document.getElementById('prog-tiempo').textContent = '';
+  document.getElementById('prog-overlay').style.display = 'flex';
+  _actualizarProgreso(1, 'Iniciando consulta…');
+  _progUiTimer = setInterval(_pintarTiempoProgreso, 500);
+}
+
+function _actualizarProgreso(pct, msg) {
+  _progPct = Math.max(_progPct, Math.min(100, pct || 0));  // nunca retrocede
+  document.getElementById('prog-bar').style.width = _progPct + '%';
+  document.getElementById('prog-pct').textContent = Math.round(_progPct) + '%';
+  if (msg) document.getElementById('prog-msg').textContent = msg;
+  _pintarTiempoProgreso();
+}
+
+function _pintarTiempoProgreso() {
+  const transcurrido = (Date.now() - _progT0) / 1000;
+  let restante;
+  if (_progPct >= 8) {
+    restante = transcurrido * (100 - _progPct) / _progPct;
+  } else {
+    // Aún sin datos de avance: estimar con la duración de la última consulta
+    const ultimaDur = parseInt(localStorage.getItem('balance_dur_consulta') || '45', 10);
+    restante = Math.max(ultimaDur - transcurrido, 5);
+  }
+  document.getElementById('prog-tiempo').textContent =
+    '⏱ ' + Math.round(transcurrido) + 's · quedan ~' + Math.max(1, Math.round(restante)) + 's';
+}
+
+function _cerrarProgreso() {
+  if (_progUiTimer) { clearInterval(_progUiTimer); _progUiTimer = null; }
+  document.getElementById('prog-overlay').style.display = 'none';
+}
+
+function showAlert(tipo, msg, duracion = 7000) {
+  ['error','success','info'].forEach(t => document.getElementById('alert-'+t).style.display = 'none');
+  const el = document.getElementById('alert-' + tipo);
+  el.innerHTML = msg;
+  el.style.display = 'block';
+  if (duracion > 0) setTimeout(() => el.style.display = 'none', duracion);
+}
+
+// ── Modo (API / Reporte / Comparar) ──────────────────────────────────────────
+function setModo(modo) {
+  _modo = modo;
+  document.getElementById('tab-api').classList.toggle('active', modo === 'api');
+  document.getElementById('tab-reporte').classList.toggle('active', modo === 'reporte');
+  document.getElementById('tab-comparar').classList.toggle('active', modo === 'comparar');
+
+  document.getElementById('btn-consultar').style.display     = modo === 'api'     ? 'inline-flex' : 'none';
+  document.getElementById('btn-consultar-rep').style.display = modo === 'reporte' ? 'inline-flex' : 'none';
+  document.getElementById('btn-comparar').style.display      = modo === 'comparar'? 'inline-flex' : 'none';
+  document.getElementById('btn-excel').style.display         = modo !== 'comparar'? 'inline-flex' : 'none';
+  if (modo !== 'comparar') document.getElementById('btn-exportar-cmp').style.display = 'none';
+
+  document.getElementById('reporte-panel').classList.toggle('visible', modo === 'reporte');
+  document.getElementById('presup-panel').classList.toggle('visible', modo === 'comparar');
+
+  // Mostrar/ocultar sección de comparación y tabla principal
+  const esCmp = modo === 'comparar';
+  document.querySelector('.table-wrap').style.display  = esCmp ? 'none' : 'block';
+  document.getElementById('cards').style.display       = esCmp ? 'none' : (window._proyectos && window._proyectos.length ? 'flex' : 'none');
+  document.getElementById('vista-tabs').style.display  = esCmp ? 'none' : (document.getElementById('vista-tabs').style.display);
+  document.getElementById('filtro-liq-panel').style.display = esCmp ? 'none' : (document.getElementById('filtro-liq-panel').style.display);
+  document.getElementById('cmp-section').classList.toggle('visible', esCmp);
+
+  // Al entrar en modo comparar, verificar si hay presupuesto disponible
+  if (esCmp) _cargarInfoPresupuesto();
+}
+
+// ── Consulta API SGS ──────────────────────────────────────────────────────────
+async function consultar() {
+  const año = parseInt(document.getElementById('inp-año').value);
+  const mes = parseInt(document.getElementById('sel-mes').value);
+
+  setLoading('consultar', true);
+  document.getElementById('btn-excel').disabled = true;
+  document.getElementById('tabla-container').innerHTML = '<div class="empty"><div class="icon">⏳</div><p>Consultando SGS...</p></div>';
+  document.getElementById('cards').style.display = 'none';
+  document.getElementById('total-mo').textContent = '';
+  document.getElementById('fuente-badge').innerHTML = '';
+
+  // Job id para seguir el progreso real de la consulta desde otro worker
+  const jobId = 'j' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  _abrirProgreso();
+  const poll = setInterval(async () => {
+    try {
+      const r = await fetch('/api/consultar-progreso?job=' + jobId);
+      const p = await r.json();
+      _actualizarProgreso(p.pct, p.msg);
+    } catch(e) { /* el polling nunca debe romper la consulta */ }
+  }, 900);
+
+  try {
+    const resp = await fetch('/api/consultar', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({año, mes, job_id: jobId}),
+    });
+    const data = await resp.json();
+    if (!data.ok) { showAlert('error', '❌ ' + data.error); return; }
+    _actualizarProgreso(100, 'Completado');
+    localStorage.setItem('balance_dur_consulta',
+      String(Math.max(5, Math.round((Date.now() - _progT0) / 1000))));
+    _renderResultados(data);
+    showAlert('success', `✅ ${data.n} proyectos cargados para ${data.mes_str} (API SGS)`);
+  } catch(e) {
+    showAlert('error', '❌ Error de conexión: ' + e.message);
+    document.getElementById('tabla-container').innerHTML = '<div class="empty"><div class="icon">❌</div><p>Error al consultar SGS</p></div>';
+  } finally {
+    clearInterval(poll);
+    _cerrarProgreso();
+    setLoading('consultar', false);
+  }
+}
+
+// ── Consulta Reporte de Producción ────────────────────────────────────────────
+async function consultarReporte() {
+  const año = parseInt(document.getElementById('inp-año').value);
+  const mes = parseInt(document.getElementById('sel-mes').value);
+
+  setLoading('consultar-rep', true);
+  document.getElementById('btn-excel').disabled = true;
+  document.getElementById('tabla-container').innerHTML = '<div class="empty"><div class="icon">⏳</div><p>Leyendo Informe de Producción...</p></div>';
+  document.getElementById('cards').style.display = 'none';
+  document.getElementById('total-mo').textContent = '';
+  document.getElementById('fuente-badge').innerHTML = '';
+
+  try {
+    const resp = await fetch('/api/consultar-reporte', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({año, mes}),
+    });
+    const data = await resp.json();
+    if (!data.ok) {
+      showAlert('error', '❌ ' + data.error.replace(/\n/g, '<br>'), 0);
+      document.getElementById('tabla-container').innerHTML = '<div class="empty"><div class="icon">📂</div><p>Sube primero el Informe de Producción</p></div>';
+      return;
+    }
+    _renderResultados(data);
+    showAlert('success', `✅ ${data.n} proyectos cargados para ${data.mes_str} (Informe de Producción)`);
+  } catch(e) {
+    showAlert('error', '❌ Error: ' + e.message);
+  } finally {
+    setLoading('consultar-rep', false);
+  }
+}
+
+// ── Filtros por liquidador ─────────────────────────────────────────────────────
+function _buildFiltrosLiquidador() {
+  const panel = document.getElementById('filtro-liq-panel');
+  const btns  = document.getElementById('filtro-liq-btns');
+
+  // Recolectar todos los liquidadores únicos según vista actual
+  const liquidadores = new Map();  // nombre -> {mo_total, es_yo}
+
+  if (_vistaActual === 'detalle') {
+    for (const d of (window._detalle || [])) {
+      const n = d.liquidador || '?';
+      const esYo = LIQUIDADORES_EQUIPO.some(frag => n.toUpperCase().includes(frag));
+      if (!liquidadores.has(n)) liquidadores.set(n, {mo: 0, es_yo: esYo});
+      liquidadores.get(n).mo += d.man_obra;
+    }
+  } else {
+    for (const p of (window._proyectos || [])) {
+      for (const l of (p.liquidadores || [])) {
+        const n = l.nombre || '?';
+        const esYo = LIQUIDADORES_EQUIPO.some(frag => n.toUpperCase().includes(frag));
+        if (!liquidadores.has(n)) liquidadores.set(n, {mo: 0, es_yo: esYo});
+        liquidadores.get(n).mo += l.mo;
+      }
+    }
+  }
+
+  if (liquidadores.size === 0) { panel.style.display = 'none'; return; }
+
+  // Ordenar: yo primero, luego por MO
+  const sorted = [...liquidadores.entries()].sort((a, b) => {
+    if (a[1].es_yo !== b[1].es_yo) return a[1].es_yo ? -1 : 1;
+    return b[1].mo - a[1].mo;
+  });
+
+  let html = `<button class="filtro-btn active-all" onclick="setFiltroLiq(null)">Todos</button>`;
+  for (const [nombre, info] of sorted) {
+    const primerNombre = nombre.split(' ').slice(0,2).join(' ');
+    const clase = info.es_yo ? 'active-yo' : 'active-otro';
+    html += `<button class="filtro-btn" onclick="setFiltroLiq('${nombre}')"
+      title="${nombre} — ${fmtPesos(info.mo)}">${primerNombre}</button>`;
+  }
+  btns.innerHTML = html;
+  panel.style.display = 'block';
+  _actualizarEstadoBtns();
+}
+
+function setFiltroLiq(nombre) {
+  _filtroLiq = nombre;
+  _actualizarEstadoBtns();
+  // Re-renderizar la vista activa con el filtro aplicado
+  if (_vistaActual === 'detalle') renderDetalle(window._detalle || []);
+  else renderTabla(window._proyectos || []);
+}
+
+function _actualizarEstadoBtns() {
+  const btns = document.querySelectorAll('#filtro-liq-btns .filtro-btn');
+  btns.forEach(btn => {
+    const onclick = btn.getAttribute('onclick') || '';
+    const esAll   = onclick.includes('null');
+    const esEste  = !esAll && onclick.includes(`'${_filtroLiq}'`);
+    btn.classList.remove('active-all','active-yo','active-otro');
+    if (_filtroLiq === null && esAll) {
+      btn.classList.add('active-all');
+    } else if (esEste) {
+      const esYo = LIQUIDADORES_EQUIPO.some(frag => btn.title.toUpperCase().includes(frag)) || btn.textContent.includes(LIQUIDADOR.split(' ')[0]);
+      btn.classList.add(esYo ? 'active-yo' : 'active-otro');
+    }
+  });
+}
+
+function _filtrarPorLiq(lista, esDetalle) {
+  if (!_filtroLiq) return lista;
+  if (esDetalle) {
+    return lista.filter(d => (d.liquidador || '').includes(_filtroLiq.split(' ')[0]));
+  } else {
+    return lista.filter(p =>
+      (p.liquidadores || []).some(l => l.nombre.includes(_filtroLiq.split(' ')[0]))
+    );
+  }
+}
+
+// ── Vista (Consolidado / Detalle / PDL / Gráficas) ───────────────────────────
+let _vistaActual = 'consolidado';
+const _TABS = ['consolidado','detalle','pdl','graficas'];
+
+function setVista(vista) {
+  _vistaActual = vista;
+  _TABS.forEach(t => {
+    const el = document.getElementById('tab-' + t);
+    if (el) el.classList.toggle('active', t === vista);
+  });
+
+  const esGraficas = vista === 'graficas';
+  const esPDL      = vista === 'pdl';
+  const esDetalle  = vista === 'detalle';
+
+  document.getElementById('table-wrap-main').style.display = esGraficas ? 'none' : 'block';
+  document.getElementById('charts-section').classList.toggle('visible', esGraficas);
+  document.getElementById('btn-exportar-detalle').style.display = esDetalle ? 'inline-flex' : 'none';
+  document.getElementById('filter-bar').classList.toggle('hidden',
+    esGraficas || esPDL);
+
+  if (vista === 'consolidado') {
+    document.getElementById('tabla-titulo').textContent = 'Proyectos liquidados';
+    _buildFilterBar();
+    renderTabla(window._proyectos || []);
+  } else if (esDetalle) {
+    document.getElementById('tabla-titulo').textContent = 'Prestaciones individuales';
+    _buildFilterBar();
+    renderDetalle(window._detalle || []);
+  } else if (esPDL) {
+    document.getElementById('tabla-titulo').textContent = 'Análisis PDL — Historial de nodos';
+    renderPDL(window._proyectos || []);
+  } else if (esGraficas) {
+    renderGraficas(window._proyectos || [], window._detalle || []);
+  }
+}
+
+// ── Render común ──────────────────────────────────────────────────────────────
+function _renderResultados(data) {
+  document.getElementById('mes-label').textContent = data.mes_str;
+  document.getElementById('meta-tabla').textContent = `${data.n} proyectos · ${data.mes_str}`;
+  document.getElementById('total-mo').textContent = fmtPesos(data.total_general);
+
+  const fuente = data.fuente === 'reporte_produccion'
+    ? '<span class="fuente-badge fuente-reporte">📊 Informe de Producción</span>'
+    : '<span class="fuente-badge fuente-api">🔌 API SGS</span>';
+  document.getElementById('fuente-badge').innerHTML = fuente;
+
+  window._detalle = data.detalle || [];
+  _filtroLiq = null;   // resetear filtro al cargar datos nuevos
+  renderCards(data.totales, data.otros, data.total_general, data.proyectos);
+
+  // Mostrar tabs de vista solo en modo API
+  const tieneTabs = data.fuente === 'api_sgs';
+  document.getElementById('vista-tabs').style.display = tieneTabs ? 'block' : 'none';
+  _vistaActual = 'consolidado';
+  _TABS.forEach(t => {
+    const el = document.getElementById('tab-' + t);
+    if (el) el.classList.toggle('active', t === 'consolidado');
+  });
+  document.getElementById('tabla-titulo').textContent = 'Proyectos liquidados';
+  document.getElementById('charts-section').classList.remove('visible');
+  document.getElementById('table-wrap-main').style.display = 'block';
+  document.getElementById('filter-bar').classList.remove('hidden');
+
+  _buildFilterBar();
+  renderTabla(data.proyectos);
+  document.getElementById('btn-excel').disabled = false;
+}
+
+// ── Cards ─────────────────────────────────────────────────────────────────────
+function renderCards(totales, otros, totalGeneral, proyectos) {
+  window._proyectos = proyectos || [];
+  const container = document.getElementById('cards');
+  let html = '';
+
+  for (const [sup, total] of Object.entries(totales)) {
+    if (total === 0) continue;
+    const cnt = window._proyectos.filter(p => p.supervisor === sup).length;
+    html += `
+      <div class="card">
+        <div class="card-label">${sup}</div>
+        <div class="card-value">${fmtPesos(total)}</div>
+        <div class="card-sub">${cnt} proy.</div>
+      </div>`;
+  }
+  for (const [sup, total] of Object.entries(otros)) {
+    if (total === 0) continue;
+    const cnt = window._proyectos.filter(p => p.supervisor === sup).length;
+    html += `
+      <div class="card">
+        <div class="card-label">${sup}</div>
+        <div class="card-value">${fmtPesos(total)}</div>
+        <div class="card-sub">${cnt} proy. (sin mapeo)</div>
+      </div>`;
+  }
+  html += `
+    <div class="card total">
+      <div class="card-label">TOTAL GENERAL</div>
+      <div class="card-value">${fmtPesos(totalGeneral)}</div>
+    </div>`;
+
+  container.innerHTML = html;
+  container.style.display = 'flex';
+}
+
+// ── Tabla (wrapper → _renderTablaDirecto vía _applyFilters) ──────────────────
+function renderTabla(proyectos) {
+  window._proyectos = proyectos;
+  _buildFiltrosLiquidador();
+  _buildFilterBar();
+  // Limpiar texto de búsqueda sin llamar _applyFilters en bucle
+  document.getElementById('filter-search').value = '';
+  document.getElementById('filter-supervisor').value = '';
+  document.getElementById('filter-proceso').value = '';
+  document.getElementById('filter-lider').value = '';
+  document.getElementById('filter-count').textContent = '';
+  _renderTablaDirecto(proyectos);
+}
+
+// ── Detalle (wrapper → _renderDetalleDirecto vía _applyFilters) ──────────────
+function renderDetalle(detalle) {
+  window._detalle = detalle;
+  _buildFiltrosLiquidador();
+  _buildFilterBar();
+  document.getElementById('filter-search').value = '';
+  document.getElementById('filter-supervisor').value = '';
+  document.getElementById('filter-proceso').value = '';
+  document.getElementById('filter-lider').value = '';
+  document.getElementById('filter-count').textContent = '';
+  _renderDetalleDirecto(detalle);
+}
+
+// ── Generar Excel ─────────────────────────────────────────────────────────────
+async function generarExcel() {
+  setLoading('excel', true);
+  document.getElementById('txt-excel').textContent = 'Generando...';
+
+  try {
+    const resp = await fetch('/api/generar-excel', { method: 'POST' });
+    if (!resp.ok) {
+      const err = await resp.json();
+      showAlert('error', '❌ Error al generar Excel: ' + err.error);
+      return;
+    }
+    const blob = await resp.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const cd   = resp.headers.get('Content-Disposition') || '';
+    const match = cd.match(/filename="?([^"]+)"?/);
+    a.href     = url;
+    a.download = match ? match[1] : 'BALANCE_FINAL_SGS.xlsx';
+    a.click();
+    URL.revokeObjectURL(url);
+    showAlert('success', '✅ Excel generado y descargado correctamente.');
+  } catch(e) {
+    showAlert('error', '❌ Error: ' + e.message);
+  } finally {
+    setLoading('excel', false);
+    document.getElementById('txt-excel').textContent = '📥 Generar Excel';
+  }
+}
+
+// ── Carga de archivo (drag & drop / input) ────────────────────────────────────
+function handleDragOver(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.add('drag-over');
+}
+function handleDragLeave(e) {
+  document.getElementById('drop-zone').classList.remove('drag-over');
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) subirArchivo(file);
+}
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (file) subirArchivo(file);
+}
+
+async function subirArchivo(file) {
+  if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+    showAlert('error', '❌ Solo se aceptan archivos .xlsx o .xls');
+    return;
+  }
+
+  showAlert('info', '⏳ Subiendo archivo...', 0);
+  const formData = new FormData();
+  formData.append('archivo', file);
+
+  try {
+    const resp = await fetch('/api/subir-reporte', { method: 'POST', body: formData });
+    const data = await resp.json();
+    if (!data.ok) {
+      showAlert('error', '❌ ' + data.error);
+      return;
+    }
+    // Mostrar nombre del archivo cargado
+    document.getElementById('reporte-nombre').textContent = data.nombre;
+    document.getElementById('reporte-actual').classList.add('visible');
+    showAlert('success', `✅ Archivo "${data.nombre}" cargado. Ahora selecciona el mes y presiona "Leer Reporte".`);
+  } catch(e) {
+    showAlert('error', '❌ Error al subir: ' + e.message);
+  }
+}
+
+// Inicializar modo si hay reporte disponible
+{% if reporte_disponible %}
+document.getElementById('reporte-panel').classList.add('visible');
+{% endif %}
+
+// ── Presupuesto: carga de info y upload ───────────────────────────────────────
+async function _cargarInfoPresupuesto() {
+  try {
+    const resp = await fetch('/api/presupuesto-info');
+    const data = await resp.json();
+    if (data.ok && data.archivos.length > 0) {
+      const nombre = data.archivos[0].nombre;
+      document.getElementById('presup-nombre').textContent = nombre;
+      document.getElementById('presup-actual').classList.add('visible');
+    } else {
+      document.getElementById('presup-actual').classList.remove('visible');
+    }
+  } catch(e) { /* silencioso */ }
+}
+
+function handleDragOverPresup(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone-presup').classList.add('drag-over');
+}
+function handleDragLeavePresup(e) {
+  document.getElementById('drop-zone-presup').classList.remove('drag-over');
+}
+function handleDropPresup(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone-presup').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) subirPresupuesto(file);
+}
+function handleFileSelectPresup(e) {
+  const file = e.target.files[0];
+  if (file) subirPresupuesto(file);
+}
+
+async function subirPresupuesto(file) {
+  if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+    showAlert('error', '❌ Solo se aceptan archivos .xlsx o .xls'); return;
+  }
+  showAlert('info', '⏳ Subiendo presupuesto...', 0);
+  const fd = new FormData();
+  fd.append('archivo', file);
+  try {
+    const resp = await fetch('/api/subir-presupuesto', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (!data.ok) { showAlert('error', '❌ ' + data.error); return; }
+    document.getElementById('presup-nombre').textContent = data.nombre;
+    document.getElementById('presup-actual').classList.add('visible');
+    showAlert('success', `✅ "${data.nombre}" cargado. Selecciona el mes y presiona Comparar.`);
+  } catch(e) {
+    showAlert('error', '❌ Error al subir: ' + e.message);
+  }
+}
+
+// ── Comparar SGS vs Presupuesto ───────────────────────────────────────────────
+async function comparar() {
+  const año = parseInt(document.getElementById('inp-año').value);
+  const mes = parseInt(document.getElementById('sel-mes').value);
+
+  setLoading('comparar', true);
+  document.getElementById('txt-comparar').textContent = 'Comparando...';
+  document.getElementById('cmp-container').innerHTML =
+    '<div class="empty"><div class="icon">⏳</div><p>Consultando SGS y comparando con el presupuesto...</p></div>';
+  document.getElementById('cmp-summary').innerHTML = '';
+
+  try {
+    const resp = await fetch('/api/comparar', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({año, mes}),
+    });
+    const data = await resp.json();
+    if (!data.ok) {
+      showAlert('error', '❌ ' + data.error, 0);
+      document.getElementById('cmp-container').innerHTML =
+        '<div class="empty"><div class="icon">❌</div><p>' + data.error + '</p></div>';
+      return;
+    }
+    renderComparacion(data);
+    document.getElementById('btn-exportar-cmp').style.display = '';
+    const pct = data.total_excel > 0 ? Math.round(data.total_liquidado / data.total_excel * 100) : 0;
+    showAlert('success',
+      `✅ ${data.mes_str} — ${data.total_liquidado} de ${data.total_excel} trabajos liquidados (${pct}%)`);
+  } catch(e) {
+    showAlert('error', '❌ Error: ' + e.message);
+  } finally {
+    setLoading('comparar', false);
+    document.getElementById('txt-comparar').textContent = '📈 Comparar';
+  }
+}
+
+function renderComparacion(data) {
+  const { filas, total_excel, total_liquidado, total_pendiente, total_extra_sgs,
+          n_sgs_total, mao_esperado, mao_liquidado, mao_sgs_total, mes_str } = data;
+
+  // Resumen
+  const pct = total_excel > 0 ? Math.round(total_liquidado / total_excel * 100) : 0;
+  document.getElementById('cmp-titulo').textContent = `SGS vs Presupuesto — ${mes_str}`;
+  document.getElementById('cmp-meta').textContent =
+    `${total_excel} trabajos en presupuesto · archivo: ${data.archivo}`;
+
+  document.getElementById('cmp-summary').innerHTML = `
+    <div class="cmp-card liq">
+      <div class="card-label">Liquidados</div>
+      <div class="card-value" style="color:#4ade80">${total_liquidado}</div>
+      <div class="card-sub">${pct}% del presupuesto</div>
+    </div>
+    <div class="cmp-card pend">
+      <div class="card-label">Pendientes</div>
+      <div class="card-value" style="color:#f87171">${total_pendiente}</div>
+      <div class="card-sub">${100 - pct}% del presupuesto</div>
+    </div>
+    <div class="cmp-card" style="border-color:#fbbf24; background:#2d2000">
+      <div class="card-label">Solo en SGS</div>
+      <div class="card-value" style="color:#fbbf24">${total_extra_sgs || 0}</div>
+      <div class="card-sub">No están en el presupuesto</div>
+    </div>
+    <div class="cmp-card total-pres">
+      <div class="card-label">MAO Presupuestada</div>
+      <div class="card-value" style="color:var(--accent)">${fmtPesos(mao_esperado)}</div>
+      <div class="card-sub">Total ${total_excel} trabajos</div>
+    </div>
+    <div class="cmp-card" style="border-color:#16a34a; background:#052e16">
+      <div class="card-label">MAO Liquidada SGS</div>
+      <div class="card-value" style="color:#4ade80">${fmtPesos(mao_sgs_total || mao_liquidado)}</div>
+      <div class="card-sub">${n_sgs_total || total_liquidado} proyectos SGS</div>
+    </div>`;
+
+  if (!filas.length) {
+    document.getElementById('cmp-container').innerHTML =
+      '<div class="empty"><div class="icon">🔍</div><p>Sin datos en el presupuesto</p></div>';
+    return;
+  }
+
+  let rows = '';
+  for (const f of filas) {
+    const rowCls = f.sgs_extra ? 'cmp-extra' : (f.liquidado ? 'cmp-liq' : 'cmp-pend');
+    const estIco = f.sgs_extra
+      ? '<span class="estado-extra">&#9888; Solo SGS</span>'
+      : f.liquidado
+        ? '<span class="estado-liq">&#10003; Liquidado</span>'
+        : '<span class="estado-pend">&#10007; Pendiente</span>';
+    const badgeTipo = f.tipo_match === 'MI'
+      ? '<span class="badge badge-mi">MI</span>'
+      : '<span class="badge badge-pg">PG</span>';
+
+    // Clave de match a mostrar: PDT para MI, LCL para PG
+    const claveLabel = f.tipo_match === 'MI' ? f.pdt : f.lcl;
+
+    const sgsInfo = f.sgs
+      ? `<td class="mo">${fmtPesos(f.sgs.man_obra)}</td>
+         <td style="font-size:12px;color:var(--muted)">${f.sgs.liquidado_por || '—'}</td>
+         <td style="font-size:11px;color:var(--muted);font-family:monospace">${f.sgs.pro_code || '—'}</td>`
+      : `<td class="mo" style="color:var(--muted)">—</td><td>—</td><td>—</td>`;
+
+    rows += `
+      <tr class="${rowCls}">
+        <td>${f.fecha || '—'}</td>
+        <td style="max-width:170px;overflow:hidden;text-overflow:ellipsis;font-size:12px" title="${f.proyecto}">${f.proyecto || '—'}</td>
+        <td style="font-family:monospace;font-size:12px;max-width:190px;overflow:hidden;text-overflow:ellipsis" title="${claveLabel}">${claveLabel || '—'}</td>
+        <td>${badgeTipo}</td>
+        <td class="hide-sm" style="font-size:12px">${f.municipio || '—'}</td>
+        <td style="font-size:12px">${f.supervisor_excel || '—'}</td>
+        <td class="mo">${f.valor_mao > 0 ? fmtPesos(f.valor_mao) : '—'}</td>
+        <td>${estIco}</td>
+        ${sgsInfo}
+      </tr>`;
+  }
+
+  document.getElementById('cmp-container').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>FECHA</th>
+          <th>PROYECTO / ANTECEDENTE</th>
+          <th>LCL / PDT</th>
+          <th>TIPO</th>
+          <th class="hide-sm">MUNICIPIO</th>
+          <th>SUPERVISOR</th>
+          <th class="num">$ PRESUPUESTO</th>
+          <th>ESTADO</th>
+          <th class="num">$ SGS</th>
+          <th>LIQUIDADO POR</th>
+          <th># COD SGS</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ── Exportar Prestaciones individuales ───────────────────────────────────────
+async function exportarDetalle() {
+  const detalle = window._detalle || [];
+  if (!detalle.length) {
+    showAlert('error', '❌ No hay prestaciones cargadas para exportar.');
+    return;
+  }
+  const btn  = document.getElementById('btn-exportar-detalle');
+  const spin = document.getElementById('spin-exp-det');
+  const txt  = document.getElementById('txt-exp-det');
+  btn.disabled = true;
+  spin.style.display = 'inline-block';
+  txt.textContent = 'Generando...';
+  try {
+    const mes_str = document.getElementById('mes-label').textContent || '';
+    const resp = await fetch('/api/exportar-detalle', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ detalle, mes_str }),
+    });
+    if (!resp.ok) {
+      const d = await resp.json().catch(() => ({}));
+      showAlert('error', '❌ ' + (d.error || resp.statusText), 0);
+      return;
+    }
+    const blob = await resp.blob();
+    const cd   = resp.headers.get('Content-Disposition') || '';
+    const m    = cd.match(/filename="?([^"]+)"?/);
+    const name = m ? m[1] : 'PRESTACIONES.xlsx';
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = name; a.click();
+    URL.revokeObjectURL(url);
+    showAlert('success', '&#8659; Excel descargado: ' + name);
+  } catch(e) {
+    showAlert('error', '❌ Error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    spin.style.display = 'none';
+    txt.textContent = '&#8659; Exportar Excel';
+  }
+}
+
+// ── Filter bar ────────────────────────────────────────────────────────────────
+function _buildFilterBar() {
+  const isDetalle = _vistaActual === 'detalle';
+  const items = isDetalle ? (window._detalle || []) : (window._proyectos || []);
+  const sups   = [...new Set(items.map(p => p.supervisor).filter(Boolean))].sort();
+  const lideres = [...new Set(items.map(p => p.lider).filter(Boolean))].sort();
+
+  const selSup = document.getElementById('filter-supervisor');
+  selSup.innerHTML = '<option value="">Supervisor (todos)</option>' +
+    sups.map(s => `<option value="${s}">${s}</option>`).join('');
+
+  const selLid = document.getElementById('filter-lider');
+  selLid.innerHTML = '<option value="">Líder (todos)</option>' +
+    lideres.map(l => `<option value="${l}">${l}</option>`).join('');
+
+  document.getElementById('filter-search').value = '';
+  document.getElementById('filter-proceso').value = '';
+}
+
+function _clearFilters() {
+  document.getElementById('filter-search').value = '';
+  document.getElementById('filter-supervisor').value = '';
+  document.getElementById('filter-proceso').value = '';
+  document.getElementById('filter-lider').value = '';
+  _applyFilters();
+}
+
+// Búsqueda de códigos (PDL, PRO, LCL) sin espacios ni mayúsculas; el texto libre, tal cual.
+const _norm = s => (s == null ? '' : String(s)).toLowerCase().replace(/\s+/g, '');
+// Un PDL se busca en TODO el historial de la fila: la casilla de SGS acumula varios
+// (el último es el vigente) y el que se usó para liquidar cualquier nodo debe encontrarse.
+function _matchPdl(x, qc) {
+  if (!qc) return true;
+  if (_norm(x.pdl_code).includes(qc) || _norm(x.pdl_ultimo).includes(qc)) return true;
+  if ((x.pdl_list || []).some(c => _norm(c).includes(qc))) return true;
+  return (x.nodos_grupo || []).some(n => _norm(n.pdl_code).includes(qc) || _norm(n.pdl_ultimo).includes(qc));
+}
+
+function _applyFilters() {
+  const q    = (document.getElementById('filter-search').value || '').toLowerCase().trim();
+  const qc   = _norm(q);
+  const sup  = document.getElementById('filter-supervisor').value;
+  const proc = document.getElementById('filter-proceso').value;
+  const lid  = document.getElementById('filter-lider').value;
+
+  if (_vistaActual === 'detalle') {
+    let lista = window._detalle || [];
+    if (q)    lista = lista.filter(d =>
+      _matchPdl(d, qc) ||
+      _norm(d.pro_code).includes(qc) ||
+      (d.lider||'').toLowerCase().includes(q) ||
+      (d.supervisor||'').toLowerCase().includes(q) ||
+      (d.nombre_pro||'').toLowerCase().includes(q));
+    if (proc) lista = lista.filter(d => d.proceso === proc);
+    if (sup)  lista = lista.filter(d => d.supervisor === sup);
+    if (lid)  lista = lista.filter(d => d.lider === lid);
+    document.getElementById('filter-count').textContent =
+      lista.length !== (window._detalle||[]).length ? `${lista.length} de ${(window._detalle||[]).length}` : '';
+    _renderDetalleDirecto(lista);
+  } else {
+    let lista = window._proyectos || [];
+    if (q)    lista = lista.filter(p =>
+      _matchPdl(p, qc) ||
+      _norm(p.pro_code).includes(qc) ||
+      (p.lider||'').toLowerCase().includes(q) ||
+      (p.supervisor||'').toLowerCase().includes(q) ||
+      _norm(p.lcl).includes(qc));
+    if (proc) lista = lista.filter(p => p.proceso === proc);
+    if (sup)  lista = lista.filter(p => p.supervisor === sup);
+    if (lid)  lista = lista.filter(p => p.lider === lid);
+    document.getElementById('filter-count').textContent =
+      lista.length !== (window._proyectos||[]).length ? `${lista.length} de ${(window._proyectos||[]).length}` : '';
+    _renderTablaDirecto(lista);
+  }
+}
+
+// renderTabla y renderDetalle ahora llaman al helper directo
+function _liqHtml(p) {
+  if (p.liquidadores && p.liquidadores.length > 0) {
+    return p.liquidadores.map(l => {
+      const nombre = l.nombre.split(' ')[0];
+      const esSerg = LIQUIDADORES_EQUIPO.some(frag => l.nombre.toUpperCase().includes(frag));
+      const color  = esSerg ? 'background:#1e3a5f;color:#7dd3fc' : 'background:#2d1a00;color:#fbbf24';
+      return `<span class="badge" style="${color};margin:1px" title="${l.nombre} — $${Number(l.mo).toLocaleString('es-CO',{minimumFractionDigits:0})}">${nombre}</span>`;
+    }).join(' ');
+  }
+  if (p.liquidado_por) return `<span style="color:var(--muted);font-size:12px">${p.liquidado_por}</span>`;
+  return '—';
+}
+
+// Historial de PDL de la fila (todo lo que acumula la casilla de SGS, menos el vigente)
+function _pdlHistorial(p, nodos, vigente) {
+  const set = new Set();
+  for (const c of (p.pdl_list || (p.pdl_code || '').split(/[;:,]/))) { const s = String(c||'').trim(); if (s) set.add(s); }
+  for (const n of (nodos || [])) for (const c of (n.pdl_code || '').split(/[;:,]/)) { const s = c.trim().replace(/\/$/, ''); if (s) set.add(s); }
+  set.delete(vigente);
+  const otros = [...set];
+  if (!otros.length) return { title: vigente, html: '' };
+  return {
+    title: `PDL vigente: ${vigente}\nHistorial: ${otros.join(' · ')}`,
+    html: `<div style="font-size:10px;color:var(--muted);white-space:normal;line-height:1.3">hist.: ${otros.join(' · ')}</div>`,
+  };
+}
+
+// Decide si una fila PG se parte en varias (una por PDL). Cada nodo trae su PDL
+// vigente (último de su casilla): si en la fila hay nodos liquidados bajo PDL
+// distintos, cada PDL va en su propia fila con su MO. Datos viejos sin pdl_ultimo
+// (caché anterior) → heurística por fecha de siempre.
+function _splitFilasPdl(p, nodos) {
+  if (p.proceso !== 'PG' || nodos.length <= 1) return null;
+  if (nodos.every(n => n.pdl_ultimo)) {
+    const grupos = {};
+    for (const n of nodos) (grupos[n.pdl_ultimo] = grupos[n.pdl_ultimo] || []).push(n);
+    return Object.keys(grupos).length >= 2 ? grupos : null;
+  }
+  const pdlParts = (p.pdl_code || '').split(/[;:,]/).map(s => s.trim()).filter(Boolean);
+  if (pdlParts.length < 2) return null;
+  const fechasUnicas = new Set(nodos.map(n => n.fecha_primera || n.fecha_ultima).filter(Boolean));
+  if (fechasUnicas.size <= 1) return null;
+  return _splitNodosPorFecha(nodos, pdlParts);
+}
+
+function _renderConsolidadoFila(p, nodos, moOverride, pdlOverride) {
+  const rowClass = p.proceso === 'MI' ? 'mi-row' : 'pg-row';
+  const badgePro = p.proceso === 'MI'
+    ? '<span class="badge badge-mi">MI</span>'
+    : '<span class="badge badge-pg">PG</span>';
+  const badgeSup = `<span class="badge badge-sup">${p.supervisor || '?'}</span>`;
+  let estadoClass = 'estado-pend', estadoTxt = p.estado || '—';
+  if (p.estado === 'ok' || p.estado === '✅') { estadoClass = 'estado-ok'; estadoTxt = '✅'; }
+  else if (p.estado === 'parcial') { estadoClass = 'estado-parcial'; estadoTxt = '⚠ parcial'; }
+
+  const pdlDisplay = pdlOverride !== undefined ? pdlOverride : (p.pdl_ultimo || p.pdl_code || '—');
+  const pdlH = _pdlHistorial(p, nodos, pdlDisplay);
+  const mo = moOverride !== undefined ? moOverride : p.man_obra;
+
+  // Fecha: usar rango de los nodos del split, o fecha del proyecto completo
+  let fecha = p.fecha || '—';
+  if (nodos && nodos.length) {
+    const fMin = nodos.map(n=>n.fecha_primera).filter(Boolean).sort()[0];
+    const fMax = nodos.map(n=>n.fecha_ultima ).filter(Boolean).sort().pop();
+    if (fMin && fMax) fecha = fMin === fMax ? fMin : `${fMin}→${fMax}`;
+  }
+
+  return `
+    <tr class="${rowClass}">
+      <td>${fecha}</td>
+      <td style="max-width:230px" title="${pdlH.title}"><div style="font-weight:600">${pdlDisplay}</div>${pdlH.html}</td>
+      <td class="hide-sm" style="white-space:nowrap" title="${p.lider}">${p.lider||'—'}</td>
+      <td class="hide-sm">${p.lcl||'N/A'}</td>
+      <td>${badgePro}</td>
+      <td style="font-family:monospace;font-size:13px">${p.pro_code}</td>
+      <td class="mo">${fmtPesos(mo)}</td>
+      <td>${badgeSup}</td>
+      <td>${_liqHtml(p)}</td>
+      <td class="${estadoClass}">${estadoTxt}</td>
+    </tr>`;
+}
+
+function _renderTablaDirecto(lista) {
+  const filtrada = _filtrarPorLiq(lista, false);
+  const totalFilt = filtrada.reduce((s,p) => s + p.man_obra, 0);
+  document.getElementById('filtro-liq-total').textContent =
+    _filtroLiq ? `Mi total: ${fmtPesos(totalFilt)}` : '';
+
+  if (!filtrada.length) {
+    document.getElementById('tabla-container').innerHTML =
+      '<div class="empty"><div class="icon">🔍</div><p>Sin proyectos con los filtros aplicados</p></div>';
+    return;
+  }
+
+  let rows = '';
+  for (const p of filtrada) {
+    const nodos = p.nodos_grupo || [];
+    const split = _splitFilasPdl(p, nodos);
+    if (split) {
+      for (const [pdlCode, pdlNodos] of Object.entries(split)) {
+        const moSub = pdlNodos.reduce((s, n) => s + (n.mo || 0), 0);
+        rows += _renderConsolidadoFila(p, pdlNodos, moSub, pdlCode);
+      }
+    } else {
+      rows += _renderConsolidadoFila(p, nodos);
+    }
+  }
+
+  document.getElementById('tabla-container').innerHTML = `
+    <table><thead><tr>
+      <th>FECHA</th><th>PDL / OT</th><th class="hide-sm">LIDER</th>
+      <th class="hide-sm">LCL</th><th>PROC</th><th># COD SGS</th>
+      <th class="num">$ MAN OBRA</th><th>SUPERVISOR</th><th>LIQUIDADO POR</th><th>ESTADO</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function _renderDetalleDirecto(lista) {
+  const filtrada = _filtrarPorLiq(lista, true);
+  const totalFilt = filtrada.reduce((s,d) => s + d.man_obra, 0);
+  document.getElementById('filtro-liq-total').textContent = filtrada.length ? fmtPesos(totalFilt) : '';
+  if (!filtrada.length) {
+    document.getElementById('tabla-container').innerHTML =
+      '<div class="empty"><div class="icon">🔍</div><p>Sin prestaciones con este filtro</p></div>';
+    return;
+  }
+  let rows = '';
+  for (const d of filtrada) {
+    const rowClass = d.proceso === 'MI' ? 'mi-row' : 'pg-row';
+    const badgePro = d.proceso === 'MI'
+      ? '<span class="badge badge-mi">MI</span>'
+      : '<span class="badge badge-pg">PG</span>';
+    const esSerg = LIQUIDADORES_EQUIPO.some(frag => (d.liquidador||'').toUpperCase().includes(frag));
+    const liqColor = esSerg ? 'background:#1e3a5f;color:#7dd3fc' : 'background:#2d1a00;color:#fbbf24';
+    const liqNombre = d.liquidador ? d.liquidador.split(' ').slice(0,2).join(' ') : '?';
+    const moColor = d.man_obra < 0 ? 'color:var(--danger)' : 'color:var(--accent2)';
+    const liderShort = (d.lider||'').split(' ').slice(0,2).join(' ') || '—';
+    rows += `
+      <tr class="${rowClass}">
+        <td>${d.fecha||'—'}</td>
+        <td style="font-family:monospace;font-size:12px">${d.pro_code}</td>
+        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;font-size:12px" title="${d.pdl_code||''}">${d.pdl_ultimo||d.pdl_code||'—'}</td>
+        <td class="hide-sm" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)" title="${d.nombre_pro}">${d.nombre_pro||'—'}</td>
+        <td class="hide-sm" style="font-size:12px;white-space:nowrap" title="${d.lider||''}">${liderShort}</td>
+        <td>${badgePro}</td>
+        <td><span class="badge badge-sup">${d.supervisor||'?'}</span></td>
+        <td class="mo" style="${moColor}">${fmtPesos(d.man_obra)}</td>
+        <td><span class="badge" style="${liqColor}" title="${d.liquidador}">${liqNombre}</span></td>
+        <td style="font-size:11px;color:var(--muted)">${d.state||''}</td>
+      </tr>`;
+  }
+  const total = (window._detalle||[]).reduce((s,d) => s + d.man_obra, 0);
+  document.getElementById('meta-tabla').textContent =
+    `${(window._detalle||[]).length} prestaciones · Total ${fmtPesos(total)}`;
+  document.getElementById('tabla-container').innerHTML = `
+    <table><thead><tr>
+      <th>FECHA</th><th># COD SGS</th><th>PDL / OT</th>
+      <th class="hide-sm">NOMBRE PROYECTO</th><th class="hide-sm">LÍDER</th>
+      <th>PROC</th><th>SUPERVISOR</th><th class="num">$ PRESTACIÓN</th>
+      <th>LIQUIDADO POR</th><th>ESTADO</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// ── Análisis PDL ──────────────────────────────────────────────────────────────
+function _clasificarPDL(nodos) {
+  if (!nodos || nodos.length === 0) return { tipo: 'Sin datos',  cls: 'badge-pdl-single' };
+  if (nodos.length === 1)           return { tipo: 'Nodo único', cls: 'badge-pdl-single' };
+  const fechas = nodos.map(n => n.fecha_primera).filter(Boolean).map(f => new Date(f));
+  if (fechas.length >= 2) {
+    const min = Math.min(...fechas), max = Math.max(...fechas);
+    const dias = Math.round((max - min) / 86400000);
+    if (dias <= 1) return { tipo: 'Multi-nodo simultáneo', cls: 'badge-pdl-simult' };
+    return { tipo: `Multi-nodo secuencial (+${dias}d)`, cls: 'badge-pdl-seq' };
+  }
+  return { tipo: 'Multi-nodo (sin fechas)', cls: 'badge-pdl-simult' };
+}
+
+// Divide nodos entre dos contratos PDL: últimos nodos (fecha max) → pdlCodes[1], el resto → pdlCodes[0]
+function _splitNodosPorFecha(nodos, pdlCodes) {
+  const sorted = [...nodos].sort((a, b) => (a.fecha_primera||'').localeCompare(b.fecha_primera||''));
+  const fechaMax = sorted[sorted.length - 1].fecha_primera || '';
+  const ultimos  = sorted.filter(n => (n.fecha_primera || '') === fechaMax);
+  const primeros = sorted.filter(n => (n.fecha_primera || '') !== fechaMax);
+  if (!primeros.length || !ultimos.length) return null; // no se puede separar
+  const result = {};
+  const ultimoPdl   = pdlCodes[pdlCodes.length - 1];
+  const primerosPdl = pdlCodes.slice(0, -1).join(';') || pdlCodes[0];
+  result[primerosPdl] = primeros;
+  result[ultimoPdl]   = ultimos;
+  return result;
+}
+
+function _renderPDLFila(p, nodos, moOverride, pdlOverride) {
+  const { tipo, cls } = _clasificarPDL(nodos);
+  const badgePro = p.proceso === 'MI'
+    ? '<span class="badge badge-mi">MI</span>'
+    : '<span class="badge badge-pg">PG</span>';
+  const badgeSup = `<span class="badge badge-sup">${p.supervisor||'?'}</span>`;
+  const pdlDisplay = pdlOverride !== undefined ? pdlOverride : (p.pdl_ultimo || p.pdl_code || '—');
+  const pdlH = _pdlHistorial(p, nodos, pdlDisplay);
+  const moTotal   = moOverride  !== undefined ? moOverride  : p.man_obra;
+
+  const fechaMin = nodos.map(n=>n.fecha_primera).filter(Boolean).sort()[0] || p.fecha || '—';
+  const fechaMax = nodos.map(n=>n.fecha_ultima ).filter(Boolean).sort().pop() || p.fecha || '—';
+  const rangoFechas = fechaMin === fechaMax ? fechaMin : `${fechaMin} → ${fechaMax}`;
+
+  const nodosHtml = nodos.map(n => `
+    <div style="font-size:11px;color:var(--muted);padding:1px 0;">
+      <span style="font-family:monospace;color:var(--text)">${n.pro_code}</span>
+      ${n.nodo_id ? `<span style="color:var(--muted)"> · Nodo ${n.nodo_id}</span>` : ''}
+      <span style="color:var(--accent2);margin-left:6px">${fmtPesos(n.mo)}</span>
+      ${n.fecha_primera ? `<span style="color:var(--muted);margin-left:6px">${n.fecha_primera}</span>` : ''}
+      ${n.pdl_ultimo ? `<span style="color:var(--muted);margin-left:6px" title="${n.pdl_code||''}">PDL ${n.pdl_ultimo}</span>` : ''}
+    </div>`).join('');
+
+  return `
+    <tr class="${p.proceso==='MI'?'mi-row':'pg-row'}">
+      <td>${rangoFechas}</td>
+      <td style="max-width:230px" title="${pdlH.title}"><div style="font-weight:600">${pdlDisplay}</div>${pdlH.html}</td>
+      <td>${p.lcl||'N/A'}</td>
+      <td>${badgePro}</td>
+      <td>${badgeSup}</td>
+      <td style="text-align:center;font-weight:700">${nodos.length}</td>
+      <td><span class="badge ${cls}">${tipo}</span></td>
+      <td class="mo">${fmtPesos(moTotal)}</td>
+      <td style="min-width:220px">${nodosHtml}</td>
+    </tr>`;
+}
+
+function renderPDL(proyectos) {
+  if (!proyectos.length) {
+    document.getElementById('meta-tabla').textContent = '0 filas PDL';
+    document.getElementById('tabla-container').innerHTML =
+      '<div class="empty"><div class="icon">📋</div><p>Sin datos</p></div>';
+    return;
+  }
+
+  let rows = '';
+  let totalFilas = 0;
+
+  for (const p of proyectos) {
+    const nodos = p.nodos_grupo || [];
+    // PG con nodos liquidados bajo PDL distintos → una fila por PDL vigente
+    const split = _splitFilasPdl(p, nodos);
+    if (split) {
+      for (const [pdlCode, pdlNodos] of Object.entries(split)) {
+        const moSub = pdlNodos.reduce((s, n) => s + (n.mo || 0), 0);
+        rows += _renderPDLFila(p, pdlNodos, moSub, pdlCode);
+        totalFilas++;
+      }
+    } else {
+      rows += _renderPDLFila(p, nodos);
+      totalFilas++;
+    }
+  }
+
+  document.getElementById('meta-tabla').textContent =
+    `${totalFilas} contratos PDL — ${proyectos.length} proyectos`;
+
+  document.getElementById('tabla-container').innerHTML = `
+    <table><thead><tr>
+      <th>FECHAS</th><th>PDL / OT</th><th>LCL</th><th>PROC</th>
+      <th>SUPERVISOR</th><th style="text-align:center"># NODOS</th>
+      <th>CLASIFICACIÓN PDL</th><th class="num">$ MAN OBRA</th>
+      <th>DETALLE NODOS</th>
+    </tr></thead><tbody>${rows}</tbody></table>
+    <div style="padding:12px 18px;font-size:11px;color:var(--muted);display:flex;gap:18px;border-top:1px solid var(--border)">
+      <span><span style="display:inline-block;width:10px;height:10px;background:#1b4332;border-radius:2px;margin-right:4px"></span>Nodo único</span>
+      <span><span style="display:inline-block;width:10px;height:10px;background:#3d2e00;border-radius:2px;margin-right:4px"></span>Multi-nodo simultáneo (≤1d)</span>
+      <span><span style="display:inline-block;width:10px;height:10px;background:#4a1515;border-radius:2px;margin-right:4px"></span>Multi-nodo secuencial (+Nd)</span>
+    </div>`;
+}
+
+// ── Gráficas ──────────────────────────────────────────────────────────────────
+const _charts = {};
+
+function _destroyChart(id) {
+  if (_charts[id]) { _charts[id].destroy(); delete _charts[id]; }
+}
+
+function renderGraficas(proyectos, detalle) {
+  // ── Chart 1: MO por Supervisor ──
+  _destroyChart('supervisor');
+  const supMap = {};
+  proyectos.forEach(p => {
+    const s = p.supervisor || '?';
+    supMap[s] = (supMap[s] || 0) + p.man_obra;
+  });
+  const supEntries = Object.entries(supMap).sort((a,b) => b[1]-a[1]);
+  _charts['supervisor'] = new Chart(document.getElementById('chart-supervisor'), {
+    type: 'bar',
+    data: {
+      labels: supEntries.map(e => e[0]),
+      datasets: [{
+        label: 'MO ($)',
+        data: supEntries.map(e => e[1]),
+        backgroundColor: ['#4f7ef8','#6ee7b7','#fbbf24','#f87171','#a78bfa','#34d399','#fb923c'],
+        borderRadius: 5,
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#94a3b8', callback: v => '$'+Number(v/1e6).toFixed(1)+'M' }, grid: { color: '#2e3354' } },
+        y: { ticks: { color: '#e2e8f0' }, grid: { display: false } }
+      }
+    }
+  });
+
+  // ── Chart 2: MI vs PG ──
+  _destroyChart('proceso');
+  const miTotal = proyectos.filter(p=>p.proceso==='MI').reduce((s,p)=>s+p.man_obra,0);
+  const pgTotal = proyectos.filter(p=>p.proceso==='PG').reduce((s,p)=>s+p.man_obra,0);
+  _charts['proceso'] = new Chart(document.getElementById('chart-proceso'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Mayor Impacto (MI)', 'Programado (PG)'],
+      datasets: [{
+        data: [miTotal, pgTotal],
+        backgroundColor: ['#4f7ef8','#6ee7b7'],
+        hoverOffset: 8,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#e2e8f0', font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => ` ${fmtPesos(ctx.raw)}` } }
+      }
+    }
+  });
+
+  // ── Chart 3: Top Líderes ──
+  _destroyChart('lideres');
+  const lidMap = {};
+  proyectos.forEach(p => {
+    (p.lideres_list||[{nombre: p.lider||'?', mo: p.man_obra}]).forEach(ll => {
+      lidMap[ll.nombre] = (lidMap[ll.nombre]||0) + ll.mo;
+    });
+  });
+  const lidEntries = Object.entries(lidMap).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  _charts['lideres'] = new Chart(document.getElementById('chart-lideres'), {
+    type: 'bar',
+    data: {
+      labels: lidEntries.map(e => e[0]),
+      datasets: [{
+        label: 'MO ($)',
+        data: lidEntries.map(e => e[1]),
+        backgroundColor: '#a78bfa',
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#94a3b8', callback: v => '$'+Number(v/1e6).toFixed(1)+'M' }, grid: { color: '#2e3354' } },
+        y: { ticks: { color: '#e2e8f0', font: { size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+
+  // ── Chart 4: Evolución por Fecha ──
+  _destroyChart('fechas');
+  const fechaMap = {};
+  (detalle.length ? detalle : proyectos).forEach(item => {
+    const f = item.fecha || '—';
+    if (f !== '—') fechaMap[f] = (fechaMap[f]||0) + item.man_obra;
+  });
+  const fechaEntries = Object.entries(fechaMap).sort((a,b)=>a[0].localeCompare(b[0]));
+  _charts['fechas'] = new Chart(document.getElementById('chart-fechas'), {
+    type: 'bar',
+    data: {
+      labels: fechaEntries.map(e => e[0]),
+      datasets: [{
+        label: 'MO ($)',
+        data: fechaEntries.map(e => e[1]),
+        backgroundColor: '#34d399',
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#94a3b8', maxRotation: 45, font: { size: 10 } }, grid: { color: '#2e3354' } },
+        y: { ticks: { color: '#94a3b8', callback: v => '$'+Number(v/1e6).toFixed(1)+'M' }, grid: { color: '#2e3354' } }
+      }
+    }
+  });
+}
+
+async function exportarComparacion() {
+  const btn = document.getElementById('btn-exportar-cmp');
+  const spin = document.getElementById('spin-exp-cmp');
+  const txt  = document.getElementById('txt-exp-cmp');
+  btn.disabled = true;
+  spin.classList.add('active');
+  txt.textContent = 'Generando...';
+  try {
+    const resp = await fetch('/api/exportar-comparacion', { method: 'POST' });
+    if (!resp.ok) {
+      const d = await resp.json().catch(() => ({}));
+      showAlert('error', '❌ ' + (d.error || resp.statusText), 0);
+      return;
+    }
+    const blob = await resp.blob();
+    const cd   = resp.headers.get('Content-Disposition') || '';
+    const m    = cd.match(/filename="?([^"]+)"?/);
+    const name = m ? m[1] : 'COMPARACION.xlsx';
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = name; a.click();
+    URL.revokeObjectURL(url);
+    showAlert('success', '&#8659; Excel descargado: ' + name);
+  } catch(e) {
+    showAlert('error', '❌ Error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    spin.classList.remove('active');
+    txt.textContent = '&#8659; Exportar Excel';
+  }
+}
+</script>
+</body>
+</html>

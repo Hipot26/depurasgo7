@@ -1,0 +1,87 @@
+{
+ "proyecto": {
+  "descripcion_general": "(4-5-6): CAMBIO DE POSTES BT (4 AL 6): CAMBIO DE RED BT(7-8): INSTALACION DE POSTES BT(6 AL 8): INSTALACION DE RED BT, (6-8): INSTALACION DE CJD",
+  "observaciones_rg02": "Se cobran trabajos menores en apoyo por retiro de templetes. Se cobra QP1175 por recargo festivo, autorizado por la ingeniera responsable",
+  "prestaciones_nodo": {
+   "4": [
+    {
+     "qp": "QP1094",
+     "desc": "T2 - CAMBIO DE POSTE DE BT",
+     "unidad": "C/U",
+     "cantidad": 1
+    },
+    {
+     "qp": "QP1113",
+     "desc": "T2 - INSTALACIÓN DE TIRANTE (VIENTO, ANCLA)",
+     "unidad": "C/U",
+     "cantidad": 1
+    },
+    {
+     "qp": "QP1156",
+     "desc": "T2 - TRABAJOS MENORES EN APOYOS",
+     "unidad": "C/U",
+     "cantidad": 1
+    },
+    {
+     "qp": "QP1175",
+     "desc": "T2 - PAGO ADICIONAL POR TRABAJOS REALIZADOS EN FESTIVOS",
+     "unidad": "C/U",
+     "cantidad": 206.48
+    },
+    {
+     "qp": "QP1176",
+     "desc": "T2 - INSPECCION PREVIA DE DESCARGOS RED",
+     "unidad": "C/U",
+     "cantidad": 1
+    }
+   ]
+  }
+ },
+ "ejemplos": [
+  {
+   "foto": 1,
+   "nodo": "4",
+   "observacion": "Observador: En la imagen se evidencia la estructura existente en madera con claro deterioro a cambiar, que tiene una acometida en la parte derecha hacia la vivienda, un templete existente a cambiar en la parte izquierda, conexión de las redes con tres ramales y los trabajadores están realizando el ahoyado para poder realizar la instalación del poste nuevo en metalico. Contexto: En la planeación se evidencia que existe una relacion en la actividad para este nodo, lo cual se verifica con las prestaciones a cobrar: QP1084 Cambio de poste que es la actividad principal, QP113 Instalacion de tirante o templete, ya que hay que instalarlo en la estructura nueva y esta actividad no esta dentro del alcance de la actividad principal del cambio de poste, QP1156 Trabajos menores en apoyo por el retiro de tirante o templete existente en la estructura a cambiar y esta actividad no esta dentro del alcance de la actividad principal del cambio de poste, QP175 Pago adicional es un cobro que no está dentro de la actividad principal del nodo, sino es un cobro administrativo adicional porque estas actividades se realizaron en dias festivos, QP1176 Inspeccion previa es un cobro administrativo que se realiza por la visita de levantamiento inicial para poder realizar la ejecución. OUTPUT FINAL: Estructura existente a cambiar, con templete existente a retirar y ahoyado para instalación de estructura nueva."
+  },
+  {
+   "foto": 2,
+   "nodo": "4",
+   "observacion": "Observador: Se evidencia poste nuevo hincado con tirante o templete nuevo. Atrás se evidencia la estructura existente a retirar.Contexto: En la planeación se evidencia que existe una relacion en la actividad para este nodo, lo cual se verifica con las prestaciones a cobrar: QP1084 Cambio de poste que es la actividad principal. OUTPUT FINAL: Poste hincado con templete nuevo."
+  },
+  {
+   "foto": 3,
+   "nodo": "4",
+   "observacion": "Observador: Se evidencia estructura de madera retirado partido en dos ya que se debe dejar así en terreno.Contexto: En la planeación se evidencia que existe una relacion en la actividad para este nodo, lo cual se verifica con las prestaciones a cobrar: QP1084 Cambio de poste que es la actividad principal y está incluido dentro de este alcance. OUTPUT FINAL: Poste madera retirado."
+  },
+  {
+   "foto": 4,
+   "nodo": "4",
+   "observacion": "Observador: Se evidencia estructura nueva y un operario realizando conexiones y adecuaciones necesarias para la normalizacion del servicio. Contexto: En la planeación se evidencia que existe una relacion en la actividad para este nodo, lo cual se verifica con las prestaciones a cobrar: QP1084 Cambio de poste que es la actividad principal, QP1113 Instalación de tirante, ya que se evidencia que éste ya se encuentra instalado . OUTPUT FINAL: Operario realizando las adecuaciones y conexiones nuevas."
+  },
+  {
+   "foto": 5,
+   "nodo": "4",
+   "observacion": "Observador: Se evidencia estructura metálica nueva final con todas las conexiones de la acometida hacia la vivienda, la red con los tres ramales y la instalación del templete. Adicional se ve el punto físico asignado para el nodo teniendo en cuenta la planeación. Contexto: En la planeación se evidencia que existe una relacion en la actividad para este nodo, lo cual se verifica con las prestaciones a cobrar: QP1084 Cambio de poste que es la actividad principal, QP1113 Instalación de tirante, ya que se evidencia que éste ya se encuentra instalado . OUTPUT FINAL: Estructura nueva final"
+  },
+  {
+   "foto": 6,
+   "nodo": "4",
+   "observacion": "Observador: Se evidencia estructura metálica nueva final con todas las conexiones de la acometida hacia la vivienda, la red con los tres ramales y la instalación del templete. Adicional se ve el punto físico asignado para el nodo teniendo en cuenta la planeación. Contexto: En la planeación se evidencia que existe una relacion en la actividad para este nodo, lo cual se verifica con las prestaciones a cobrar: QP1084 Cambio de poste que es la actividad principal, QP1113 Instalación de tirante, ya que se evidencia que éste ya se encuentra instalado . OUTPUT FINAL: Estructura nueva final"
+  },
+  {
+   "foto": 7,
+   "nodo": "4",
+   "observacion": "Observador: Se evidencia estructura metálica nueva final con todas las conexiones de la acometida hacia la vivienda, la red con los tres ramales y la instalación del templete. Adicional se ve el punto físico asignado para el nodo teniendo en cuenta la planeación. Contexto: En la planeación se evidencia que existe una relacion en la actividad para este nodo, lo cual se verifica con las prestaciones a cobrar: QP1084 Cambio de poste que es la actividad principal, QP1113 Instalación de tirante, ya que se evidencia que éste ya se encuentra instalado . OUTPUT FINAL: Estructura nueva final"
+  },
+  {
+   "foto": 8,
+   "nodo": "4",
+   "observacion": "Observador: Se evidencia estructura metálica nueva final con todas las conexiones de la acometida hacia la vivienda, la red con los tres ramales y la instalación del templete. Contexto: En la planeación se evidencia que existe una relacion en la actividad para este nodo, lo cual se verifica con las prestaciones a cobrar: QP1084 Cambio de poste que es la actividad principal e incluye las conexiones para la normalizacion del servicio, QP1113 Instalación de tirante, ya que se evidencia que éste ya se encuentra instalado . OUTPUT FINAL: Conexiones finales"
+  },
+  {
+   "foto": 9,
+   "nodo": "4",
+   "observacion": "Observador: Se evidencia estructura metálica nueva final con todas las conexiones de la acometida hacia la vivienda, la red con los tres ramales y la instalación del templete. Adicional se ve el punto físico asignado para el nodo teniendo en cuenta la planeación. Contexto: En la planeación se evidencia que existe una relacion en la actividad para este nodo, lo cual se verifica con las prestaciones a cobrar: QP1084 Cambio de poste que es la actividad principal, QP1113 Instalación de tirante, ya que se evidencia que éste ya se encuentra instalado . OUTPUT FINAL: Estructura nueva final"
+  }
+ ]
+}

@@ -1,0 +1,696 @@
+{% extends "liquidador2/base.html" %}
+{% block title %}Resultado Liquidación — SGS UI{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+  <h1 style="font-size:1.3rem;margin:0;">Resultado de Liquidación</h1>
+  <a href="{{ url_for('liquidador2.auditoria', sid=sid) }}" class="btn btn-success">
+    ↻ Verificar en SGS
+  </a>
+</div>
+<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+  <a href="{{ url_for('liquidador2.cierre_rapido', sid=sid) }}" class="btn btn-primary">
+    Verificar cierre rapido
+  </a>
+  <a href="{{ url_for('liquidador2.panel_pdl', sid=sid) }}" class="btn btn-secondary">
+    Verificar / Parchear PDL
+  </a>
+  <span style="font-size:0.82rem;color:#888;">
+    Abre una tabla para comparar fecha, PDL y estado antes de corregir.
+  </span>
+</div>
+<p style="color:#888;font-size:0.85rem;margin-bottom:20px;">{{ s.filename }}</p>
+
+{# ── Cierre en modo SOLO ESTADO (plantilla MAT masiva) ── #}
+{% if s.get('cierre_modo') == 'solo_estado' %}
+{% set cierre_est = s.get('cierre_estado_resultados') or [] %}
+<div class="card" style="border-left:4px solid #8e24aa;margin-bottom:20px;">
+  <h2 style="color:#6a1b9a;">Cierre solo estado — fechas y PDL sin tocar</h2>
+  {% if cierre_est %}
+    {% set ce_ya  = cierre_est | selectattr('accion', 'equalto', 'ya_estaba') | list | length %}
+    {% set ce_cam = cierre_est | selectattr('accion', 'equalto', 'cambiado')  | list | length %}
+    {% set ce_err = cierre_est | rejectattr('ok') | list | length %}
+    <p style="font-size:0.85rem;color:#555;margin:0 0 10px;">
+      {{ cierre_est|length }} nodo(s) 100% OK evaluados:
+      <strong>{{ ce_cam }}</strong> cambiado(s) a 1.4-TERMINADO/EN BALANCE,
+      <strong>{{ ce_ya }}</strong> ya lo tenía(n),
+      <strong style="color:{{ '#b42318' if ce_err else '#216e39' }};">{{ ce_err }}</strong> con error.
+      Cada cambio se confirmó releyendo el estado por API.
+    </p>
+    <table>
+      <thead><tr><th>PRO</th><th>Estado antes</th><th>Estado después</th><th>Acción</th><th>Detalle</th></tr></thead>
+      <tbody>
+      {% for r in cierre_est %}
+      <tr style="background:{{ '#fde2e1' if not r.ok else ('#f3fbf5' if r.accion == 'cambiado' else '#fafafa') }};">
+        <td><strong>{{ r.pro_code or ('PID ' ~ r.pid) }}</strong></td>
+        <td style="font-size:0.83rem;">{{ r.estado_antes or '-' }}</td>
+        <td style="font-size:0.83rem;">{{ r.estado_despues or '-' }}</td>
+        <td>
+          <span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.76rem;font-weight:700;
+                       background:{{ '#dff3e3' if r.ok else '#fde2e1' }};
+                       color:{{ '#216e39' if r.ok else '#b42318' }};">
+            {% if r.accion == 'ya_estaba' %}Ya estaba{% elif r.accion == 'cambiado' %}Cambiado{% else %}Error{% endif %}
+          </span>
+        </td>
+        <td style="font-size:0.8rem;color:#b42318;">{{ r.error or '' }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p style="font-size:0.85rem;color:#555;margin:0;">
+      No se cambió ningún estado: ningún nodo quedó 100% OK en esta corrida (o la liquidación se canceló).
+      Revisa los errores abajo y usa <em>Verificar cierre rapido</em> (modo solo estado) para cerrar a mano los que correspondan.
+    </p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% set ok_count    = resultados | selectattr('ok')                          | list | length %}
+{% set err_count   = resultados | rejectattr('ok')                          | list | length %}
+{% set new_count   = resultados | selectattr('creada')                      | list | length %}
+{% set audit_ok    = resultados | selectattr('auditoria') | selectattr('auditoria.coincide') | list | length %}
+{% set audit_desc  = resultados | selectattr('ok') | selectattr('auditoria') | rejectattr('auditoria.coincide') | list | length %}
+
+<div class="stat-row" style="margin-bottom:20px;">
+  <div class="stat {{ 'green' if ok_count == resultados|length else 'blue' }}">
+    <div class="num">{{ ok_count }}</div><div class="lbl">Liquidadas OK</div>
+  </div>
+  <div class="stat {{ 'red' if err_count else 'gray' }}">
+    <div class="num">{{ err_count }}</div><div class="lbl">Con error</div>
+  </div>
+  <div class="stat gray">
+    <div class="num">{{ new_count }}</div><div class="lbl">Creadas nuevas</div>
+  </div>
+  <div style="width:1px;background:#eee;margin:0 8px;"></div>
+  <div class="stat {{ 'green' if audit_ok == ok_count else 'red' }}">
+    <div class="num">{{ audit_ok }}</div><div class="lbl">Auditoría ✓</div>
+  </div>
+  <div class="stat {{ 'red' if audit_desc else 'gray' }}">
+    <div class="num">{{ audit_desc }}</div><div class="lbl">Descuadres</div>
+  </div>
+</div>
+
+{# ── Tabla de resultados ── #}
+<div class="card">
+  <h2>Detalle</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Tipo</th><th>Código</th><th>PRO</th><th>Líder</th><th>Cant. liquidada</th>
+        <th>Nueva</th><th>Estado liq.</th>
+        <th style="border-left:2px solid #ddd;">SGS Advance</th>
+        <th>SGS Balance</th><th>Auditoría</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in resultados %}
+    {% set aud = r.auditoria or {} %}
+    <tr>
+      <td>
+        <span class="badge {{ 'badge-blue' if r.tipo == 'MAT' else 'badge-ok' }}">
+          {{ r.tipo }}
+        </span>
+      </td>
+      <td><strong>{{ r.codigo }}</strong></td>
+      <td style="font-size:0.8rem;">{{ r.pro_code }}</td>
+      <td style="font-size:0.78rem;">
+        {{ r.partner_nombre or '—' }}
+        {% if r.ban_justificacion %}
+          <div style="font-size:0.7rem;color:#888;">{{ r.ban_justificacion }}</div>
+        {% endif %}
+      </td>
+      <td style="text-align:right;">{{ r.cantidad }}</td>
+      <td style="text-align:center;">
+        {% if r.creada %}<span class="badge badge-blue">Nueva</span>
+        {% else %}<span style="color:#aaa;">—</span>{% endif %}
+      </td>
+      <td>
+        {% if r.ok %}
+          <span class="badge badge-ok">OK</span>
+          {% if r.ya_liquidada %}
+            <span class="badge badge-warn" title="{{ r.msg }}"
+                  style="margin-left:4px;font-size:0.7rem;">ya estaba liquidada</span>
+          {% endif %}
+          {% if r.verificacion_persistencia is defined %}
+            {% if r.verificacion_persistencia.confirmado %}
+              <span class="badge badge-ok"
+                    title="Línea ID={{ r.verificacion_persistencia.linea_id }} | Guardado={{ r.verificacion_persistencia.cantidad_guardada }} | {{ r.verificacion_persistencia.fecha }}"
+                    style="margin-left:4px;font-size:0.7rem;">✓ persistido</span>
+            {% else %}
+              <span class="badge badge-warn"
+                    title="{{ r.verificacion_persistencia.aviso or ('guardado='+r.verificacion_persistencia.cantidad_guardada|string) }}"
+                    style="margin-left:4px;font-size:0.7rem;">⚠ sin confirmar</span>
+            {% endif %}
+          {% endif %}
+        {% else %}
+          <span class="badge badge-error">Error</span>
+          {% if r.error_tipo == 'sobre_proyectado' %}
+            <span class="badge badge-warn" style="margin-left:4px;font-size:0.7rem;">SOBRE_PROYECTADO</span>
+          {% endif %}
+          {% if r.error %}
+            <div style="font-size:0.75rem;color:#e74c3c;margin-top:3px;">{{ r.error[:120] }}</div>
+          {% endif %}
+        {% endif %}
+      </td>
+      {# ── Auditoría ── #}
+      <td style="text-align:right;border-left:2px solid #ddd;">
+        {{ aud.advance if aud.advance is defined else '—' }}
+      </td>
+      <td style="text-align:right;">
+        {{ aud.balance if aud.balance is defined else '—' }}
+      </td>
+      <td>
+        {% if aud.estado == 'ok' %}
+          <span class="badge badge-ok">✓ Coincide</span>
+        {% elif aud.estado == 'descuadre' %}
+          <span class="badge badge-error">⚠ Descuadre</span>
+          <div style="font-size:0.75rem;color:#e74c3c;">
+            advance={{ aud.advance }} / esperado={{ r.cantidad }}
+          </div>
+        {% elif aud.estado == 'liquidado_sgs' %}
+          <span class="badge badge-ok">✓ Ya liquidado en SGS</span>
+          <div style="font-size:0.72rem;color:#2e7d32;">
+            El error del navegador fue falso — SGS muestra pendiente 0.
+          </div>
+        {% elif aud.estado == 'error_confirmado' %}
+          <span class="badge badge-error">✗ Sin liquidar en SGS</span>
+          <div style="font-size:0.72rem;color:#e74c3c;">
+            pendiente={{ aud.balance }} — reintentar o revisar manualmente.
+          </div>
+        {% elif aud.estado == 'no_ejecutado' %}
+          <span class="badge badge-gray">No ejecutado</span>
+        {% elif aud.estado == 'no_encontrado' %}
+          <span class="badge badge-warn">No encontrado</span>
+        {% elif aud.estado == 'error' %}
+          <span class="badge badge-warn">Error API</span>
+        {% else %}
+          <span class="badge badge-gray">{{ aud.estado or '—' }}</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{# ── Resumen auditoría ── #}
+<div class="card" style="background:{% if audit_ok > 0 and audit_desc == 0 %}#f0faf4{% elif audit_desc > 0 %}#fff8f0{% else %}#f8f9fa{% endif %};">
+  <h2>Auditoría SGS</h2>
+  {% set auditada = resultados | selectattr('auditoria') | selectattr('auditoria.estado') | list %}
+  {% if not auditada %}
+  <div class="alert alert-info">
+    La auditoría verifica en SGS que los balances quedaron en 0 tras la liquidación.<br>
+    Odoo puede tardar unos segundos en recomputar los campos.
+    Cuando estés listo, pulsa <strong>↻ Verificar en SGS</strong> arriba.
+  </div>
+  {% elif audit_desc == 0 %}
+  <div class="alert alert-info" style="background:#d4edda;border-color:#c3e6cb;color:#155724;">
+    ✓ Todos los balances en SGS coinciden. No hay descuadres.
+  </div>
+  {% else %}
+  <div class="alert alert-warning">
+    ⚠ {{ audit_desc }} item(s) con descuadre. Revisar manualmente en SGS.
+  </div>
+  {% endif %}
+  {% if auditada %}
+  <p style="font-size:0.85rem;color:#555;margin-top:8px;">
+    Coinciden: <strong>{{ audit_ok }}</strong> &nbsp;|&nbsp;
+    Descuadres: <strong>{{ audit_desc }}</strong>
+  </p>
+  {% endif %}
+</div>
+
+{# ── Widget: Auditoría post-liquidación ── #}
+<div id="audit-post-widget" class="card" style="border-left:4px solid #3498db;margin-top:8px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+    <h2 style="margin:0;border:none;padding:0;font-size:1rem;">Integridad post-liquidacion</h2>
+    <span id="audit-estado-badge"
+          style="font-size:0.75rem;padding:2px 10px;border-radius:12px;
+                 background:#d6eaf8;color:#1a5276;">verificando...</span>
+  </div>
+  <div id="audit-nodos-container" style="display:flex;flex-direction:column;gap:10px;"></div>
+  <div id="audit-error-global" style="display:none;color:#e74c3c;font-size:0.83rem;margin-top:6px;"></div>
+</div>
+
+{# Modal informe de integridad #}
+<div id="audit-modal"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
+            z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:10px;max-width:740px;width:95%;
+              max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.3);">
+    <div style="padding:14px 20px;border-bottom:1px solid #eee;
+                display:flex;align-items:center;justify-content:space-between;">
+      <strong>Informe de integridad</strong>
+      <button onclick="document.getElementById('audit-modal').style.display='none'"
+              style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#888;">x</button>
+    </div>
+    <div style="padding:14px 20px;flex:1;overflow-y:auto;">
+      <textarea id="audit-text" readonly
+                style="width:100%;height:340px;font-family:monospace;font-size:0.78rem;
+                       border:1px solid #ddd;border-radius:6px;padding:10px;resize:vertical;
+                       background:#f8f9fa;"></textarea>
+    </div>
+    <div style="padding:10px 20px;border-top:1px solid #eee;display:flex;gap:10px;align-items:center;">
+      <button onclick="copiarAudit()"
+              style="background:#1a1a2e;color:white;border:none;padding:8px 20px;
+                     border-radius:6px;font-weight:700;cursor:pointer;">Copiar</button>
+      <span id="audit-copia-ok"
+            style="color:#27ae60;font-size:0.85rem;display:none;">Copiado</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var SID = {{ sid | tojson }};
+  var URL_AUDIT = "/liquidador2/auditoria_post/" + SID;
+  var _timer = null;
+  var _allReportes = [];
+  window._auditReportes = {};  // pid (int) → texto del informe de auditoría; accesible desde onclick
+  var _auditReportes = window._auditReportes;
+
+  function _esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function _badge(texto, color) {
+    return '<span style="font-size:0.72rem;padding:2px 8px;border-radius:10px;' +
+           'background:' + color + ';color:#fff;margin-right:4px;">' + texto + '</span>';
+  }
+
+  function _renderNodo(nodo) {
+    var ok = nodo.ok !== false;
+    if (!ok) {
+      return '<div style="color:#e74c3c;font-size:0.82rem;">Error al auditar ' +
+             (nodo.pro_code || nodo.pid) + ': ' + (nodo.error || '') + '</div>';
+    }
+    var r        = nodo.resumen || {};
+    var pends    = nodo.pendientes || [];
+    var limpio   = nodo.assessment === 'LIMPIO';
+    var bgColor  = limpio ? '#f0faf4' : '#fff8f0';
+    var border   = limpio ? '#27ae60' : '#e67e22';
+
+    var html = '<div style="border-left:3px solid ' + border + ';padding:8px 12px;' +
+               'background:' + bgColor + ';border-radius:4px;">';
+    html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
+    html += '<strong style="font-size:0.9rem;">' + (nodo.pro_code || 'PID ' + nodo.pid) + '</strong>';
+    if (nodo.nodo_nombre) {
+      html += '<span style="font-size:0.84rem;font-weight:600;color:#333;">' +
+              _esc(nodo.nodo_nombre) + '</span>';
+    }
+    if (limpio) {
+      html += _badge('LIMPIO', '#27ae60');
+    } else {
+      html += _badge('PENDIENTES: ' + pends.length, '#e67e22');
+    }
+    html += '<span style="font-size:0.78rem;color:#888;">' +
+            r.liquidados + ' liquidados / ' + r.total_con_movimiento + ' con movimiento' +
+            '</span>';
+    html += '</div>';
+
+    if (pends.length > 0) {
+      html += '<div style="margin-top:8px;">';
+      html += '<div style="font-size:0.78rem;color:#555;margin-bottom:4px;">' +
+              nodo.assessment_desc + '</div>';
+      html += '<table style="width:100%;font-size:0.78rem;border-collapse:collapse;">';
+      html += '<tr style="color:#888;border-bottom:1px solid #eee;">' +
+              '<th style="text-align:left;padding:2px 6px;">Material</th>' +
+              '<th style="text-align:left;padding:2px 6px;">L&iacute;der (sumar stock a)</th>' +
+              '<th style="text-align:right;padding:2px 6px;">Neto</th>' +
+              '<th style="text-align:right;padding:2px 6px;">Advance</th>' +
+              '<th style="text-align:right;padding:2px 6px;">Pendiente</th>' +
+              '<th style="text-align:left;padding:2px 6px;">Causa</th></tr>';
+      pends.forEach(function(p) {
+        var raizColor = {
+          'error_sistema':    '#e74c3c',
+          'excel_incompleto': '#8e44ad',
+          'variante_c':       '#c0392b',
+          'filtro_verificador':'#e67e22',
+          'filtro_capa2':     '#e67e22',
+          'no_seleccionado':  '#7f8c8d',
+          'recompute':        '#2980b9',
+        }[p.raiz] || '#555';
+        html += '<tr style="border-bottom:1px solid #f0f0f0;">' +
+                '<td style="padding:3px 6px;font-family:monospace;">' + p.codigo + '</td>' +
+                '<td style="padding:3px 6px;font-weight:600;color:#333;font-size:0.73rem;">' +
+                _esc(p.lider || '—') + '</td>' +
+                '<td style="text-align:right;padding:3px 6px;">' + (p.neto_bandejas||0).toFixed(2) + '</td>' +
+                '<td style="text-align:right;padding:3px 6px;">' + (p.advance_actual||0).toFixed(2) + '</td>' +
+                '<td style="text-align:right;padding:3px 6px;font-weight:700;color:' + raizColor + ';">' +
+                (p.pendiente||0).toFixed(2) + '</td>' +
+                '<td style="padding:3px 6px;color:' + raizColor + ';font-size:0.73rem;">' +
+                _esc(p.causa) + '</td></tr>';
+      });
+      html += '</table>';
+      _auditReportes[nodo.pid] = nodo.reporte_auditoria || '';
+      html += '<button onclick="abrirAudit(_auditReportes[' + nodo.pid + '])"' +
+              ' style="margin-top:8px;background:#1a1a2e;color:white;border:none;' +
+              'padding:5px 14px;border-radius:5px;font-size:0.78rem;cursor:pointer;">' +
+              'Informe</button>';
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function _poll() {
+    fetch(URL_AUDIT)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var estado = data.estado || 'no_iniciado';
+        var nodos  = data.nodos  || {};
+        var keys   = Object.keys(nodos);
+
+        // Badge global
+        var badge = document.getElementById('audit-estado-badge');
+        if (estado === 'listo') {
+          var hayPend = keys.some(function(k) { return (nodos[k].pendientes||[]).length > 0; });
+          badge.textContent = hayPend ? 'pendientes detectados' : 'integridad OK';
+          badge.style.background = hayPend ? '#f39c12' : '#27ae60';
+          badge.style.color = '#fff';
+        } else if (estado === 'corriendo') {
+          badge.textContent = 'verificando... (' + keys.length + '/' + (data.total_nodos||'?') + ')';
+        } else if (estado === 'no_iniciado') {
+          badge.textContent = 'iniciando...';
+        }
+
+        // Render nodos
+        var container = document.getElementById('audit-nodos-container');
+        container.innerHTML = keys.map(function(k) {
+          return _renderNodo(nodos[k]);
+        }).join('');
+
+        if (estado !== 'listo' && estado !== 'no_job') {
+          _timer = setTimeout(_poll, 2500);
+        }
+      })
+      .catch(function(err) {
+        document.getElementById('audit-error-global').style.display = 'block';
+        document.getElementById('audit-error-global').textContent = 'Error al consultar auditoría: ' + err;
+      });
+  }
+
+  window.abrirAudit = function(texto) {
+    sgo7GuardarInforme('integridad', texto);
+    document.getElementById('audit-text').value = texto || '';
+    var m = document.getElementById('audit-modal');
+    m.style.display = 'flex';
+  };
+
+  window.copiarAudit = function() {
+    var ta = document.getElementById('audit-text');
+    ta.select();
+    document.execCommand('copy');
+    var ok = document.getElementById('audit-copia-ok');
+    ok.style.display = 'inline';
+    setTimeout(function() { ok.style.display = 'none'; }, 2000);
+  };
+
+  // Arrancar polling con pequeño delay para dar tiempo al job de lanzar los hilos
+  setTimeout(_poll, 1500);
+})();
+</script>
+
+{# ── Datos de errores para el botón debug (JSON embebido) ── #}
+{% set errores_todos = resultados | rejectattr('ok') | list %}
+{% if errores_todos %}
+<script>
+window._sgsDebugData = {
+  fecha:    new Date().toLocaleString(),
+  archivo:  {{ s.filename | tojson }},
+  ok:       {{ ok_count }},
+  errores:  {{ errores_todos | length }},
+  items: [
+    {% for r in errores_todos %}
+    {
+      tipo:       {{ r.tipo       | tojson }},
+      codigo:     {{ r.codigo     | tojson }},
+      pro_code:   {{ r.pro_code   | tojson }},
+      pm_id:      {{ r.pm_id      | tojson if r.pm_id is defined else 'null' }},
+      cantidad:   {{ r.cantidad   | tojson if r.cantidad is defined else 'null' }},
+      error_tipo: {{ (r.error_tipo if r.error_tipo is defined else '') | tojson }},
+      error:      {{ r.error      | tojson if r.error else '""' }},
+      screenshot: {{ (r.pasos[-1] if r.pasos else '') | tojson }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ]
+};
+</script>
+{% endif %}
+
+{# Modal debug ── #}
+<div id="debug-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
+     z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:10px;max-width:720px;width:95%;
+              max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.3);">
+    <div style="padding:16px 20px;border-bottom:1px solid #eee;display:flex;
+                align-items:center;justify-content:space-between;">
+      <strong style="font-size:1rem;">Informe técnico de errores</strong>
+      <button onclick="document.getElementById('debug-modal').style.display='none'"
+              style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#888;line-height:1;">×</button>
+    </div>
+    <div style="padding:14px 20px;flex:1;overflow-y:auto;">
+      <textarea id="debug-text" readonly
+                style="width:100%;height:320px;font-family:monospace;font-size:0.78rem;
+                       border:1px solid #ddd;border-radius:6px;padding:10px;resize:vertical;
+                       background:#f8f9fa;color:#1a1a2e;"></textarea>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid #eee;display:flex;gap:10px;align-items:center;">
+      <button id="btn-copiar" onclick="copiarDebug()"
+              style="background:#1a1a2e;color:white;border:none;padding:8px 20px;
+                     border-radius:6px;font-weight:700;cursor:pointer;">
+        Copiar
+      </button>
+      <span id="copia-ok" style="color:#27ae60;font-size:0.85rem;display:none;">✓ Copiado</span>
+      <span style="font-size:0.8rem;color:#aaa;margin-left:auto;">
+        Guardado en el servidor · copia para soporte
+      </span>
+    </div>
+  </div>
+</div>
+
+{# ── Sección de reparación (MAT + MO unificado) ── #}
+{% set n_fallidos = resultados | rejectattr('ok') | selectattr('tipo','equalto','MAT') | selectattr('pm_id') | list | length %}
+{% set mo_retry_items = job.get('mo_retry_pendientes', []) %}
+{% set tiene_reparables = n_fallidos or mo_retry_items %}
+
+{% if errores_todos and not tiene_reparables %}
+<div class="card" style="border-left:4px solid #e74c3c;margin-top:8px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+    <div>
+      <h2 style="color:#c0392b;margin:0;border:none;padding:0;">Errores de liquidacion</h2>
+      <p style="font-size:0.85rem;color:#666;margin-top:8px;">Informe técnico guardado en el servidor (Registros de SGO7).</p>
+    </div>
+    <button onclick="abrirDebug()"
+            style="background:#1a1a2e;color:white;border:none;padding:7px 16px;
+                   border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer;">
+      Informe técnico
+    </button>
+  </div>
+</div>
+{% endif %}
+
+{% if tiene_reparables %}
+<div class="card" style="border-left:4px solid #e74c3c;margin-top:8px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;
+              margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+    <h2 style="color:#c0392b;margin:0;border:none;padding:0;">
+      Reparar errores
+      {% if n_fallidos %}({{ n_fallidos }} MAT{% if mo_retry_items %} + {{ mo_retry_items|length }} MO{% endif %})
+      {% else %}({{ mo_retry_items|length }} MO){% endif %}
+    </h2>
+    <button onclick="abrirDebug()"
+            style="background:#1a1a2e;color:white;border:none;padding:7px 16px;
+                   border-radius:6px;font-size:0.82rem;font-weight:700;cursor:pointer;">
+      Informe técnico
+    </button>
+  </div>
+  <p style="font-size:0.85rem;color:#666;margin-bottom:14px;">
+    Selecciona los ítems que quieres reintentar. El sistema los reliquidará en un único proceso nuevo.
+  </p>
+  <form method="POST" action="{{ url_for('liquidador2.reparar_todo', sid=sid) }}" id="form-reparar">
+
+    {# ── Items MAT ── #}
+    {% if n_fallidos %}
+    <div style="margin-bottom:10px;font-size:0.8rem;font-weight:700;color:#c0392b;
+                text-transform:uppercase;letter-spacing:0.04em;">Materiales (MAT)</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;">
+    {% for r in resultados %}
+    {% if not r.ok and r.tipo == 'MAT' and r.pm_id %}
+      {% set i = loop.index0 %}
+      {% if r.pasos %}
+        {% set ss_file = r.pasos[-1] | replace('\\', '/') | replace('//', '/') %}
+        {% set ss_file = ss_file.split('/')[-1] %}
+      {% else %}
+        {% set ss_file = None %}
+      {% endif %}
+      <div style="display:flex;gap:14px;align-items:flex-start;
+                  background:#fff8f8;border:1px solid #f5c6cb;border-radius:8px;padding:12px;">
+        <div style="padding-top:3px;">
+          <input type="checkbox" name="idx_reparar" value="{{ i }}" id="rep_{{ i }}"
+                 checked style="width:18px;height:18px;cursor:pointer;accent-color:#e74c3c;">
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+            <label for="rep_{{ i }}" style="font-weight:700;cursor:pointer;">{{ r.codigo }}</label>
+            <span style="font-size:0.8rem;color:#888;">{{ r.pro_code }}</span>
+            <span style="font-size:0.8rem;color:#888;">qty={{ r.cantidad }}</span>
+            {% if r.error_tipo is defined and r.error_tipo %}
+              <span class="badge badge-error" style="font-size:0.72rem;">{{ r.error_tipo }}</span>
+            {% endif %}
+          </div>
+          <div style="font-size:0.8rem;color:#c0392b;background:#fff;border:1px solid #f5c6cb;
+                      border-radius:4px;padding:6px 8px;font-family:monospace;
+                      word-break:break-all;max-height:60px;overflow-y:auto;">
+            {{ r.error or '(sin mensaje de error)' }}
+          </div>
+        </div>
+        {% if ss_file %}
+        <div style="flex-shrink:0;">
+          <a href="{{ url_for('liquidador2.log_img', filename=ss_file) }}" target="_blank"
+             title="Ver screenshot completo">
+            <img src="{{ url_for('liquidador2.log_img', filename=ss_file) }}"
+                 style="width:120px;height:75px;object-fit:cover;border-radius:5px;
+                        border:1px solid #ddd;display:block;">
+          </a>
+        </div>
+        {% else %}
+        <div style="flex-shrink:0;width:120px;height:75px;background:#f0f0f0;border-radius:5px;
+                    display:flex;align-items:center;justify-content:center;
+                    font-size:0.75rem;color:#aaa;border:1px solid #ddd;">
+          sin screenshot
+        </div>
+        {% endif %}
+      </div>
+    {% endif %}
+    {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ── Items MO ── #}
+    {% if mo_retry_items %}
+    {% if n_fallidos %}
+    <div style="margin-bottom:10px;font-size:0.8rem;font-weight:700;color:#b84800;
+                text-transform:uppercase;letter-spacing:0.04em;">Actividades (MO)</div>
+    {% endif %}
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;">
+    {% for item in mo_retry_items %}
+      {% set i = loop.index0 %}
+      <div style="display:flex;gap:14px;align-items:flex-start;
+                  background:#fff8f3;border:1px solid #f5c6a0;border-radius:8px;padding:12px;">
+        <div style="padding-top:3px;">
+          <input type="checkbox" name="idx_mo_reparar" value="{{ i }}" id="mop_{{ i }}"
+                 checked style="width:18px;height:18px;cursor:pointer;accent-color:#e67e22;">
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+            <label for="mop_{{ i }}" style="font-weight:700;cursor:pointer;">{{ item.act_code }}</label>
+            <span style="font-size:0.8rem;color:#888;">{{ item.get('pro_code','') }}</span>
+            <span style="font-size:0.8rem;color:#888;">qty={{ item.get('cantidad',0) }}</span>
+            {% if item.get('_error_tipo') %}
+              <span class="badge badge-error" style="font-size:0.72rem;">{{ item._error_tipo }}</span>
+            {% endif %}
+          </div>
+          <div style="font-size:0.8rem;color:#b84800;background:#fff;border:1px solid #f5c6a0;
+                      border-radius:4px;padding:6px 8px;font-family:monospace;
+                      word-break:break-all;max-height:60px;overflow-y:auto;">
+            {{ item.get('_error') or '(sin mensaje de error)' }}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+    </div>
+    {% endif %}
+
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <button type="submit" class="btn btn-danger">
+        ↻ Reintentar seleccionados
+      </button>
+      <label style="font-size:0.82rem;color:#555;cursor:pointer;display:flex;align-items:center;gap:5px;">
+        <input type="checkbox" id="chk-rep-all" checked
+               onchange="document.querySelectorAll('#form-reparar input[type=checkbox][name]').forEach(c=>c.checked=this.checked)">
+        Todos
+      </label>
+      <span style="font-size:0.8rem;color:#aaa;">
+        El reintento abre un proceso nuevo — no modifica este reporte.
+      </span>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+{% set _volver_sid = s.get('_parent_sid', sid) %}
+<div style="margin-top:12px;display:flex;gap:12px;">
+  <a href="{{ url_for('liquidador2.verificar', sid=_volver_sid) }}" class="btn btn-light">← Volver a verificación</a>
+  <a href="{{ url_for('liquidador2.subir') }}" class="btn btn-light">Subir otro Excel</a>
+</div>
+
+<script>
+function abrirDebug() {
+  var d = window._sgsDebugData;
+  if (!d) { alert("No hay datos de error disponibles."); return; }
+
+  var lines = [];
+  lines.push("=== REPORTE DEBUG SGS UI ===");
+  lines.push("Archivo : " + d.archivo);
+  lines.push("OK      : " + d.ok + "  |  Errores: " + d.errores);
+  lines.push("");
+
+  d.items.forEach(function(r, idx) {
+    lines.push("--- ERROR #" + (idx + 1) + " ---");
+    lines.push("Tipo        : " + r.tipo);
+    lines.push("Codigo      : " + r.codigo);
+    lines.push("PRO         : " + r.pro_code);
+    if (r.pm_id)      lines.push("pm_id       : " + r.pm_id);
+    if (r.cantidad !== null) lines.push("Cantidad    : " + r.cantidad);
+    if (r.error_tipo) lines.push("Clasificacion: " + r.error_tipo);
+    lines.push("Error completo:");
+    lines.push(r.error || "(sin mensaje)");
+    var ssFile = r.screenshot ? r.screenshot.split(/[/\\]/).pop() : null;
+    if (ssFile) lines.push("Screenshot  : " + ssFile);
+    lines.push("");
+  });
+
+  lines.push("===========================");
+
+  document.getElementById("debug-text").value = lines.join("\n");
+  document.getElementById("copia-ok").style.display = "none";
+  sgo7GuardarInforme('errores', lines.join("\n"));
+  document.getElementById("debug-modal").style.display = "flex";
+}
+
+function copiarDebug() {
+  var ta = document.getElementById("debug-text");
+  ta.select();
+  try {
+    navigator.clipboard.writeText(ta.value).then(function() {
+      mostrarCopiado();
+    }).catch(function() {
+      document.execCommand("copy");
+      mostrarCopiado();
+    });
+  } catch(e) {
+    document.execCommand("copy");
+    mostrarCopiado();
+  }
+}
+
+function mostrarCopiado() {
+  var ok = document.getElementById("copia-ok");
+  ok.style.display = "inline";
+  setTimeout(function() { ok.style.display = "none"; }, 2500);
+}
+
+// Cerrar modal con Escape
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape") document.getElementById("debug-modal").style.display = "none";
+});
+// Cerrar haciendo click fuera
+document.getElementById("debug-modal").addEventListener("click", function(e) {
+  if (e.target === this) this.style.display = "none";
+});
+</script>
+
+{% endblock %}

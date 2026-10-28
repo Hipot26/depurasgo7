@@ -1,0 +1,2489 @@
+{% extends "liquidador2/base.html" %}
+{% block title %}Verificacion — SGS UI{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+  <h1 style="font-size:1.3rem;">Verificacion: {{ s.filename }}</h1>
+  <span style="color:#888;font-size:0.85rem;">{{ s.verificado_at }}</span>
+</div>
+
+<div id="browser-banner"
+     style="display:none;position:sticky;top:0;z-index:100;
+            background:#7f1d1d;color:#fff;padding:11px 18px;border-radius:7px;
+            margin-bottom:16px;align-items:center;gap:10px;font-size:0.9rem;
+            box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+  <span style="font-weight:700;font-size:1rem;">&#9888;</span>
+  <span>
+    <strong>Sesión SGS no lista</strong> — se abre sola al arrancar; espera a que el indicador de arriba quede en verde.
+    Los botones de liquidación se activarán automáticamente cuando la sesión esté lista.
+  </span>
+  <span id="browser-banner-dots" style="margin-left:auto;opacity:0.6;letter-spacing:2px;"></span>
+</div>
+
+{# ── Resumen general ── #}
+<div class="stat-row">
+  <div class="stat {{ 'green' if resumen_mo.ok == resumen_mo.total else 'blue' }}">
+    <div class="num">{{ resumen_mo.ok }}</div>
+    <div class="lbl">MO OK</div>
+  </div>
+  <div class="stat {{ 'red' if resumen_mo.error else 'gray' }}">
+    <div class="num">{{ resumen_mo.error }}</div>
+    <div class="lbl">MO con error</div>
+  </div>
+  <div class="stat gray">
+    <div class="num">{{ resumen_mo.ya_liquidado }}</div>
+    <div class="lbl">MO ya liquidadas</div>
+  </div>
+  <div style="width:1px;background:#eee;margin:0 8px;"></div>
+  <div class="stat {{ 'green' if resumen_mat.ok == resumen_mat.total else 'blue' }}">
+    <div class="num">{{ resumen_mat.ok }}</div>
+    <div class="lbl">MAT OK</div>
+  </div>
+  <div class="stat {{ 'red' if resumen_mat.error else 'gray' }}">
+    <div class="num">{{ resumen_mat.error }}</div>
+    <div class="lbl">MAT con error</div>
+  </div>
+  <div class="stat gray">
+    <div class="num">{{ resumen_mat.ya_liquidado }}</div>
+    <div class="lbl">MAT ya liquidados</div>
+  </div>
+</div>
+
+{% if s.total_mo %}
+<div class="alert alert-info">
+  Total MO en Excel: <strong>${{ "{:,.2f}".format(s.total_mo) }}</strong>
+</div>
+{% endif %}
+
+{# ── PDL detectado ── #}
+{# ── Fecha de planilla ── #}
+{% set fecha_iso = s.get('fecha_liquidacion_iso', '') %}
+{% if fecha_iso %}
+<div style="padding:10px 16px;background:#e8f5e9;border-left:4px solid #388e3c;
+            border-radius:6px;margin-bottom:10px;display:flex;align-items:center;
+            gap:16px;flex-wrap:wrap;">
+  <span style="font-weight:700;color:#2e7d32;">
+    Fecha de planilla: {{ fecha_iso | replace('-', '/') }}
+  </span>
+  <span style="color:#555;font-size:0.83rem;">Se registrará en todas las actividades y en el cierre del nodo.</span>
+  <form method="POST" action="{{ url_for('liquidador2.set_fecha', sid=sid) }}"
+        style="display:flex;gap:8px;align-items:center;margin:0;">
+    <input type="date" name="fecha_planilla" value="{{ fecha_iso }}"
+           style="padding:4px 8px;border:1px solid #a5d6a7;border-radius:5px;font-size:0.85rem;" required>
+    <button type="submit" class="btn" style="padding:4px 12px;font-size:0.82rem;">Cambiar</button>
+  </form>
+</div>
+{% elif s.get('cierre_modo') == 'solo_estado' and not checks_mo %}
+<div style="padding:10px 16px;background:#f3e5f5;border-left:4px solid #8e24aa;
+            border-radius:6px;margin-bottom:10px;display:flex;align-items:center;
+            gap:14px;flex-wrap:wrap;">
+  <span style="font-weight:700;color:#6a1b9a;">Sin fecha de planilla — no hace falta en modo solo estado</span>
+  <span style="color:#555;font-size:0.83rem;">Los materiales no llevan fecha y las fechas del nodo no se tocan. Solo defínela si cambias a cierre con fecha.</span>
+  <form method="POST" action="{{ url_for('liquidador2.set_fecha', sid=sid) }}"
+        style="display:flex;gap:8px;align-items:center;margin:0;">
+    <input type="date" name="fecha_planilla"
+           style="padding:4px 8px;border:1px solid #ce93d8;border-radius:5px;font-size:0.85rem;" required>
+    <button type="submit" class="btn" style="padding:4px 12px;font-size:0.82rem;">Definir fecha</button>
+  </form>
+</div>
+{% else %}
+<div style="padding:10px 16px;background:#ffebee;border-left:4px solid #c62828;
+            border-radius:6px;margin-bottom:10px;display:flex;align-items:center;
+            gap:14px;flex-wrap:wrap;">
+  <span style="font-weight:700;color:#c62828;">Fecha de planilla no definida — LIQUIDACIÓN BLOQUEADA</span>
+  <form method="POST" action="{{ url_for('liquidador2.set_fecha', sid=sid) }}"
+        style="display:flex;gap:8px;align-items:center;margin:0;">
+    <input type="date" name="fecha_planilla"
+           style="padding:4px 8px;border:2px solid #c62828;border-radius:5px;font-size:0.85rem;" required>
+    <button type="submit" class="btn btn-primary" style="padding:4px 12px;font-size:0.82rem;">
+      Definir fecha
+    </button>
+  </form>
+</div>
+{% endif %}
+
+{# ── Modo de cierre (fase final del job) ── #}
+{% set cierre_modo = s.get('cierre_modo', 'fecha_estado') %}
+{% if s.get('plantilla_mat_masiva') %}
+<div style="padding:10px 16px;background:#ede7f6;border-left:4px solid #5e35b1;
+            border-radius:6px;margin-bottom:10px;font-size:0.86rem;color:#311b92;">
+  <strong>Plantilla MAT masiva</strong> — solo materiales, varios proyectos en un archivo
+  (PRO explícito por bloque). Nodos con MO liquidada en meses anteriores: el cruce
+  material ↔ líder y las reglas de Liquidador 2 aplican igual.
+</div>
+{% endif %}
+<div style="padding:10px 16px;background:{{ '#f3e5f5' if cierre_modo == 'solo_estado' else '#e3f2fd' }};
+            border-left:4px solid {{ '#8e24aa' if cierre_modo == 'solo_estado' else '#1565c0' }};
+            border-radius:6px;margin-bottom:10px;display:flex;align-items:center;
+            gap:16px;flex-wrap:wrap;">
+  <span style="font-weight:700;color:{{ '#6a1b9a' if cierre_modo == 'solo_estado' else '#0d47a1' }};">
+    Cierre al final:
+    {% if cierre_modo == 'solo_estado' %}solo estado{% else %}fecha + PDL + estado{% endif %}
+  </span>
+  <span style="color:#555;font-size:0.83rem;">
+    {% if cierre_modo == 'solo_estado' %}
+      Nodos 100% OK → <strong>1.4-TERMINADO/EN BALANCE</strong> solo si no lo tienen. Fechas y PDL intactos.
+    {% else %}
+      Nodos 100% OK → 7 fechas = fecha de planilla, PDL y <strong>1.4-TERMINADO/EN BALANCE</strong>.
+    {% endif %}
+  </span>
+  <form method="POST" action="{{ url_for('liquidador2.set_cierre_modo', sid=sid) }}"
+        style="display:flex;gap:8px;align-items:center;margin:0;margin-left:auto;">
+    <select name="cierre_modo" style="padding:4px 8px;border:1px solid #bbb;border-radius:5px;font-size:0.85rem;">
+      <option value="solo_estado" {% if cierre_modo == 'solo_estado' %}selected{% endif %}>Solo estado (fechas/PDL intactos)</option>
+      <option value="fecha_estado" {% if cierre_modo != 'solo_estado' %}selected{% endif %}>Fecha + PDL + estado (normal)</option>
+    </select>
+    <button type="submit" class="btn" style="padding:4px 12px;font-size:0.82rem;">Cambiar</button>
+  </form>
+</div>
+
+{% if s.pdl_detectado %}
+<div class="alert alert-info" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+  <span>PDL detectado del Excel: <strong>{{ s.pdl_detectado }}</strong></span>
+  <span style="color:#888;font-size:0.82rem;">Se usará al liquidar (fase fechas/estado).</span>
+</div>
+{% elif cierre_modo != 'solo_estado' %}
+<div style="padding:8px 14px;background:#fff3e0;border-radius:6px;
+            border-left:3px solid #ff9800;margin-bottom:8px;
+            font-size:0.84rem;color:#e65100;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+  <span>PDL no detectado en el Excel. Si este proyecto necesita PDL, usar
+    <a href="{{ url_for('liquidador2.panel_pdl', sid=sid) }}" style="color:#e65100;font-weight:600;">
+      Panel PDL
+    </a> después de la liquidación para aplicarlo.
+  </span>
+</div>
+{% endif %}
+
+{# ── Nodos faltantes en SGS ── #}
+{% if nodos_faltantes and nodos_faltantes.nodos_faltantes %}
+{% set _nf = nodos_faltantes %}
+<div class="card" id="card-nodos-faltantes" style="border-left:4px solid #e65100;">
+
+  <h2 style="color:#e65100;margin-bottom:14px;">
+    Nodos faltantes en SGS ({{ _nf.nodos_faltantes|length }})
+  </h2>
+
+  {# ── Padre individual (sin check 'Contiene sub proyectos') ── #}
+  {% set _solitarios = _nf.padre_chk and _nf.padre_chk.solitarios %}
+  {% if _solitarios %}
+  <div style="padding:10px 14px;margin-bottom:14px;background:#fff8e1;border:1px solid #ffcc80;
+              border-radius:8px;font-size:0.82rem;color:#5d4037;">
+    <strong>Familia de nodos solitarios.</strong>
+    {{ _nf.padre_chk.code }} «{{ _nf.padre_chk.name }}» es un proyecto individual
+    (sin <strong>Contiene sub proyectos</strong>) y la familia no tiene padre azul.
+    Colgarle nodos con el Excel masivo los deja <strong>fantasma</strong>.
+    <br>El faltante se crea como <strong>otro individual</strong>, clonando todo el
+    formulario de {{ _nf.padre_chk.code }} (región, cliente, contrato, macro/micro,
+    supervisor, fórmula, proceso, fecha de asignación…). Solo cambian nombre y nodo; PDL queda «-».
+    <div style="margin-top:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <button id="btn-crear-nodos" onclick="crearNodosFaltantes('{{ sid }}')"
+              style="background:#e65100;color:#fff;border:none;border-radius:6px;
+                     padding:7px 16px;font-weight:700;font-size:0.84rem;cursor:pointer;">
+        Crear como individual (navegador)
+      </button>
+      <span id="nodos-status-msg" style="font-size:0.82rem;color:#555;"></span>
+    </div>
+    <div id="nodos-log" style="display:none;margin-top:8px;background:#1a1a1a;color:#00e676;
+         font-family:monospace;font-size:0.78rem;padding:10px;border-radius:6px;max-height:160px;overflow-y:auto;"></div>
+    <div style="margin-top:6px;font-size:0.78rem;color:#777;">
+      Al terminar se verifica solo contra SGS. Después: <strong>Re-verificar todo</strong>
+      para que la planilla tome el nodo nuevo. <strong>③ Completar campos</strong> solo si quedó
+      alguno vacío. Si sale <em>guardado_verificar</em>: NO reintentar, revisar en SGS (R1).
+    </div>
+  </div>
+  {% elif _nf.padre_chk and _nf.padre_chk.individual and _nf.padre_chk.padre_real %}
+  <div style="padding:10px 14px;margin-bottom:14px;background:#e3f2fd;border:1px solid #90caf9;
+              border-radius:8px;font-size:0.82rem;color:#0d47a1;">
+    {{ _nf.padre_chk.code }} es un proyecto individual; se usará el padre real
+    <strong>{{ _nf.padre_chk.padre_real }}</strong> de la familia.
+  </div>
+  {% elif _nf.padre_chk and _nf.padre_chk.individual %}
+  <div style="padding:10px 14px;margin-bottom:14px;background:#ffebee;border:1px solid #ef9a9a;
+              border-radius:8px;font-size:0.82rem;color:#b71c1c;">
+    <strong>⚠ {{ _nf.padre_chk.code }} no es un padre</strong> («{{ _nf.padre_chk.name }}»,
+    sin <strong>Contiene sub proyectos</strong>) y la familia tiene varios padres posibles.
+    Deja un solo padre azul en SGS y recarga.
+  </div>
+  {% endif %}
+
+  {# ── Pasos ── #}
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+    {# Paso 1 #}
+    <div style="flex:1;min-width:200px;padding:12px 14px;background:#e3f2fd;border-radius:8px;border:1px solid #90caf9;">
+      <div style="font-weight:700;font-size:0.83rem;color:#1565c0;margin-bottom:6px;">① Importar en Odoo</div>
+      <p style="font-size:0.8rem;color:#333;margin:0 0 8px;">
+        Descarga el Excel, ve a SGS → lista proyectos → ⚙ Acciones → <strong>Importar registros</strong> → súbelo.
+      </p>
+      {% if _solitarios %}
+      <span style="font-size:0.8rem;color:#c62828;">
+        No aplica: familia de solitarios — el Excel masivo crearía nodos fantasma.
+        Usa <strong>Crear como individual</strong>.
+      </span>
+      {% elif _nf.parent_pro_code %}
+      <a href="{{ url_for('liquidador2.generar_excel_nodos', sid=sid) }}"
+         style="display:inline-block;padding:6px 14px;background:#1565c0;color:#fff;
+                border-radius:5px;font-weight:700;font-size:0.82rem;text-decoration:none;">
+        Descargar Excel ↓
+      </a>
+      {% else %}
+      <span style="font-size:0.8rem;color:#c62828;">PRO padre no detectado — no se puede generar Excel</span>
+      {% endif %}
+    </div>
+
+    {# Paso 2 #}
+    <div style="flex:1;min-width:200px;padding:12px 14px;background:#fce4ec;border-radius:8px;border:1px solid #f48fb1;">
+      <div style="font-weight:700;font-size:0.83rem;color:#880e4f;margin-bottom:6px;">② Verificar en SGS</div>
+      <p style="font-size:0.8rem;color:#333;margin:0 0 8px;">
+        Después de importar, comprueba aquí si los nodos ya existen en SGS (rápido, sin recargar la página).
+      </p>
+      <button onclick="reverificarNodos()"
+              style="padding:6px 14px;background:#880e4f;color:#fff;border:none;
+                     border-radius:5px;font-weight:700;font-size:0.82rem;cursor:pointer;">
+        Verificar en SGS ↺
+      </button>
+      <span id="nf-rev-msg" style="display:block;font-size:0.79rem;margin-top:6px;color:#555;"></span>
+    </div>
+
+    {# Paso 3 #}
+    <div style="flex:1;min-width:200px;padding:12px 14px;background:#e8f5e9;border-radius:8px;border:1px solid #a5d6a7;">
+      <div style="font-weight:700;font-size:0.83rem;color:#1b5e20;margin-bottom:6px;">③ Completar campos</div>
+      <p style="font-size:0.8rem;color:#333;margin:0 0 8px;">
+        Inyecta los 13 campos que Odoo deja vacíos (macro, micro, proceso, PDI, aprobadores…) copiándolos del PRO padre.
+      </p>
+      <button id="btn-completar-nodos" onclick="completarNodos()"
+              style="padding:6px 14px;background:#2e7d32;color:#fff;border:none;
+                     border-radius:5px;font-weight:700;font-size:0.82rem;cursor:pointer;">
+        Completar campos ✓
+      </button>
+      <span id="nf-comp-msg" style="display:block;font-size:0.79rem;margin-top:6px;color:#555;"></span>
+    </div>
+  </div>
+
+  {# ── Tabla de nodos ── #}
+  <table style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-bottom:10px;">
+    <thead><tr style="background:#fff3e0;">
+      <th style="padding:6px 10px;text-align:left;border-bottom:1px solid #ffe0b2;">Nodo</th>
+      <th style="padding:6px 10px;text-align:left;border-bottom:1px solid #ffe0b2;">Nombre en SGS</th>
+      <th style="padding:6px 10px;text-align:left;border-bottom:1px solid #ffe0b2;">PRO</th>
+      <th style="padding:6px 10px;text-align:left;border-bottom:1px solid #ffe0b2;">Estado</th>
+    </tr></thead>
+    <tbody id="tbody-nodos-faltantes">
+    {% for nodo in _nf.nodos_faltantes %}
+    {% set sufijo = 'N' + nodo.split('AL')[0] + '_N' + nodo.split('AL')[1] if 'AL' in nodo.upper() else 'NODO ' + nodo %}
+    <tr data-nodo="{{ nodo }}">
+      <td style="padding:5px 10px;border-bottom:1px solid #f5f5f5;font-weight:700;">{{ nodo }}</td>
+      <td style="padding:5px 10px;border-bottom:1px solid #f5f5f5;color:#555;font-size:0.82rem;">
+        {% if _solitarios and _nf.padre_chk.nombres.get(nodo) %}{{ _nf.padre_chk.nombres.get(nodo) }}
+        {% else %}{{ _nf.lcl or _nf.ticket }} {{ sufijo }}{% endif %}
+      </td>
+      <td style="padding:5px 10px;border-bottom:1px solid #f5f5f5;font-family:monospace;font-size:0.78rem;" class="nodo-pro-code">—</td>
+      <td style="padding:5px 10px;border-bottom:1px solid #f5f5f5;">
+        <span class="nodo-badge badge-pendiente">Pendiente</span>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+    <button onclick="location.reload()"
+            style="padding:6px 14px;background:#eee;color:#333;border:none;border-radius:5px;
+                   font-size:0.82rem;cursor:pointer;">
+      Re-verificar todo (lento) ↺
+    </button>
+    <span style="font-size:0.78rem;color:#888;">
+      PRO padre: <strong>{{ _nf.parent_pro_code or '—' }}</strong>
+      &nbsp;| LCL: <strong>{{ _nf.lcl or '—' }}</strong>
+      &nbsp;| Ticket: <strong>{{ _nf.ticket or '—' }}</strong>
+    </span>
+  </div>
+
+  {% if not _solitarios %}
+  <details style="margin-top:10px;">
+    <summary style="font-size:0.8rem;color:#aaa;cursor:pointer;">Creación alternativa vía navegador</summary>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <button id="btn-crear-nodos" onclick="crearNodosFaltantes('{{ sid }}')"
+              style="background:#e65100;color:#fff;border:none;border-radius:6px;
+                     padding:6px 14px;font-weight:700;font-size:0.82rem;cursor:pointer;">
+        Crear vía Playwright
+      </button>
+      <span id="nodos-status-msg" style="font-size:0.82rem;color:#555;"></span>
+    </div>
+    <div id="nodos-log" style="display:none;margin-top:8px;background:#1a1a1a;color:#00e676;
+         font-family:monospace;font-size:0.78rem;padding:10px;border-radius:6px;max-height:160px;overflow-y:auto;"></div>
+  </details>
+  {% endif %}
+</div>
+
+<script>
+const _URL_NODOS_CREAR    = '/liquidador2/crear_nodos_faltantes/{{ sid }}';
+const _URL_NODOS_POLL     = '/liquidador2/crear_nodos_estado/{{ sid }}';
+const _URL_COMPLETAR      = '/liquidador2/completar_nodos/{{ sid }}';
+const _URL_COMPLETAR_POLL = '/liquidador2/completar_nodos_estado/{{ sid }}';
+const _URL_REVERIFICAR    = '/liquidador2/reverificar_nodos/{{ sid }}';
+
+function reverificarNodos() {
+  var msg = document.getElementById('nf-rev-msg');
+  if (msg) { msg.textContent = 'Consultando SGS…'; msg.style.color = '#555'; }
+  fetch(_URL_REVERIFICAR)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) { if (msg) { msg.textContent = 'Error: ' + data.error; msg.style.color = '#c62828'; } return; }
+      var rows = document.querySelectorAll('#tbody-nodos-faltantes tr');
+      (data.resultados || []).forEach(function(r) {
+        rows.forEach(function(row) {
+          if (row.dataset.nodo !== r.nodo) return;
+          var badge   = row.querySelector('.nodo-badge');
+          var proCell = row.querySelector('.nodo-pro-code');
+          if (r.status === 'encontrado') {
+            badge.className = 'nodo-badge ' + (r.completo ? 'badge-ok' : 'badge-creando');
+            badge.textContent = r.completo ? 'Creado ✓' : 'Creado — campos vacíos';
+            if (proCell) proCell.textContent = r.code || '—';
+          } else {
+            badge.className = 'nodo-badge badge-pendiente';
+            badge.textContent = 'No encontrado aún';
+          }
+        });
+      });
+      if (data.todos_encontrados) {
+        if (msg) { msg.textContent = '✓ Todos los nodos encontrados en SGS. Procede al paso ③.'; msg.style.color = '#2e7d32'; }
+        _marcarNodosEnMO(data.resultados);
+      } else {
+        var pend = (data.resultados || []).filter(function(r) { return r.status === 'pendiente'; }).length;
+        if (msg) { msg.textContent = pend + ' nodo(s) aún no importados.'; msg.style.color = '#e65100'; }
+      }
+    })
+    .catch(function(e) { if (msg) { msg.textContent = 'Error de red: ' + e; msg.style.color='#c62828'; } });
+}
+
+function _marcarNodosEnMO(resultados) {
+  // col 3 = row.pro (nodo), col 9 = badge, col 10 = errores
+  document.querySelectorAll('tbody tr').forEach(function(row) {
+    var nodoCell = row.querySelector('td:nth-child(3)');
+    if (!nodoCell) return;
+    var nodoTxt = nodoCell.textContent.trim();
+    var match = (resultados || []).find(function(r) { return r.nodo === nodoTxt && r.status === 'encontrado'; });
+    if (!match) return;
+    // Celda de errores (col 10): reemplazar texto de "no existe"
+    var errCell = row.querySelector('td:nth-child(10)');
+    if (errCell && errCell.textContent.indexOf('no existe en SGS') !== -1) {
+      errCell.innerHTML = '<div style="color:#2e7d32;font-size:0.82rem;font-weight:700;">' +
+                         '✓ Nodo creado (' + match.code + '). Re-verifica para liquidar.</div>';
+    }
+    // Celda de badge (col 9): badge-error → "Creado — re-verifica"
+    var badgeCell = row.querySelector('td:nth-child(9)');
+    if (badgeCell) {
+      badgeCell.querySelectorAll('.badge-error').forEach(function(b) {
+        b.className = 'badge badge-warn';
+        b.textContent = 'Nodo creado';
+      });
+    }
+  });
+  _mostrarBannerReVerificar();
+}
+
+var _reVerifTimer = null;
+function _mostrarBannerReVerificar() {
+  var banner = document.getElementById('banner-reverificar-mo');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'banner-reverificar-mo';
+    banner.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);' +
+      'background:#1565c0;color:#fff;padding:16px 28px;border-radius:10px;' +
+      'box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:9999;text-align:center;font-size:0.95rem;';
+    banner.innerHTML = '<strong>✓ Nodos creados en SGS</strong><br>' +
+      '<span style="font-size:0.85rem;">La tabla MO aún muestra el error anterior. ' +
+      'Re-verifica para actualizar.</span><br>' +
+      '<button onclick="location.reload()" ' +
+      'style="margin-top:10px;padding:8px 24px;background:#fff;color:#1565c0;' +
+      'border:none;border-radius:6px;font-weight:700;font-size:0.9rem;cursor:pointer;">' +
+      'Re-verificar tabla MO ahora →</button>' +
+      '<div id="banner-rev-countdown" style="font-size:0.78rem;margin-top:6px;opacity:0.8;"></div>';
+    document.body.appendChild(banner);
+  }
+  // Cuenta regresiva de 15s y recarga automática
+  var secs = 15;
+  var cntEl = document.getElementById('banner-rev-countdown');
+  _reVerifTimer = setInterval(function() {
+    secs--;
+    if (cntEl) cntEl.textContent = 'Recargando automáticamente en ' + secs + 's…';
+    if (secs <= 0) {
+      clearInterval(_reVerifTimer);
+      location.reload();
+    }
+  }, 1000);
+}
+
+var _completarTimer = null;
+function completarNodos() {
+  var btn = document.getElementById('btn-completar-nodos');
+  var msg = document.getElementById('nf-comp-msg');
+  if (btn) { btn.disabled = true; btn.textContent = 'Inyectando…'; }
+  if (msg) { msg.textContent = 'Iniciando…'; msg.style.color = '#555'; }
+  fetch(_URL_COMPLETAR, {method: 'POST'})
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Completar campos ✓'; }
+        if (msg) { msg.textContent = 'Error: ' + data.error; msg.style.color = '#c62828'; }
+        return;
+      }
+      _completarTimer = setInterval(_pollCompletar, 2000);
+    })
+    .catch(function(e) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Completar campos ✓'; }
+      if (msg) { msg.textContent = 'Error de red: ' + e; msg.style.color = '#c62828'; }
+    });
+}
+
+function _pollCompletar() {
+  var msg = document.getElementById('nf-comp-msg');
+  var btn = document.getElementById('btn-completar-nodos');
+  fetch(_URL_COMPLETAR_POLL)
+    .then(function(r) { return r.json(); })
+    .then(function(job) {
+      var p = job.procesados || 0, t = job.total || 0;
+      if (msg) msg.textContent = 'Procesando ' + p + '/' + t + '…';
+      if (job.estado === 'ok') {
+        clearInterval(_completarTimer);
+        var ok  = (job.resultados || []).filter(function(r) { return r.status === 'ok'; }).length;
+        var err = (job.resultados || []).filter(function(r) { return r.status === 'error'; }).length;
+        if (msg) { msg.textContent = '✓ Completados: ' + ok + (err ? ' | Errores: ' + err : ''); msg.style.color = '#2e7d32'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Completar campos ✓'; }
+        reverificarNodos();
+      } else if (job.estado === 'error') {
+        clearInterval(_completarTimer);
+        if (msg) { msg.textContent = 'Error: ' + job.error; msg.style.color = '#c62828'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Completar campos ✓'; }
+      }
+    });
+}
+</script>
+
+<style>
+  .nodo-badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:0.76rem; font-weight:700; }
+  .badge-pendiente { background:#fff3e0; color:#e65100; }
+  .badge-creando   { background:#e3f2fd; color:#1565c0; }
+  .badge-ok        { background:#e8f5e9; color:#2e7d32; }
+  .badge-error     { background:#ffebee; color:#c62828; }
+  .fila-sin-lider  { background:#fff8e1 !important; }
+  .fila-sin-lider td { border-left: 3px solid #e65100; }
+  .fila-cant-nc    { background:#fff0f0 !important; opacity:0.9; }
+  .fila-cant-nc td { border-left: 3px solid #c0392b; }
+  .fila-sin-lider td:first-child { border-left: none; }
+</style>
+<script>
+var _nodosPollTimer = null;
+function crearNodosFaltantes(sid) {
+  var btn = document.getElementById('btn-crear-nodos');
+  var msg = document.getElementById('nodos-status-msg');
+  var logEl = document.getElementById('nodos-log');
+  if (btn) { btn.disabled = true; btn.textContent = 'Creando...'; }
+  if (msg) { msg.style.color = ''; msg.textContent = 'Lanzando...'; }
+  if (logEl) logEl.style.display = 'block';
+  fetch(_URL_NODOS_CREAR, {method:'POST'}).then(function(r){return r.json();})
+    .then(function(data){
+      if (data.error) { if(msg) msg.textContent='Error: '+data.error; if(btn){btn.disabled=false;btn.textContent='Reintentar';} return; }
+      _nodosPollTimer = setInterval(function(){
+        fetch(_URL_NODOS_POLL).then(function(r){return r.json();}).then(function(job){
+          if(msg) msg.textContent=(job.procesados||0)+'/'+(job.total||'?')+' procesados';
+          if(job.estado==='ok'||job.estado==='error'){
+            clearInterval(_nodosPollTimer);
+            // Resultado por nodo: un error individual no cambia job.estado
+            if(logEl){
+              logEl.textContent=(job.resultados||[]).map(function(r){
+                return 'nodo '+r.nodo+' → '+r.status+(r.code?' '+r.code:'')+
+                       (r.nombre?' «'+r.nombre+'»':'')+(r.error?' | '+r.error:'');
+              }).join('\n');
+              logEl.style.whiteSpace='pre-wrap';
+            }
+            if(job.estado==='ok'){
+              var malos=(job.resultados||[]).filter(function(r){return r.status!=='ok'&&r.status!=='ya_existe';});
+              if(btn){ btn.textContent=malos.length?'Revisar resultado':'Creado ✓'; }
+              // Error antes de GUARDAR (o rechazado por SGS) → se puede reintentar; antes de crear se relee la familia (no duplica)
+              var reintentar=malos.length>0&&malos.every(function(r){return r.status==='error';});
+              if(reintentar){
+                if(btn){btn.disabled=false;btn.textContent='Reintentar';}
+                if(msg){msg.style.color='#c62828';msg.textContent='✗ No se creó. Reintentar es seguro: antes de crear se revisa en SGS que el nodo no exista.';}
+              } else if(malos.length>0&&msg){msg.style.color='#c62828';msg.textContent='⚠ Revisa en SGS antes de reintentar (R1).';}
+              reverificarNodos();
+            }
+            else { if(msg){msg.textContent='Error: '+(job.error||'?');} if(btn){btn.disabled=false;btn.textContent='Reintentar';} }
+          }
+        });
+      }, 2500);
+    })
+    .catch(function(e){if(msg)msg.textContent='Error: '+e;if(btn){btn.disabled=false;btn.textContent='Reintentar';}});
+}
+</script>
+{% endif %}
+
+{# Errores de parseo #}
+{% if s.errs_mo or s.errs_mat %}
+<div class="card">
+  <h2>Avisos del parser</h2>
+  {% for e in s.errs_mo %}
+    <div class="alert {{ 'alert-info' if '[INFO]' in e else 'alert-warning' }}">{{ e }}</div>
+  {% endfor %}
+  {% for e in s.errs_mat %}
+    <div class="alert alert-warning">{{ e }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── Tabla MO ── #}
+{% if checks_mo %}
+{% set mo_liquidables    = checks_mo | selectattr('ok') | rejectattr('ya_liquidada') | list %}
+{% set mo_ya_liquidadas  = checks_mo | selectattr('ya_liquidada') | list %}
+{% set mo_repetibles     = mo_ya_liquidadas | selectattr('ya_liquidada_mes_anterior') | list %}
+{% set mo_rep_sumables   = checks_mo | selectattr('repetible_sumable') | list %}
+<style>
+  .mo-lider-section { margin-bottom: 18px; }
+  .mo-global-box { border: 1px solid #c8d8e8; border-radius: 8px; background: #f4f8fc; padding: 14px 16px; margin-bottom: 14px; }
+  .mo-global-title { font-weight: 700; font-size: 0.84rem; color: #1a3e6e; margin-bottom: 10px; }
+  .btn-global-apply { background: #1a3e2e; color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 0.82rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+  .btn-global-apply:hover { background: #245036; }
+  .mo-multi-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .mo-multi-row input[type="number"] { width: 56px; padding: 5px 8px; border: 1.5px solid #81c784; border-radius: 5px; font-size: 0.85rem; font-weight: 700; text-align: center; }
+  .btn-remove-lider { background: none; border: none; color: #c62828; font-size: 1rem; cursor: pointer; line-height: 1; padding: 2px 5px; }
+  .mo-multi-total { font-size: 0.8rem; margin-top: 6px; font-weight: 700; }
+  .mo-multi-total.ok  { color: #2e7d32; }
+  .mo-multi-total.err { color: #c62828; }
+  .btn-add-lider { background: #e8f5e9; border: 1.5px solid #81c784; border-radius: 5px; padding: 5px 12px; font-size: 0.8rem; color: #2e7d32; cursor: pointer; font-weight: 700; margin-top: 3px; }
+  .btn-add-lider:hover { background: #c8e6c9; }
+  /* ── Autocomplete búsqueda de líderes ────────────────────────────────────── */
+  .mo-search-wrap { flex: 1; position: relative; min-width: 0; }
+  .mo-search-input { width: 100%; padding: 5px 8px; border: 1.5px solid #81c784; border-radius: 5px; font-size: 0.8rem; box-sizing: border-box; }
+  .mo-ac-dropdown { position: absolute; left: 0; right: 0; top: 100%; z-index: 300; background: #fff; border: 1px solid #81c784; border-radius: 5px; box-shadow: 0 3px 10px rgba(0,0,0,0.12); max-height: 200px; overflow-y: auto; }
+  .mo-ac-item { padding: 7px 10px; font-size: 0.8rem; cursor: pointer; border-bottom: 1px solid #f0f0f0; }
+  .mo-ac-item:hover { background: #e8f5e9; }
+  .mo-lider-sel { font-size: 0.8rem; padding: 3px 6px; border: 1px solid #81c784; border-radius: 4px; max-width: 220px; }
+  /* ── Modo repetición ─────────────────────────────────────────────────────── */
+  .btn-modo-rep { background: #fff3e0; border: 2px solid #e65100; color: #e65100;
+    border-radius: 6px; padding: 6px 14px; font-size: 0.82rem; font-weight: 700;
+    cursor: pointer; white-space: nowrap; }
+  .btn-modo-rep.activo { background: #e65100; color: #fff; }
+  .chk-ya-liquidada { display: none; }
+  .chk-rep-sumable  { display: none; }
+  .sel-ya-liquidada { display: none; }
+  .sel-rep-sumable  { display: none; }
+  .rep-lider-label  { font-size: 0.78rem; color: #888; }
+  /* Repetible: liquidada mes anterior → fila naranja suave */
+  tr.fila-repetible { background: #fff8f0; }
+  tr.fila-repetible.modo-rep-visible { background: #ffe0c0; }
+  /* Repetible sumable: falta delta por ppto insuficiente en SGS → fila rosa */
+  tr.fila-rep-sumable { background: #fce4ec; }
+  tr.fila-rep-sumable.modo-rep-visible { background: #f8bbd0; }
+  /* Bloqueada firme: liquidada este mes → fila gris */
+  tr.fila-bloqueada-firme { opacity: 0.6; }
+  /* ── Tooltip de líder MAT ─────────────────────────────────────────────────── */
+  .ban-info { display: inline-block; vertical-align: middle; margin-left: 3px; position: relative; }
+  .ban-info summary { list-style: none; cursor: pointer; color: #2563eb; font-size: 0.75rem; user-select: none; }
+  .ban-info summary::-webkit-details-marker { display: none; }
+  .ban-info[open] summary { color: #1d4ed8; }
+  .ban-popup {
+    position: absolute; left: 0; top: 1.4em; z-index: 200;
+    background: #fff; border: 1px solid #b0c4de; border-radius: 7px;
+    padding: 9px 13px; font-size: 0.78rem; min-width: 220px; max-width: 320px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.13); line-height: 1.5;
+    white-space: normal; color: #222;
+  }
+</style>
+<div class="card">
+  <h2>Mano de Obra ({{ checks_mo|length }} filas)</h2>
+
+  <form method="POST" action="{{ url_for('liquidador2.liquidar', sid=sid) }}" id="form-liquidar-mo">
+  {# Flag modo repetición — SIEMPRE presente (fuera del if mo_items_js: cuando
+     todas las filas son repetibles, mo_items_js está vacío y el bloque no se
+     renderiza — el flag debe existir igual para que el JS lo pueda activar) #}
+  <input type="hidden" name="omitir_ya_liquidadas" id="omitir-ya-liquidadas-val" value="0">
+  {% if mo_items_js %}
+  <script>
+  const MO_ITEMS           = {{ mo_items_js|tojson }};
+  const TODOS_LIDERES      = {{ todos_lideres|tojson }};
+  const LIDERES_CEDULA     = {{ todos_lideres_cedula|tojson }};
+  const DISTRIBUCION_EXCEL = {{ distribucion_excel|tojson }};
+  const IA_NODO_LIDER      = {{ ia_nodo_lider|tojson }};
+  const NODOS_FALTANTES    = {{ ((nodos_faltantes.nodos_faltantes if nodos_faltantes else []))|tojson }};
+  var   _selectedCedulas = {};
+  </script>
+  {# Hidden inputs por fila — nombre y cédula del líder asignado #}
+  {% for item in mo_items_js %}
+  <input type="hidden" name="mo_lider_idx_{{ item.idx }}" id="mo-lider-hid-{{ item.idx }}" value="{{ item.default_partner }}">
+  <input type="hidden" name="mo_lider_ced_{{ item.idx }}" id="mo-lider-ced-{{ item.idx }}" value="{{ item.default_cedula or '' }}">
+  {% endfor %}
+  {# ── Banner IA activa ── #}
+  <div id="ia-banner" style="display:{{ 'flex' if ia_nodo_lider else 'none' }};
+              padding:8px 14px;background:#e8f5e9;border-left:4px solid #388e3c;
+              border-radius:6px;margin-bottom:10px;align-items:center;gap:12px;flex-wrap:wrap;font-size:0.85rem;">
+    <span style="font-weight:700;color:#2e7d32;" id="ia-banner-txt">
+      {% if ia_resumen %}Asignación IA activa ({{ ia_resumen|length }} nodos)
+      {% elif ia_nodo_lider %}Asignación IA activa ({{ ia_nodo_lider|length }} nodos){% endif %}
+    </span>
+    <button type="button" onclick="aplicarIANodoLider()"
+            style="padding:4px 12px;background:#388e3c;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:0.82rem;">
+      Re-aplicar
+    </button>
+    <button type="button" onclick="toggleIAPanel()"
+            style="padding:4px 12px;background:#fff;color:#388e3c;border:1px solid #388e3c;border-radius:5px;cursor:pointer;font-size:0.82rem;">
+      Modificar
+    </button>
+    <span id="ia-banner-detail" style="color:#666;font-size:0.78rem;">
+      {% if ia_resumen %}
+        {{ ia_resumen|join(' · ') }}
+      {% elif ia_nodo_lider %}
+        {% for nodo, info in ia_nodo_lider.items() %}
+          Nodo {{ nodo }}: {{ info.partner_nombre }}{% if not loop.last %} · {% endif %}
+        {% endfor %}
+      {% endif %}
+    </span>
+  </div>
+
+  <div class="mo-lider-section">
+    <div class="mo-global-box" id="mo-global-box">
+      <div style="display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap;">
+        <div class="mo-global-title" style="margin:0;">⚙ Distribución por porcentaje — el sistema asigna cada prestación entera a un líder</div>
+        <button type="button" onclick="toggleIAPanel()"
+                style="padding:5px 12px;background:#7b1fa2;color:#fff;border:none;border-radius:5px;
+                       font-size:0.82rem;cursor:pointer;white-space:nowrap;">
+          Distribuir con IA ✦
+        </button>
+      </div>
+
+      {# ── Panel IA inline ── #}
+      <div id="ia-panel-inline" style="display:none;margin-top:14px;padding:14px;
+           background:#f3e5f5;border:1.5px solid #ce93d8;border-radius:8px;">
+        <div style="font-weight:700;color:#6a1b9a;margin-bottom:8px;font-size:0.92rem;">
+          Distribución con IA — pega las instrucciones de tu planilla
+        </div>
+        <textarea id="ia-texto" rows="6"
+                  placeholder="Ejemplo:&#10;NODO 1 Y NODO 17: LIDER UNO&#10;NODO 2-3-4: LIDER DOS&#10;NODO 5: LIDER TRES&#10;NODO 2 AL 6: LIDER CUATRO   ← nodo cable 2AL6 si existe en la planilla&#10;NODO 7: JUAN Y PEDRO   ← dos líderes en un nodo se reparten sus prestaciones"
+                  style="width:100%;box-sizing:border-box;padding:9px;font-size:0.87rem;
+                         border:1px solid #ce93d8;border-radius:6px;resize:vertical;
+                         font-family:monospace;background:#fdf6ff;"></textarea>
+        <div style="margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button type="button" onclick="interpretarConIA()"
+                  style="padding:6px 18px;background:#7b1fa2;color:#fff;border:none;
+                         border-radius:6px;font-weight:700;font-size:0.88rem;cursor:pointer;">
+            Interpretar con IA ▸
+          </button>
+          <span id="ia-estado" style="font-size:0.82rem;color:#666;"></span>
+        </div>
+
+        {# Tabla de resultados (se llena vía JS) #}
+        <div id="ia-resultado-box" style="display:none;margin-top:14px;">
+          <div style="font-weight:700;color:#4a148c;margin-bottom:8px;font-size:0.87rem;">
+            Confirma las asignaciones — puedes cambiar el líder antes de aplicar:
+          </div>
+          <table id="ia-tabla-result" style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-bottom:12px;">
+            <thead>
+              <tr style="background:#e1bee7;">
+                <th style="padding:6px 10px;text-align:left;">Nodo</th>
+                <th style="padding:6px 10px;text-align:left;">IA interpretó</th>
+                <th style="padding:6px 10px;text-align:left;">Líder SGS</th>
+                <th style="padding:6px 10px;text-align:left;">Cédula</th>
+                <th style="padding:6px 10px;text-align:left;">Confianza</th>
+              </tr>
+            </thead>
+            <tbody id="ia-tabla-body"></tbody>
+          </table>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <button type="button" onclick="aplicarIAParsed()"
+                    style="padding:7px 20px;background:#4a148c;color:#fff;border:none;
+                           border-radius:6px;font-weight:700;font-size:0.88rem;cursor:pointer;">
+              Aplicar al formulario ✓
+            </button>
+            <button type="button" onclick="document.getElementById('ia-resultado-box').style.display='none'"
+                    style="padding:7px 14px;background:#eee;color:#555;border:none;
+                           border-radius:6px;font-size:0.85rem;cursor:pointer;">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="mo-global-multi-rows" style="margin-top:8px;"></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap;">
+        <button type="button" class="btn-add-lider" onclick="_globalAddRow()">+ Agregar líder</button>
+        <div id="mo-global-multi-total" class="mo-multi-total err">Total: 0%</div>
+      </div>
+      <div style="margin-top:12px;">
+        <button type="button" class="btn-global-apply" onclick="calcularDistribucion()">Calcular distribución ▸</button>
+      </div>
+      <div id="mo-distrib-summary" style="display:none;margin-top:10px;padding:10px 14px;background:#f0fff4;border:1px solid #c8e6c9;border-radius:6px;font-size:0.82rem;line-height:1.7;"></div>
+    </div>
+  </div>
+  {% endif %}
+  <table>
+    <thead>
+      <tr>
+        <th style="width:36px;">
+          {% if mo_liquidables %}
+          <input type="checkbox" id="chk-all" title="Seleccionar todas"
+                 onchange="toggleAll(this)" style="cursor:pointer;">
+          {% endif %}
+        </th>
+        <th>Fila</th><th>Nodo/PRO</th><th>Codigo</th><th>Cantidad</th>
+        <th>PRO SGS</th><th>Líderes disponibles</th><th>Líder asignado</th><th>Estado</th>
+        <th style="white-space:nowrap;font-size:0.78rem;">Liquidado en SGS</th>
+        <th>Errores / Avisos</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for ck in checks_mo %}
+    {% set row = ck.row %}
+    {% set lider_req = (not ck.ok) and ck.lider_faltante and ck.pid %}
+    {% set cant_nc    = ck.get('cant_no_coincide', False) %}
+    {% set rep_sum    = ck.get('repetible_sumable', False) %}
+    {% set liquidable = (ck.ok or lider_req) and not ck.ya_liquidada and not cant_nc %}
+    {% set repetible  = ck.ya_liquidada and ck.get('ya_liquidada_mes_anterior', False) %}
+    {% set lideres = ck.lideres if ck.lideres is defined else [] %}
+    {% set default_p = (lideres[0].nombre if lideres else (ck.partner_nombre or '')) %}
+    {# Sin líder por defecto (p. ej. nodo recién creado, sin equipo en SGS): el
+       select arranca en "— Seleccionar líder —". Antes el navegador mostraba el
+       primer líder de la lista sin que quedara elegido y el servidor rechazaba
+       el lote entero ("QP1129: no tiene líder disponible", 20AL24, 2026-09-29). #}
+    {% set sin_lider = liquidable and not default_p %}
+    <tr {% if liquidable %}class="fila-liquidable{% if lider_req or sin_lider %} fila-sin-lider{% endif %}"
+        {% elif rep_sum %}class="fila-cant-nc fila-rep-sumable"
+        {% elif cant_nc %}class="fila-cant-nc"
+        {% elif repetible %}class="fila-ya-liquidada fila-repetible"
+        {% elif ck.ya_liquidada %}class="fila-ya-liquidada fila-bloqueada-firme"{% endif %}>
+      <td>
+        {% set fila_data %}data-fila="{{ row.fila }}" data-nodo="{{ row.pro or row._odm or '' }}" data-cod="{{ row.codigo }}"{% endset %}
+        {% if liquidable %}
+        <input type="checkbox" name="idx_mo" value="{{ loop.index0 }}"
+               class="chk-mo{% if lider_req or sin_lider %} chk-lider-req{% endif %}"
+               {{ fila_data }} style="cursor:pointer;">
+        {% elif rep_sum %}
+        <input type="checkbox" name="idx_mo" value="{{ loop.index0 }}"
+               class="chk-mo chk-rep-sumable" {{ fila_data }} style="cursor:pointer;">
+        <input type="hidden" name="mo_lider_idx_{{ loop.index0 }}" id="mo-lider-hid-{{ loop.index0 }}"
+               value="{{ lideres[0].nombre if lideres else (ck.partner_nombre or '') }}">
+        <input type="hidden" name="mo_lider_ced_{{ loop.index0 }}" id="mo-lider-ced-{{ loop.index0 }}"
+               value="{{ lideres[0].cedula if lideres else '' }}">
+        {% elif repetible %}
+        <input type="checkbox" name="idx_mo" value="{{ loop.index0 }}"
+               class="chk-mo chk-ya-liquidada" {{ fila_data }} style="cursor:pointer;">
+        <input type="hidden" name="mo_lider_idx_{{ loop.index0 }}" id="mo-lider-hid-{{ loop.index0 }}"
+               value="{{ lideres[0].nombre if lideres else (ck.partner_nombre or '') }}">
+        <input type="hidden" name="mo_lider_ced_{{ loop.index0 }}" id="mo-lider-ced-{{ loop.index0 }}"
+               value="{{ lideres[0].cedula if lideres else '' }}">
+        {% endif %}
+      </td>
+      <td>{{ row.fila }}</td>
+      <td>{{ row.pro or row._odm or '—' }}</td>
+      <td><strong>{{ row.codigo }}</strong></td>
+      <td style="text-align:right">{{ row.cantidad }}</td>
+      <td>
+        {% if ck.pro_code %}
+          <span style="font-size:0.8rem;">{{ ck.pro_code }}</span><br>
+          <span style="color:#888;font-size:0.75rem;">{{ ck.pnombre[:40] if ck.pnombre else '' }}</span>
+        {% else %}—{% endif %}
+      </td>
+      <td style="font-size:0.78rem;color:#777;">
+        {% if lideres|length > 1 %}
+          {% for l in lideres %}<div>{{ l.nombre }}</div>{% endfor %}
+        {% else %}
+          {{ ck.partner_nombre if ck.partner_nombre else '—' }}
+        {% endif %}
+      </td>
+      <td>
+        {% if liquidable %}
+          <select class="mo-lider-sel" id="mo-lider-sel-{{ loop.index0 }}"
+                  onchange="syncHidden({{ loop.index0 }}, this.value)"
+                  style="{% if lider_req or sin_lider %}border-color:#e65100;max-width:220px;{% elif lideres|length <= 1 %}border-color:#b0bec5;max-width:220px;{% endif %}">
+            {% if lider_req or sin_lider %}
+            <option value="">— Seleccionar líder —</option>
+            {% endif %}
+            {% for l in todos_lideres %}
+            <option value="{{ l }}" {% if l == default_p %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+          </select>
+        {% elif rep_sum %}
+          {% set default_rs = (lideres[0].nombre if lideres else (ck.partner_nombre or '')) %}
+          <select class="mo-lider-sel sel-rep-sumable" id="mo-lider-sel-{{ loop.index0 }}"
+                  onchange="syncHidden({{ loop.index0 }}, this.value)"
+                  style="max-width:220px;border-color:#c2185b;">
+            {% if not default_rs %}<option value="">— Seleccionar líder —</option>{% endif %}
+            {% for l in todos_lideres %}
+            <option value="{{ l }}" {% if l == default_rs %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+          </select>
+          <span class="rep-lider-label">{{ default_rs or '—' }}</span>
+        {% elif repetible %}
+          {% set default_rep = (lideres[0].nombre if lideres else (ck.partner_nombre or '')) %}
+          <select class="mo-lider-sel sel-ya-liquidada" id="mo-lider-sel-{{ loop.index0 }}"
+                  onchange="syncHidden({{ loop.index0 }}, this.value)"
+                  style="max-width:220px;border-color:#e65100;">
+            {% if not default_rep %}<option value="">— Seleccionar líder —</option>{% endif %}
+            {% for l in todos_lideres %}
+            <option value="{{ l }}" {% if l == default_rep %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+          </select>
+          <span class="rep-lider-label">{{ default_rep or '—' }}</span>
+        {% else %}—{% endif %}
+      </td>
+      <td>
+        {% if rep_sum %}
+          <span class="badge" id="badge-rep-{{ loop.index0 }}"
+                style="background:#fce4ec;color:#880e4f;border:1px solid #c2185b;"
+                title="{{ ck.errores[0] if ck.errores else '' }}">
+            Completar {{ ck.delta_qty | int }} ud
+          </span>
+        {% elif cant_nc %}
+          <span class="badge badge-error" title="{{ ck.errores[0] if ck.errores else '' }}">⚠ Cant. no coincide</span>
+        {% elif repetible %}
+          <span class="badge" id="badge-rep-{{ loop.index0 }}"
+                style="background:#fff3e0;color:#e65100;border:1px solid #e65100;">
+            Repetible
+            {% if ck.fecha_avance %}
+            <small style="font-size:0.7em;opacity:0.85;">{{ ck.fecha_avance[:7] }}</small>
+            {% endif %}
+          </span>
+        {% elif ck.ya_liquidada %}
+          <span class="badge badge-gray" id="badge-rep-{{ loop.index0 }}">Ya liquidada (este mes)</span>
+        {% elif lider_req or sin_lider %}
+          <span class="badge badge-warn">Sin líder</span>
+        {% elif ck.ok %}
+          {% if ck.act_existente and ck.act_existente.advance > 0 %}
+            <span class="badge badge-warn">Avance parcial</span>
+          {% else %}
+            <span class="badge badge-ok">OK</span>
+          {% endif %}
+        {% else %}
+          <span class="badge badge-error">Error</span>
+        {% endif %}
+      </td>
+      <td style="font-size:0.78rem;white-space:nowrap;color:#555;">
+        {% if rep_sum %}
+          {% set ea = ck.act_existente %}
+          {% if ea %}
+            <span style="color:#880e4f;font-weight:600;">avance={{ ea.advance }}</span> / <span style="color:#555;">ppto={{ ea.amount }}</span>
+            <br><span style="color:#880e4f;font-size:0.7em;">Falta {{ ck.delta_qty | int }} ud</span>
+          {% else %}—{% endif %}
+        {% elif cant_nc %}
+          {% set ea = ck.act_existente %}
+          {% if ea %}
+            <span style="color:#c0392b;font-weight:600;">ppto={{ ea.amount }}</span>
+            {% if ea.advance %} / <span style="color:#555;">avance={{ ea.advance }}</span>{% endif %}
+            <br><span style="color:#c0392b;font-size:0.7em;">XLS pide {{ row.cantidad }}</span>
+          {% else %}—{% endif %}
+        {% elif ck.ya_liquidada or (ck.act_existente and ck.act_existente.advance > 0) %}
+          {% set ea = ck.act_existente %}
+          {% if ck.fecha_avance %}
+            <span style="font-weight:600;">{{ ck.fecha_avance }}</span><br>
+          {% endif %}
+          {% if ea %}
+            <span style="color:#1a3e6e;">avance={{ ea.advance }}</span>
+            {% if ea.amount %} / <span style="color:#555;">ppto={{ ea.amount }}</span>{% endif %}
+          {% endif %}
+        {% else %}—{% endif %}
+      </td>
+      <td>
+        {% if lider_req %}
+          <ul class="warns">
+            <li>Proyecto encontrado pero sin líder en SGS. Selecciona el líder en el selector.</li>
+          </ul>
+          {% if ck.advertencias %}
+            <ul class="warns">{% for w in ck.advertencias %}<li>{{ w }}</li>{% endfor %}</ul>
+          {% endif %}
+        {% else %}
+          {% if ck.errores %}
+            <ul class="errores">{% for e in ck.errores %}<li>{{ e }}</li>{% endfor %}</ul>
+          {% endif %}
+          {% if ck.advertencias %}
+            <ul class="warns">{% for w in ck.advertencias %}<li>{{ w }}</li>{% endfor %}</ul>
+          {% endif %}
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  {# ── Resumen monetario MO ── #}
+  {% if mo_calculo %}
+  <div style="margin-top:16px;padding:14px 18px;background:#f0f7ff;border:1.5px solid #90b8e0;border-radius:8px;">
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <div>
+        <span style="font-size:0.78rem;font-weight:700;color:#1a3e6e;text-transform:uppercase;letter-spacing:.04em;">
+          Valor estimado MO (según baremo MDO&amp;MAT)
+        </span><br>
+        <span style="font-size:1.45rem;font-weight:800;color:#1a5c2e;">
+          ${{ "{:,.2f}".format(mo_calculo.total) }}
+        </span>
+      </div>
+      <div style="flex:1;min-width:180px;">
+        <span style="font-size:0.78rem;color:#555;">
+          {{ mo_calculo.lineas | rejectattr('precio', 'equalto', 0) | list | length }} códigos con precio
+          / {{ mo_calculo.lineas | length }} total
+        </span>
+        {% if mo_calculo.sin_precio %}
+        <div style="margin-top:4px;font-size:0.76rem;color:#b35c00;">
+          Sin precio en MDO&amp;MAT:
+          <strong>{{ mo_calculo.sin_precio | join(', ') }}</strong>
+          — su valor no está incluido en el total.
+        </div>
+        {% endif %}
+      </div>
+      <details style="font-size:0.78rem;color:#444;cursor:pointer;">
+        <summary style="font-weight:700;color:#1a3e6e;">Ver desglose por código</summary>
+        <table style="margin-top:8px;border-collapse:collapse;font-size:0.77rem;">
+          <thead>
+            <tr style="background:#dce8f5;">
+              <th style="padding:4px 10px;text-align:left;">Código</th>
+              <th style="padding:4px 10px;text-align:left;">PRO/Nodo</th>
+              <th style="padding:4px 8px;text-align:right;">Cantidad</th>
+              <th style="padding:4px 8px;text-align:right;">Precio unit.</th>
+              <th style="padding:4px 8px;text-align:right;">Valor</th>
+              <th style="padding:4px 8px;text-align:center;">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for l in mo_calculo.lineas %}
+            <tr style="border-bottom:1px solid #e0eaf4;{% if l.ya_liq %}opacity:0.65;{% endif %}">
+              <td style="padding:3px 10px;font-weight:600;">{{ l.cod }}</td>
+              <td style="padding:3px 10px;color:#555;">{{ l.pro or '—' }}</td>
+              <td style="padding:3px 8px;text-align:right;">{{ l.cant | int }}</td>
+              <td style="padding:3px 8px;text-align:right;">
+                {% if l.precio > 0 %}${{ "{:,.2f}".format(l.precio) }}{% else %}<span style="color:#b35c00;">sin precio</span>{% endif %}
+              </td>
+              <td style="padding:3px 8px;text-align:right;font-weight:{% if l.valor > 0 %}600{% else %}400{% endif %};">
+                {% if l.valor > 0 %}${{ "{:,.2f}".format(l.valor) }}{% else %}—{% endif %}
+              </td>
+              <td style="padding:3px 8px;text-align:center;font-size:0.72rem;">
+                {% if l.repetible_sumable %}
+                  <span style="color:#880e4f;font-weight:600;" title="Faltan {{ l.delta_qty | int }} ud — activa Modo Repetición: la máquina amplía el ppto y liquida el delta.">⊕ Completar {{ l.delta_qty | int }} ud</span>
+                {% elif l.cant_no_coincide %}
+                  <span style="color:#c0392b;font-weight:600;" title="Excel pide más unidades de las presupuestadas en SGS.">⚠ Cant. no coincide</span>
+                {% elif l.ya_liq %}
+                  <span style="color:#1a5c2e;">✓ Liquidada</span>
+                {% else %}
+                  <span style="color:#555;">Pendiente</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr style="background:#dce8f5;font-weight:800;">
+              <td colspan="4" style="padding:4px 10px;text-align:right;">TOTAL ESTIMADO</td>
+              <td style="padding:4px 8px;text-align:right;">${{ "{:,.2f}".format(mo_calculo.total) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </details>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if mo_liquidables or mo_repetibles or mo_rep_sumables %}
+  <div style="margin-top:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+    <span id="lbl-seleccionadas" style="font-size:0.85rem;color:#555;">0 seleccionadas</span>
+    <button type="submit" id="btn-liquidar" class="btn btn-success" disabled
+            onclick="return confirmarLiquidar()">
+      Liquidar seleccionadas →
+    </button>
+    {% if mo_repetibles or mo_rep_sumables %}
+    <button type="button" id="btn-modo-rep" class="btn-modo-rep"
+            onclick="toggleModoRepeticion()"
+            title="Activa para re-liquidar meses anteriores (naranja) o completar delta de ppto insuficiente (rosa)">
+      ⚠ Modo repetición ({{ mo_repetibles|length + mo_rep_sumables|length }})
+    </button>
+    <span id="modo-rep-hint" style="display:none;font-size:0.78rem;color:#e65100;">
+      Naranja = Repetible (mes anterior). Rosa = Completar delta. En ambos casos la máquina amplía el ppto en SGS automáticamente si falta pendiente.
+      <button type="button" onclick="marcarTodasRepetibles()" style="margin-left:10px;padding:2px 10px;font-size:0.78rem;background:#fff;border:1px solid #e65100;color:#e65100;border-radius:4px;cursor:pointer;">Marcar todas</button>
+      <button type="button" onclick="desmarcarTodasRepetibles()" style="margin-left:4px;padding:2px 10px;font-size:0.78rem;background:#fff;border:1px solid #999;color:#555;border-radius:4px;cursor:pointer;">Desmarcar</button>
+    </span>
+    {% endif %}
+  </div>
+  {% endif %}
+  </form>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// Panel global — fila con autocomplete de búsqueda
+// ══════════════════════════════════════════════════════════════════════════════
+
+function _acAttach(inp, hid, drop, onUpdate) {
+  var timer = null;
+  inp.addEventListener('input', function() {
+    clearTimeout(timer);
+    var q = inp.value.trim();
+    if (q.length < 2) { drop.style.display = 'none'; return; }
+    timer = setTimeout(function() {
+      fetch('/liquidador2/api/buscar_lider?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(items) {
+          drop.innerHTML = '';
+          if (!items.length) { drop.style.display = 'none'; return; }
+          items.forEach(function(it) {
+            var cedOk = it.cedula && /^C\d+$/.test(it.cedula.trim());
+            var el = document.createElement('div');
+            el.className = 'mo-ac-item';
+            el.style.cssText = cedOk ? '' : 'opacity:0.45;cursor:not-allowed;';
+            el.title = cedOk ? it.cedula : 'Sin cédula válida — no se puede seleccionar';
+            // Mostrar nombre + cédula (o aviso si no tiene)
+            var label = it.nombre;
+            if (cedOk)  label += ' (' + it.cedula + ')';
+            else        label += ' ⚠ sin cédula';
+            el.textContent = label;
+            el.addEventListener('mousedown', function(e) {
+              e.preventDefault();
+              if (!cedOk) {
+                inp.style.outline = '2px solid #e74c3c';
+                setTimeout(function() { inp.style.outline = ''; }, 1500);
+                return; // bloquear selección
+              }
+              // Guardar cédula en mapa global para que syncHidden la propague
+              if (typeof _selectedCedulas !== 'undefined') {
+                _selectedCedulas[it.nombre] = it.cedula.trim();
+              }
+              inp.value = it.nombre; hid.value = it.nombre;
+              drop.style.display = 'none';
+              if (onUpdate) onUpdate();
+            });
+            drop.appendChild(el);
+          });
+          drop.style.display = '';
+        })
+        .catch(function() { drop.style.display = 'none'; });
+    }, 350);
+  });
+  inp.addEventListener('blur', function() {
+    setTimeout(function() { drop.style.display = 'none'; }, 200);
+    // Solo aceptar texto libre si ya hay una cédula conocida para ese nombre
+    if (hid.value !== inp.value) {
+      var cedKnown = (typeof LIDERES_CEDULA !== 'undefined' && LIDERES_CEDULA[inp.value])
+                     || (typeof _selectedCedulas !== 'undefined' && _selectedCedulas[inp.value]);
+      if (cedKnown) {
+        hid.value = inp.value;
+        if (onUpdate) onUpdate();
+      } else {
+        // Revertir al valor confirmado si no tiene cédula
+        inp.value = hid.value;
+      }
+    }
+  });
+  inp.addEventListener('focus', function() {
+    if (inp.value.length >= 2 && drop.children.length > 0) drop.style.display = '';
+  });
+}
+
+function _globalMakeRow(nombre, pct) {
+  var row = document.createElement('div');
+  row.className = 'mo-multi-row';
+
+  var wrap = document.createElement('div');
+  wrap.className = 'mo-search-wrap';
+
+  var inp = document.createElement('input');
+  inp.type = 'text'; inp.className = 'mo-search-input';
+  inp.placeholder = 'Nombre o Cédula (Cxxxxxxxxx)';
+  inp.autocomplete = 'off'; inp.value = nombre || '';
+
+  var hid = document.createElement('input');
+  hid.type = 'hidden'; hid.className = 'mo-search-value'; hid.value = nombre || '';
+
+  var drop = document.createElement('div');
+  drop.className = 'mo-ac-dropdown'; drop.style.display = 'none';
+
+  wrap.appendChild(inp); wrap.appendChild(hid); wrap.appendChild(drop);
+  _acAttach(inp, hid, drop, _globalUpdate);
+
+  var pctInp = document.createElement('input');
+  pctInp.type = 'number'; pctInp.min = 0; pctInp.max = 100; pctInp.step = 1;
+  pctInp.value = (pct !== undefined && pct !== '') ? pct : '';
+  pctInp.placeholder = '%';
+  pctInp.style.cssText = 'width:56px;padding:5px 8px;border:1.5px solid #81c784;border-radius:5px;font-size:0.85rem;font-weight:700;text-align:center;';
+  pctInp.addEventListener('input', _globalUpdate);
+
+  var pctLbl = document.createElement('span');
+  pctLbl.textContent = '%'; pctLbl.style.cssText = 'font-size:0.8rem;color:#555;';
+
+  var rmBtn = document.createElement('button');
+  rmBtn.type = 'button'; rmBtn.className = 'btn-remove-lider'; rmBtn.innerHTML = '✕'; rmBtn.title = 'Quitar';
+  rmBtn.addEventListener('click', function() { row.remove(); _globalUpdate(); });
+
+  row.appendChild(wrap); row.appendChild(pctInp); row.appendChild(pctLbl); row.appendChild(rmBtn);
+  return row;
+}
+
+function _globalReadSplits() {
+  var container = document.getElementById('mo-global-multi-rows');
+  if (!container) return [];
+  var out = [];
+  container.querySelectorAll('.mo-multi-row').forEach(function(row) {
+    var hid    = row.querySelector('.mo-search-value');
+    var pctInp = row.querySelector('input[type="number"]');
+    var nombre = hid ? hid.value.trim() : '';
+    var pct    = parseFloat((pctInp && pctInp.value) || 0) || 0;
+    if (nombre) out.push({nombre: nombre, pct: pct});
+  });
+  return out;
+}
+
+function _globalUpdate() {
+  var rows  = _globalReadSplits();
+  var total = rows.reduce(function(s, r) { return s + r.pct; }, 0);
+  var el    = document.getElementById('mo-global-multi-total');
+  if (!el) return;
+  var ok = Math.abs(total - 100) < 0.5;
+  el.textContent = 'Total: ' + total.toFixed(1) + '%' + (ok ? ' ✓' : '');
+  el.className   = 'mo-multi-total ' + (ok ? 'ok' : 'err');
+}
+
+function _globalAddRow() {
+  var container = document.getElementById('mo-global-multi-rows');
+  if (container) { container.appendChild(_globalMakeRow('', '')); _globalUpdate(); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Algoritmo greedy de distribución
+// ══════════════════════════════════════════════════════════════════════════════
+
+function calcularDistribucion() {
+  if (typeof MO_ITEMS === 'undefined' || !MO_ITEMS.length) {
+    alert('No hay filas MO liquidables.'); return;
+  }
+  var splits = _globalReadSplits();
+  if (!splits.length) { alert('Agrega al menos un líder al panel.'); return; }
+  var totalPct = splits.reduce(function(s, r) { return s + r.pct; }, 0);
+  if (Math.abs(totalPct - 100) > 1.5) {
+    alert('Los porcentajes deben sumar 100% (ahora: ' + totalPct.toFixed(1) + '%).'); return;
+  }
+
+  var totalValor = MO_ITEMS.reduce(function(s, it) { return s + it.valor; }, 0);
+  var targets = splits.map(function(s) {
+    return {nombre: s.nombre, target: totalValor * s.pct / 100, asignado: 0, pct: s.pct};
+  });
+
+  // Todos los items van al pool libre — el usuario configuró un panel de porcentajes
+  // y quiere que el greedy distribuya el 100% de las prestaciones, sin bloquear
+  // por el líder detectado en bandeja (que solo sirve como sugerencia inicial).
+  var libres = MO_ITEMS.slice();
+
+  // Greedy: asignar filas libres al target con mayor déficit
+  var asignaciones = {};
+  libres.slice().sort(function(a, b) { return b.valor - a.valor; }).forEach(function(item) {
+    var mejor = targets.reduce(function(best, t) {
+      return (t.target - t.asignado) > (best.target - best.asignado) ? t : best;
+    });
+    asignaciones[item.idx] = mejor.nombre;
+    mejor.asignado += item.valor;
+  });
+
+  // Aplicar al dropdown y al hidden input de cada fila
+  Object.keys(asignaciones).forEach(function(idx) {
+    var nombre = asignaciones[idx];
+    var sel = document.getElementById('mo-lider-sel-' + idx);
+    if (sel) {
+      if (!sel.querySelector('option[value="' + CSS.escape(nombre) + '"]')) {
+        var opt = document.createElement('option');
+        opt.value = nombre; opt.textContent = nombre;
+        sel.insertBefore(opt, sel.firstChild);
+      }
+      sel.value = nombre;
+    }
+    syncHidden(parseInt(idx), nombre);
+  });
+
+  mostrarResumen(targets, totalValor);
+}
+
+function syncHidden(idx, value) {
+  var hid = document.getElementById('mo-lider-hid-' + idx);
+  if (hid) hid.value = value;
+  var ced = document.getElementById('mo-lider-ced-' + idx);
+  if (ced) {
+    ced.value = (typeof LIDERES_CEDULA !== 'undefined' && LIDERES_CEDULA[value])
+                || (typeof _selectedCedulas !== 'undefined' && _selectedCedulas[value])
+                || '';
+  }
+}
+
+function mostrarResumen(targets, total) {
+  var el = document.getElementById('mo-distrib-summary');
+  if (!el) return;
+  var html = '<strong>Distribución resultante:</strong><br>';
+  targets.forEach(function(t) {
+    var realPct = total > 0 ? (t.asignado / total * 100) : 0;
+    var diff    = Math.abs(realPct - t.pct);
+    var color   = diff < 3 ? '#2e7d32' : (diff < 8 ? '#b26a00' : '#c62828');
+    var nombre  = t.nombre.split(' ')[0];
+    html += '<span style="color:' + color + ';margin-right:16px;">' +
+            nombre + ': objetivo ' + t.pct.toFixed(1) + '% → real ' + realPct.toFixed(1) + '%</span>';
+  });
+  el.innerHTML = html; el.style.display = '';
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Init panel + selección de filas
+// ══════════════════════════════════════════════════════════════════════════════
+
+function initGlobalPanel() {
+  if (typeof TODOS_LIDERES === 'undefined' || !TODOS_LIDERES.length) return;
+  var container = document.getElementById('mo-global-multi-rows');
+  if (!container || container.children.length > 0) return;
+  var init = [];
+
+  // Si el Excel trae una distribución explícita (hoja LIQUIDACION o sección
+  // DISTRIBUCIÓN en la hoja de MO), usarla directamente — sigue siendo editable.
+  if (typeof DISTRIBUCION_EXCEL !== 'undefined' && DISTRIBUCION_EXCEL.length >= 1) {
+    DISTRIBUCION_EXCEL.forEach(function(d) {
+      init.push({nombre: d.nombre, pct: d.pct});
+    });
+    var nota = document.createElement('div');
+    nota.style.cssText = 'font-size:0.78rem;color:#7b1fa2;margin-top:4px;';
+    nota.textContent = '✦ Distribución cargada del Excel (' +
+                       DISTRIBUCION_EXCEL.length + ' líder' +
+                       (DISTRIBUCION_EXCEL.length !== 1 ? 'es' : '') +
+                       ') — puedes editarla antes de calcular.';
+    container.parentNode.insertBefore(nota, container);
+  } else {
+    // Fallback: dos primeros líderes al 50% cada uno
+    if (TODOS_LIDERES.length >= 1) init.push({nombre: TODOS_LIDERES[0], pct: 50});
+    if (TODOS_LIDERES.length >= 2) init.push({nombre: TODOS_LIDERES[1], pct: 50});
+  }
+
+  init.forEach(function(s) { container.appendChild(_globalMakeRow(s.nombre, s.pct)); });
+  _globalUpdate();
+}
+
+function toggleAll(master) {
+  document.querySelectorAll('.chk-mo').forEach(function(c) {
+    // Solo marcar visibles (no ocultar ya-liquidadas si modo-rep está inactivo)
+    if (c.style.display !== 'none') c.checked = master.checked;
+  });
+  actualizarContador();
+}
+document.querySelectorAll('.chk-mo').forEach(function(c) { c.addEventListener('change', actualizarContador); });
+function actualizarContador() {
+  var n   = document.querySelectorAll('.chk-mo:checked').length;
+  var lbl = document.getElementById('lbl-seleccionadas');
+  var btn = document.getElementById('btn-liquidar');
+  if (lbl) lbl.textContent = n + ' seleccionada' + (n !== 1 ? 's' : '');
+  if (btn) btn.disabled = (n === 0 || !window._browserActivo);
+  if (typeof actualizarCombinado === 'function') actualizarCombinado();
+}
+
+var _modoRepeticion = false;
+function toggleModoRepeticion() {
+  _modoRepeticion = !_modoRepeticion;
+  var btnRep  = document.getElementById('btn-modo-rep');
+  var hidFlag = document.getElementById('omitir-ya-liquidadas-val');
+  var hint    = document.getElementById('modo-rep-hint');
+
+  if (_modoRepeticion) {
+    if (btnRep)  { btnRep.classList.add('activo'); btnRep.textContent = '⚠ Modo repetición ACTIVO — Desactivar'; }
+    if (hidFlag) hidFlag.value = '1';
+    if (hint)    hint.style.display = '';
+    // Repetible (mes anterior): checkboxes naranjas — display explícito para vencer la clase CSS
+    document.querySelectorAll('.chk-ya-liquidada').forEach(function(c) {
+      c.style.display = 'inline-block';
+      c.addEventListener('change', actualizarContador);
+    });
+    document.querySelectorAll('.sel-ya-liquidada').forEach(function(s) { s.style.display = 'inline-block'; });
+    document.querySelectorAll('tr.fila-ya-liquidada').forEach(function(r) { r.classList.add('modo-rep-visible'); });
+    // Repetible sumable: checkboxes rosas
+    document.querySelectorAll('.chk-rep-sumable').forEach(function(c) {
+      c.style.display = 'inline-block';
+      c.addEventListener('change', actualizarContador);
+    });
+    document.querySelectorAll('.sel-rep-sumable').forEach(function(s) { s.style.display = 'inline-block'; });
+    document.querySelectorAll('tr.fila-rep-sumable').forEach(function(r) { r.classList.add('modo-rep-visible'); });
+    document.querySelectorAll('.rep-lider-label').forEach(function(s) { s.style.display = 'none'; });
+  } else {
+    if (btnRep)  { btnRep.classList.remove('activo'); btnRep.textContent = '⚠ Modo repetición'; }
+    if (hidFlag) hidFlag.value = '0';
+    if (hint)    hint.style.display = 'none';
+    // Ocultar y desmarcar ambos tipos
+    document.querySelectorAll('.chk-ya-liquidada').forEach(function(c) { c.checked = false; c.style.display = 'none'; });
+    document.querySelectorAll('.sel-ya-liquidada').forEach(function(s) { s.style.display = 'none'; });
+    document.querySelectorAll('tr.fila-ya-liquidada').forEach(function(r) { r.classList.remove('modo-rep-visible'); });
+    document.querySelectorAll('.chk-rep-sumable').forEach(function(c) { c.checked = false; c.style.display = 'none'; });
+    document.querySelectorAll('.sel-rep-sumable').forEach(function(s) { s.style.display = 'none'; });
+    document.querySelectorAll('tr.fila-rep-sumable').forEach(function(r) { r.classList.remove('modo-rep-visible'); });
+    document.querySelectorAll('.rep-lider-label').forEach(function(s) { s.style.display = ''; });
+  }
+  actualizarContador();
+}
+function marcarTodasRepetibles() {
+  document.querySelectorAll('.chk-ya-liquidada, .chk-rep-sumable').forEach(function(c) {
+    c.checked = true;
+  });
+  actualizarContador();
+}
+function desmarcarTodasRepetibles() {
+  document.querySelectorAll('.chk-ya-liquidada, .chk-rep-sumable').forEach(function(c) {
+    c.checked = false;
+  });
+  actualizarContador();
+}
+function _descFilaMo(d) {
+  return 'Fila ' + (d.fila || '?') + (d.nodo ? ' · nodo ' + d.nodo : '') + (d.cod ? ' · ' + d.cod : '');
+}
+// Filas MO marcadas sin líder. Lo que se ve en el select es lo que se liquida:
+// si el hidden quedó distinto del select, se alinea con el select. Una fila
+// sin líder hace que el servidor rechace el lote ENTERO, así que se frena aquí.
+function _filasMoSinLider() {
+  var faltan = [];
+  document.querySelectorAll('.chk-mo:checked').forEach(function(chk) {
+    var idx = chk.value;
+    var sel = document.getElementById('mo-lider-sel-' + idx);
+    var hid = document.getElementById('mo-lider-hid-' + idx);
+    if (sel && hid && sel.value && hid.value !== sel.value) syncHidden(idx, sel.value);
+    if (!hid || !hid.value.trim()) faltan.push(_descFilaMo(chk.dataset || {}));
+  });
+  return faltan;
+}
+function _alertaSinLider(faltan) {
+  alert('⚠ Estas filas no tienen líder asignado. Elígelo en la columna «Líder asignado» ' +
+        '(o desmárcalas) antes de liquidar:\n\n' + faltan.join('\n'));
+}
+function confirmarLiquidar() {
+  var sinLider = _filasMoSinLider();
+  if (sinLider.length) {
+    _alertaSinLider(sinLider);
+    return false;
+  }
+  var n = document.querySelectorAll('.chk-mo:checked').length;
+  var msg = 'Liquidar ' + n + ' actividad(es) MO en SGS?\n\nSe abrirá el navegador Playwright. No cerrar hasta que termine.';
+  if (typeof NODOS_FALTANTES !== 'undefined' && NODOS_FALTANTES.length > 0) {
+    msg += '\n\n⚠ ATENCIÓN — Los siguientes nodos aún no están creados en SGS:\n  ' +
+           NODOS_FALTANTES.join(', ') +
+           '\n\nSus filas no se liquidarán. ¿Continuar con los nodos disponibles?';
+  }
+  return confirm(msg);
+}
+// ── IA inline ──────────────────────────────────────────────────────────────
+var _iaParsed            = {};  // nodo → {partner_nombre, partner_cedula, lider_ia, score}
+var _iaExtraCedulas      = {};  // nombre_sgs → cedula (líderes encontrados en SGS, no en sesión)
+var _iaMode              = 'nodo';   // 'nodo', 'equitativo' o 'prestacion'
+var _iaLideresEquitativo = [];       // [{lider_ia, nombre, cedula, score}] para modo equitativo
+var _iaPrestacionAsigs   = [];       // [{nodo, codigo, cant, lideres:[...]}] para modo prestación
+var _iaPrestacionLideres = {};       // LIDER_IA (upper) → {nombre, cedula} resuelto/corregido
+
+function toggleIAPanel() {
+  var p = document.getElementById('ia-panel-inline');
+  if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function interpretarConIA() {
+  var texto = (document.getElementById('ia-texto') || {}).value || '';
+  if (!texto.trim()) { alert('Pega el texto primero.'); return; }
+  var estado = document.getElementById('ia-estado');
+  if (estado) { estado.textContent = 'Consultando IA…'; estado.style.color = '#7b1fa2'; }
+  document.getElementById('ia-resultado-box').style.display = 'none';
+
+  fetch('{{ url_for("liquidador2.ia_parsear", sid=sid) }}', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({texto: texto})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (!data.ok) {
+      if (estado) { estado.textContent = 'Error: ' + data.error; estado.style.color = '#c62828'; }
+      return;
+    }
+    _iaMode         = data.mode || 'nodo';
+    _iaExtraCedulas = data.extra_cedulas || {};
+    var tbody = document.getElementById('ia-tabla-body');
+    tbody.innerHTML = '';
+
+    // ── Actualizar cabecera de tabla según el modo ──
+    var thead = document.querySelector('#ia-tabla-result thead tr');
+    if (thead) {
+      if (_iaMode === 'equitativo') {
+        thead.innerHTML =
+          '<th style="padding:6px 10px;text-align:left;">IA interpretó</th>' +
+          '<th style="padding:6px 10px;text-align:left;">Líder SGS</th>' +
+          '<th style="padding:6px 10px;text-align:left;">Cédula</th>' +
+          '<th style="padding:6px 10px;text-align:left;">Confianza</th>' +
+          '<th style="padding:6px 10px;text-align:right;">%</th>' +
+          '<th style="padding:6px 10px;text-align:right;">Materiales</th>';
+      } else if (_iaMode === 'prestacion') {
+        thead.innerHTML =
+          '<th style="padding:6px 10px;text-align:left;">Interpretado</th>' +
+          '<th style="padding:6px 10px;text-align:left;">Líder SGS</th>' +
+          '<th style="padding:6px 10px;text-align:left;">Cédula</th>' +
+          '<th style="padding:6px 10px;text-align:left;">Confianza</th>' +
+          '<th style="padding:6px 10px;text-align:right;">Filas</th>';
+      } else {
+        thead.innerHTML =
+          '<th style="padding:6px 10px;text-align:left;">Nodo</th>' +
+          '<th style="padding:6px 10px;text-align:left;">IA interpretó</th>' +
+          '<th style="padding:6px 10px;text-align:left;">Líder SGS</th>' +
+          '<th style="padding:6px 10px;text-align:left;">Cédula</th>' +
+          '<th style="padding:6px 10px;text-align:left;">Confianza</th>';
+      }
+    }
+
+    if (_iaMode === 'prestacion') {
+      // ── Modo prestación: (nodo, código QP) → líder(es) explícitos ──
+      _iaPrestacionAsigs   = data.asignaciones || [];
+      _iaPrestacionLideres = {};
+      (data.lideres || []).forEach(function(l) {
+        _iaPrestacionLideres[l.lider_ia.toUpperCase()] = {nombre: l.nombre, cedula: l.cedula};
+      });
+      // Cruce contra las filas MO de la planilla
+      var _normN = function(n) { return String(n||'').trim().toUpperCase().replace(/^0+(?=\d)/, ''); };
+      var clavesMO = {};
+      (MO_ITEMS || []).forEach(function(it) {
+        clavesMO[_normN(it.pro) + '|' + String(it.cod||'').toUpperCase()] = true;
+      });
+      var enPlanilla = _iaPrestacionAsigs.filter(function(a) {
+        return clavesMO[_normN(a.nodo) + '|' + a.codigo];
+      }).length;
+      var fuera = _iaPrestacionAsigs.length - enPlanilla;
+      var grupos = _iaPrestacionAsigs.some(function(a) { return (a.lideres||[]).length > 1; });
+      if (estado) {
+        estado.textContent = 'Por prestación (' + (data.fuente === 'tabla' ? 'tabla detectada' : 'IA') + '): ' +
+          _iaPrestacionAsigs.length + ' filas interpretadas, ' + enPlanilla + ' coinciden con la planilla' +
+          (fuera ? ' (' + fuera + ' no están en MO — se omiten)' : '') +
+          (grupos ? '. Filas con varios líderes se reparten entre ellos (round-robin).' : '.');
+        estado.style.color = enPlanilla ? '#2e7d32' : '#c62828';
+      }
+      (data.lideres || []).forEach(function(l, i) {
+        var key   = l.lider_ia.toUpperCase();
+        var color = l.score >= 80 ? '#2e7d32' : (l.score >= 50 ? '#b26a00' : '#c62828');
+        var tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid #e1bee7';
+        if (!l.nombre) tr.style.background = '#fff8f8';
+        tr.innerHTML =
+          '<td style="padding:6px 10px;color:#555;font-size:0.82rem;">' + _esc(l.lider_ia) + '</td>' +
+          '<td class="ia-ac-cell" style="padding:4px 8px;position:relative;min-width:220px;"></td>' +
+          '<td style="padding:6px 10px;font-family:monospace;font-size:0.8rem;color:#555;" ' +
+               'id="ia-pres-ced-' + i + '">' + _esc(l.cedula || (l.nombre ? '—' : '')) + '</td>' +
+          '<td style="padding:6px 10px;font-weight:700;color:' + color + ';" ' +
+               'id="ia-pres-score-' + i + '">' + l.score + '%</td>' +
+          '<td style="padding:6px 10px;text-align:right;font-weight:700;color:#1565c0;">' +
+               (l.filas || 0) + '</td>';
+        var liderCell = tr.querySelector('.ia-ac-cell');
+        var inp = document.createElement('input');
+        inp.type = 'text';
+        inp.value = l.nombre || '';
+        inp.placeholder = l.nombre ? '' : 'Buscar nombre o C0000000…';
+        inp.autocomplete = 'off';
+        inp.style.cssText = 'width:100%;box-sizing:border-box;padding:4px 6px;font-size:0.85rem;' +
+          'border:1px solid ' + (l.nombre ? '#ce93d8' : '#e53935') + ';border-radius:4px;';
+        var hid = document.createElement('input');
+        hid.type = 'hidden';
+        hid.value = l.nombre || '';
+        var drop = document.createElement('div');
+        drop.style.cssText = 'display:none;position:absolute;top:100%;left:0;right:0;' +
+          'background:#fff;border:1px solid #ce93d8;border-radius:4px;z-index:300;' +
+          'max-height:180px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.18);';
+        liderCell.appendChild(inp);
+        liderCell.appendChild(hid);
+        liderCell.appendChild(drop);
+        (function(key, i) {
+          _acAttach(inp, hid, drop, function() {
+            var nombre = hid.value;
+            var cedula = (_selectedCedulas && _selectedCedulas[nombre])
+                         || (LIDERES_CEDULA && LIDERES_CEDULA[nombre])
+                         || _iaExtraCedulas[nombre] || '';
+            _iaPrestacionLideres[key] = {nombre: nombre, cedula: cedula};
+            inp.style.borderColor = nombre ? '#ce93d8' : '#e53935';
+            var cedEl = document.getElementById('ia-pres-ced-' + i);
+            if (cedEl) cedEl.textContent = cedula || '—';
+            var scoreEl = document.getElementById('ia-pres-score-' + i);
+            if (scoreEl && nombre) { scoreEl.style.color = '#2e7d32'; scoreEl.textContent = '✓ Manual'; }
+          });
+        })(key, i);
+        tbody.appendChild(tr);
+      });
+      var btnAplicarPres = document.querySelector('[onclick="aplicarIAParsed()"]');
+      if (btnAplicarPres) btnAplicarPres.disabled = !enPlanilla;
+
+    } else if (_iaMode === 'equitativo') {
+      // ── Modo equitativo: preview con % editables y recálculo en tiempo real ──
+      _iaLideresEquitativo = data.lideres || [];
+      var total = MO_ITEMS ? MO_ITEMS.length : 0;
+      var n     = _iaLideresEquitativo.length;
+      if (estado) {
+        estado.textContent = 'Distribución: ' + n + ' líder(es) para ' + total + ' materiales. Ajusta los % si quieres.';
+        estado.style.color = '#2e7d32';
+      }
+      _iaLideresEquitativo.forEach(function(l, i) {
+        var color = l.score >= 80 ? '#2e7d32' : (l.score >= 50 ? '#b26a00' : '#c62828');
+        var tr = document.createElement('tr');
+        tr.dataset.liderIdx = i;
+        tr.style.borderBottom = '1px solid #e1bee7';
+        if (!l.nombre) tr.style.background = '#fff8f8';
+        tr.innerHTML =
+          '<td style="padding:6px 10px;color:#555;font-size:0.82rem;">' + _esc(l.lider_ia) + '</td>' +
+          '<td style="padding:6px 10px;font-weight:600;">' + _esc(l.nombre || '⚠ No encontrado') + '</td>' +
+          '<td style="padding:6px 10px;font-family:monospace;font-size:0.8rem;color:#555;">' + _esc(l.cedula || '—') + '</td>' +
+          '<td style="padding:6px 10px;font-weight:700;color:' + color + ';">' + l.score + '%</td>' +
+          '<td style="padding:4px 8px;">' +
+            '<input type="number" min="0" max="100" step="0.5" ' +
+                   'id="ia-pct-' + i + '" value="' + (l.pct || 0) + '" ' +
+                   'style="width:64px;padding:3px 5px;font-size:0.88rem;text-align:right;' +
+                          'border:1px solid #ce93d8;border-radius:4px;font-weight:700;">' +
+            '<span style="margin-left:2px;font-size:0.82rem;color:#666;">%</span>' +
+          '</td>' +
+          '<td style="padding:6px 10px;text-align:right;font-weight:700;color:#1565c0;" ' +
+               'id="ia-cnt-' + i + '">—</td>';
+        tbody.appendChild(tr);
+      });
+      // Fila de totales
+      var trTot = document.createElement('tr');
+      trTot.style.cssText = 'background:#f3e5f5;font-weight:700;border-top:2px solid #ce93d8;';
+      trTot.innerHTML =
+        '<td colspan="4" style="padding:6px 10px;text-align:right;font-size:0.85rem;">Total:</td>' +
+        '<td style="padding:4px 8px;" id="ia-pct-total-cell"></td>' +
+        '<td style="padding:6px 10px;text-align:right;" id="ia-cnt-total">—</td>';
+      tbody.appendChild(trTot);
+      // Función de recálculo conectada a los inputs
+      function _recalcEquitativo() {
+        var total2 = MO_ITEMS ? MO_ITEMS.length : 0;
+        var pcts = [], sumPct = 0;
+        _iaLideresEquitativo.forEach(function(_, i) {
+          var v = parseFloat(document.getElementById('ia-pct-' + i).value) || 0;
+          _iaLideresEquitativo[i].pct = v;
+          pcts.push(v);
+          sumPct += v;
+        });
+        var counts = _calcMaterialesPorPct(pcts, total2);
+        counts.forEach(function(c, i) {
+          var el = document.getElementById('ia-cnt-' + i);
+          if (el) el.textContent = c + ' mat.';
+        });
+        // Total
+        var cell = document.getElementById('ia-pct-total-cell');
+        var cellCnt = document.getElementById('ia-cnt-total');
+        var ok = Math.abs(sumPct - 100) < 0.01;
+        if (cell) {
+          cell.innerHTML = '<span style="color:' + (ok ? '#2e7d32' : '#c62828') + ';font-size:0.88rem;padding:3px 6px;">' +
+                           sumPct.toFixed(1) + '%' + (ok ? ' ✓' : ' ⚠') + '</span>';
+        }
+        if (cellCnt) cellCnt.textContent = total2 + ' mat.';
+        // Habilitar/deshabilitar botón Aplicar
+        var btn = document.querySelector('[onclick="aplicarIAParsed()"]');
+        if (btn) btn.disabled = !ok;
+      }
+      // Enlazar inputs
+      _iaLideresEquitativo.forEach(function(_, i) {
+        var inp = document.getElementById('ia-pct-' + i);
+        if (inp) inp.addEventListener('input', _recalcEquitativo);
+      });
+      _recalcEquitativo();
+
+    } else {
+      // ── Modo nodo: un nodo puede traer VARIOS líderes (fila por líder, k/n) ──
+      // "Nodo 2: líder A" + "Nodo 2 al 6: líder B" → nodo 2 con dos líderes; sus
+      // prestaciones se reparten entre ellos por valor al aplicar (_aplicarNodoMultiIA).
+      _iaParsed = {};
+      _iaParsedMulti = {};
+      (data.asignaciones || []).forEach(function(a) {
+        var info = {partner_nombre: a.nombre, partner_cedula: a.cedula,
+                    lider_ia: a.lider_ia, score: a.score};
+        if (!_iaParsedMulti[a.nodo]) { _iaParsedMulti[a.nodo] = []; _iaParsed[a.nodo] = info; }
+        _iaParsedMulti[a.nodo].push(info);
+      });
+      var nNodos = Object.keys(_iaParsedMulti).length;
+      var nMulti = Object.keys(_iaParsedMulti).filter(function(n) { return _iaParsedMulti[n].length > 1; }).length;
+      if (estado) {
+        var fuenteTxt = data.fuente === 'lineas' ? 'leído directo del texto, sin IA'
+                                                 : ('IA ' + (data.proveedor || ''));
+        estado.textContent = nNodos + ' nodo(s) detectados (' + fuenteTxt + ')' +
+          (nMulti ? ' · ' + nMulti + ' con varios líderes: sus prestaciones se reparten entre ellos por valor.' : '.') +
+          (data.aviso ? ' ' + data.aviso : '');
+        estado.style.color = '#2e7d32';
+      }
+      (data.asignaciones || []).forEach(function(a) {
+        var k   = a.k || 0;
+        var rid = String(a.nodo).replace(/[^A-Za-z0-9]/g, '_') + '-' + k;
+        var color = a.score >= 80 ? '#2e7d32' : (a.score >= 50 ? '#b26a00' : '#c62828');
+        var enExcel = a.en_nodos ? '' : '<span style="color:#f57c00;font-size:0.75rem;margin-left:4px;">no en Excel</span>';
+        var multi = (a.n_lideres || 1) > 1
+          ? '<span style="color:#6a1b9a;font-size:0.72rem;margin-left:6px;font-weight:600;">líder ' + (k + 1) + ' de ' + a.n_lideres + '</span>'
+          : '';
+        var cedDisplay = a.cedula || (a.nombre ? '—' : '');
+
+        var tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid #e1bee7';
+        if (!a.nombre) tr.style.background = '#fff8f8';
+        if (k > 0) tr.style.background = a.nombre ? '#faf5fc' : '#fff8f8';
+        tr.innerHTML =
+          '<td style="padding:6px 10px;font-weight:700;">' + (k === 0 ? a.nodo : '<span style="color:#aaa;">' + a.nodo + '</span>') + enExcel + multi + '</td>' +
+          '<td style="padding:6px 10px;color:#555;font-size:0.82rem;">' + _esc(a.lider_ia) + '</td>' +
+          '<td class="ia-ac-cell" style="padding:4px 8px;position:relative;min-width:220px;"></td>' +
+          '<td style="padding:6px 10px;font-family:monospace;font-size:0.8rem;color:#555;" ' +
+               'id="ia-ced-' + rid + '">' + _esc(cedDisplay) + '</td>' +
+          '<td style="padding:6px 10px;font-weight:700;color:' + color + ';" ' +
+               'id="ia-score-' + rid + '">' + a.score + '%</td>';
+
+        var liderCell = tr.querySelector('.ia-ac-cell');
+        var inp = document.createElement('input');
+        inp.type = 'text';
+        inp.value = a.nombre || '';
+        inp.placeholder = a.nombre ? '' : 'Buscar nombre o C0000000…';
+        inp.autocomplete = 'off';
+        inp.style.cssText = 'width:100%;box-sizing:border-box;padding:4px 6px;font-size:0.85rem;' +
+          'border:1px solid ' + (a.nombre ? '#ce93d8' : '#e53935') + ';border-radius:4px;';
+        var hid = document.createElement('input');
+        hid.type = 'hidden';
+        hid.value = a.nombre || '';
+        var drop = document.createElement('div');
+        drop.style.cssText = 'display:none;position:absolute;top:100%;left:0;right:0;' +
+          'background:#fff;border:1px solid #ce93d8;border-radius:4px;z-index:300;' +
+          'max-height:180px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.18);';
+        liderCell.appendChild(inp);
+        liderCell.appendChild(hid);
+        liderCell.appendChild(drop);
+
+        (function(nodo, k, rid) {
+          _acAttach(inp, hid, drop, function() {
+            var nombre = hid.value;
+            var cedula = (_selectedCedulas && _selectedCedulas[nombre])
+                         || (LIDERES_CEDULA && LIDERES_CEDULA[nombre])
+                         || _iaExtraCedulas[nombre] || '';
+            var reg = (_iaParsedMulti[nodo] || [])[k];
+            if (reg) { reg.partner_nombre = nombre; reg.partner_cedula = cedula; }
+            if (k === 0 && _iaParsed[nodo]) {
+              _iaParsed[nodo].partner_nombre = nombre;
+              _iaParsed[nodo].partner_cedula = cedula;
+            }
+            inp.style.borderColor = nombre ? '#ce93d8' : '#e53935';
+            var cedEl = document.getElementById('ia-ced-' + rid);
+            if (cedEl) cedEl.textContent = cedula || '—';
+            var scoreEl = document.getElementById('ia-score-' + rid);
+            if (scoreEl && nombre) {
+              scoreEl.style.color = '#2e7d32';
+              scoreEl.textContent = '✓ Manual';
+            }
+          });
+        })(a.nodo, k, rid);
+
+        tbody.appendChild(tr);
+      });
+    }
+    document.getElementById('ia-resultado-box').style.display = 'block';
+  })
+  .catch(function(e) {
+    if (estado) { estado.textContent = 'Error de red: ' + e; estado.style.color = '#c62828'; }
+  });
+}
+
+function _esc(s) { return (s || '').replace(/"/g, '&quot;'); }
+
+// Distribuye `total` enteros según array de porcentajes; método largest-remainder para que sumen exacto.
+function _calcMaterialesPorPct(pcts, total) {
+  var exact = pcts.map(function(p) { return total * p / 100; });
+  var floors = exact.map(Math.floor);
+  var rems   = exact.map(function(v, i) { return v - floors[i]; });
+  var asig   = floors.reduce(function(a, b) { return a + b; }, 0);
+  var left   = total - asig;
+  var idxs   = rems.map(function(_, i) { return i; }).sort(function(a, b) { return rems[b] - rems[a]; });
+  for (var k = 0; k < left; k++) floors[idxs[k]]++;
+  return floors;
+}
+
+function _aplicarEquitativoIA() {
+  var lideres = (_iaLideresEquitativo || []).filter(function(l) { return l.nombre; });
+  if (!lideres.length || !MO_ITEMS || !MO_ITEMS.length) return;
+  var n     = lideres.length;
+  var total = MO_ITEMS.length;
+  // Leer pcts actuales de los inputs (el usuario puede haberlos editado)
+  var pcts = lideres.map(function(l, i) {
+    var inp = document.getElementById('ia-pct-' + i);
+    return inp ? (parseFloat(inp.value) || 0) : (l.pct || 0);
+  });
+  var counts = _calcMaterialesPorPct(pcts, total);
+  // Asignar por bloques: primeros counts[0] items → lideres[0], etc.
+  var mapaGuardar = {};
+  var offset = 0;
+  counts.forEach(function(c, li) {
+    var lider = lideres[li];
+    for (var j = 0; j < c; j++) {
+      var item = MO_ITEMS[offset + j];
+      if (!item) continue;
+      var nombre = lider.nombre;
+      var cedula = lider.cedula
+                   || (_iaExtraCedulas && _iaExtraCedulas[nombre])
+                   || (LIDERES_CEDULA && LIDERES_CEDULA[nombre]) || '';
+      var sel = document.getElementById('mo-lider-sel-' + item.idx);
+      if (sel) {
+        if (!Array.from(sel.options).some(function(o) { return o.value === nombre; })) {
+          var opt = document.createElement('option');
+          opt.value = nombre; opt.textContent = nombre;
+          sel.insertBefore(opt, sel.firstChild);
+        }
+        sel.value = nombre;
+      }
+      var hid = document.getElementById('mo-lider-hid-' + item.idx);
+      if (hid) hid.value = nombre;
+      var hidCed = document.getElementById('mo-lider-ced-' + item.idx);
+      if (hidCed) hidCed.value = cedula;
+      mapaGuardar['IDX:' + item.idx] = {partner_nombre: nombre, partner_cedula: cedula};
+    }
+    offset += c;
+  });
+  fetch('{{ url_for("liquidador2.ia_guardar", sid=sid) }}', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(mapaGuardar)
+  });
+  // Banner equitativo
+  var banner = document.getElementById('ia-banner');
+  var txt    = document.getElementById('ia-banner-txt');
+  var det    = document.getElementById('ia-banner-detail');
+  if (banner) {
+    banner.style.display = 'flex';
+    if (txt) txt.textContent = 'Distribución IA activa (' + n + ' líderes, ' + total + ' materiales)';
+    if (det) det.textContent = lideres.map(function(l, i) {
+      return l.nombre + ' (' + counts[i] + ')';
+    }).join(' · ');
+  }
+}
+
+function _aplicarPrestacionIA() {
+  if (!_iaPrestacionAsigs.length || !MO_ITEMS || !MO_ITEMS.length) return;
+  var normN = function(n) { return String(n||'').trim().toUpperCase().replace(/^0+(?=\d)/, ''); };
+  var porClave = {};
+  MO_ITEMS.forEach(function(item) {
+    porClave[normN(item.pro) + '|' + String(item.cod||'').toUpperCase()] = item;
+  });
+  var mapaGuardar = {}, conteoLider = {};
+  var aplicados = 0, sinFila = 0, sinLider = 0;
+  _iaPrestacionAsigs.forEach(function(a) {
+    var item = porClave[normN(a.nodo) + '|' + String(a.codigo||'').toUpperCase()];
+    if (!item) { sinFila++; return; }
+    var resueltos = (a.lideres || [])
+      .map(function(l) { return _iaPrestacionLideres[String(l).toUpperCase()]; })
+      .filter(function(r) { return r && r.nombre; });
+    if (!resueltos.length) { sinLider++; return; }
+    var elegido;
+    if (resueltos.length === 1) {
+      elegido = resueltos[0];
+    } else {
+      // Varias personas para la misma fila: la fila entera va al miembro del
+      // grupo con MENOS filas asignadas hasta ahora — balancea incluso cuando
+      // un mismo líder aparece en varios grupos distintos.
+      elegido = resueltos[0];
+      resueltos.forEach(function(r) {
+        if ((conteoLider[r.nombre] || 0) < (conteoLider[elegido.nombre] || 0)) elegido = r;
+      });
+    }
+    var nombre = elegido.nombre;
+    var cedula = elegido.cedula
+                 || (_iaExtraCedulas && _iaExtraCedulas[nombre])
+                 || (LIDERES_CEDULA && LIDERES_CEDULA[nombre]) || '';
+    var sel = document.getElementById('mo-lider-sel-' + item.idx);
+    if (sel) {
+      if (!Array.from(sel.options).some(function(o) { return o.value === nombre; })) {
+        var opt = document.createElement('option');
+        opt.value = nombre; opt.textContent = nombre;
+        sel.insertBefore(opt, sel.firstChild);
+      }
+      sel.value = nombre;
+    }
+    var hid = document.getElementById('mo-lider-hid-' + item.idx);
+    if (hid) hid.value = nombre;
+    var hidCed = document.getElementById('mo-lider-ced-' + item.idx);
+    if (hidCed) hidCed.value = cedula;
+    mapaGuardar['IDX:' + item.idx] = {partner_nombre: nombre, partner_cedula: cedula};
+    conteoLider[nombre] = (conteoLider[nombre] || 0) + 1;
+    aplicados++;
+  });
+  fetch('{{ url_for("liquidador2.ia_guardar", sid=sid) }}', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(mapaGuardar)
+  });
+  var banner = document.getElementById('ia-banner');
+  var txt    = document.getElementById('ia-banner-txt');
+  var det    = document.getElementById('ia-banner-detail');
+  if (banner && aplicados) {
+    banner.style.display = 'flex';
+    if (txt) txt.textContent = 'Asignación IA por prestación activa (' +
+      Object.keys(conteoLider).length + ' líderes, ' + aplicados + ' filas)';
+    if (det) det.textContent = Object.keys(conteoLider).map(function(n) {
+      return n + ' (' + conteoLider[n] + ')';
+    }).join(' · ');
+  }
+  if (sinFila || sinLider) {
+    alert('Aplicadas ' + aplicados + ' filas.' +
+      (sinFila ? '\n' + sinFila + ' fila(s) del texto no están en la planilla MO (ya liquidadas o nodo distinto) — omitidas.' : '') +
+      (sinLider ? '\n' + sinLider + ' fila(s) sin líder resuelto — corrige el nombre en la tabla y vuelve a aplicar.' : ''));
+  }
+}
+
+function aplicarIAParsed() {
+  if (_iaMode === 'prestacion') {
+    _aplicarPrestacionIA();
+  } else if (_iaMode === 'equitativo') {
+    _aplicarEquitativoIA();
+  } else {
+    if (!_aplicarNodoMultiIA()) return;
+  }
+  document.getElementById('ia-panel-inline').style.display = 'none';
+  // Filas que el texto no cubrió (típico: nodos cable como 20AL24 cuando el
+  // texto habla de nodos sueltos) y que tampoco traen líder de SGS: avisar ya,
+  // no al darle Liquidar.
+  var huecos = (MO_ITEMS || []).filter(function(it) {
+    var hid = document.getElementById('mo-lider-hid-' + it.idx);
+    return hid && !hid.value.trim();
+  });
+  if (huecos.length) {
+    alert('La distribución no asignó líder a ' + huecos.length + ' fila(s): su nodo no estaba ' +
+          'en el texto y el proyecto no tiene equipo en SGS. Elígelo a mano en «Líder asignado»:\n\n' +
+          huecos.map(function(it) { return _descFilaMo({fila: it.fila, nodo: it.pro, cod: it.cod}); }).join('\n'));
+  }
+}
+
+var _iaParsedMulti = {};   // nodo → [{partner_nombre, partner_cedula, lider_ia, score}, ...]
+
+function _normNodoIA(n) { return String(n || '').trim().toUpperCase().replace(/^0+(?=\d)/, ''); }
+
+// Modo nodo con soporte de VARIOS líderes por nodo: un nodo con un solo líder
+// se aplica por clave de nodo (como siempre); un nodo con varios reparte sus
+// filas MO entre ellos — cada prestación entera al líder con menos valor
+// acumulado dentro de ese nodo (empate → el que tenga menos filas).
+function _aplicarNodoMultiIA() {
+  var mapa = {}, resumen = [], nodosAplicados = 0, sinFilas = [];
+  Object.keys(_iaParsedMulti).forEach(function(nodo) {
+    var lids = _iaParsedMulti[nodo].filter(function(l) { return l.partner_nombre; });
+    if (!lids.length) return;
+    if (lids.length === 1) {
+      mapa[nodo] = {partner_nombre: lids[0].partner_nombre, partner_cedula: lids[0].partner_cedula};
+      resumen.push('Nodo ' + nodo + ': ' + lids[0].partner_nombre);
+      nodosAplicados++;
+      return;
+    }
+    var filas = (MO_ITEMS || []).filter(function(it) { return _normNodoIA(it.pro) === _normNodoIA(nodo); })
+                  .slice().sort(function(a, b) { return (b.valor || 0) - (a.valor || 0); });
+    if (!filas.length) { sinFilas.push(nodo); return; }
+    var acum = lids.map(function() { return 0; });
+    var cnt  = lids.map(function() { return 0; });
+    filas.forEach(function(it) {
+      var j = 0;
+      for (var i = 1; i < lids.length; i++) {
+        if (acum[i] < acum[j] || (acum[i] === acum[j] && cnt[i] < cnt[j])) j = i;
+      }
+      acum[j] += (it.valor || 0);
+      cnt[j]++;
+      mapa['IDX:' + it.idx] = {partner_nombre: lids[j].partner_nombre, partner_cedula: lids[j].partner_cedula};
+    });
+    resumen.push('Nodo ' + nodo + ': ' + lids.map(function(l, i) {
+      return l.partner_nombre + ' (' + cnt[i] + ')';
+    }).join(' + '));
+    nodosAplicados++;
+  });
+  if (!Object.keys(mapa).length) {
+    alert('Ningún nodo tiene líder resuelto' + (sinFilas.length ? ' o filas MO en la planilla (nodos ' + sinFilas.join(', ') + ').' : '.'));
+    return false;
+  }
+  _aplicarNodoLiderMap(mapa);
+  var cuerpo = Object.assign({}, mapa, {_resumen: resumen});
+  fetch('{{ url_for("liquidador2.ia_guardar", sid=sid) }}', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(cuerpo)
+  });
+  var banner = document.getElementById('ia-banner');
+  var txt    = document.getElementById('ia-banner-txt');
+  var det    = document.getElementById('ia-banner-detail');
+  if (banner) {
+    banner.style.display = 'flex';
+    if (txt) txt.textContent = 'Asignación IA activa (' + nodosAplicados + ' nodos)';
+    if (det) det.textContent = resumen.join(' · ');
+  }
+  if (sinFilas.length) {
+    alert('Nodo(s) ' + sinFilas.join(', ') + ' traen varios líderes pero no tienen filas MO liquidables en la planilla — se omitieron.');
+  }
+  return true;
+}
+
+function aplicarIANodoLider() {
+  if (typeof IA_NODO_LIDER === 'undefined' || !Object.keys(IA_NODO_LIDER).length) return;
+  _aplicarNodoLiderMap(IA_NODO_LIDER);
+}
+
+function _aplicarNodoLiderMap(mapa) {
+  if (!mapa || !Object.keys(mapa).length) return;
+  var aplicados = 0;
+  MO_ITEMS.forEach(function(item, i) {
+    // Soporta claves IDX:{idx} (modo equitativo guardado en sesión) y nodo normal
+    var info = mapa['IDX:' + item.idx]
+             || (String(item.pro || '') ? mapa[String(item.pro)] : null);
+    if (!info) return;
+    var nombre = info.partner_nombre || '';
+    var cedula = info.partner_cedula || (LIDERES_CEDULA && LIDERES_CEDULA[nombre]) || '';
+    if (!nombre) return;
+    var sel = document.getElementById('mo-lider-sel-' + item.idx);
+    if (sel) {
+      if (!Array.from(sel.options).some(function(o) { return o.value === nombre; })) {
+        var opt = document.createElement('option');
+        opt.value = nombre; opt.textContent = nombre;
+        sel.insertBefore(opt, sel.firstChild);
+      }
+      sel.value = nombre;
+    }
+    var hid = document.getElementById('mo-lider-hid-' + item.idx);
+    if (hid) hid.value = nombre;
+    var hidCed = document.getElementById('mo-lider-ced-' + item.idx);
+    if (hidCed) hidCed.value = cedula;
+    aplicados++;
+  });
+  return aplicados;
+}
+
+function _actualizarBannerIA(mapa) {
+  var banner = document.getElementById('ia-banner');
+  var txt    = document.getElementById('ia-banner-txt');
+  var det    = document.getElementById('ia-banner-detail');
+  var nodos  = Object.keys(mapa);
+  if (!banner || !nodos.length) return;
+  banner.style.display = 'flex';
+  if (txt) txt.textContent = 'Asignación IA activa (' + nodos.length + ' nodos)';
+  if (det) {
+    det.textContent = nodos.map(function(n) {
+      return 'Nodo ' + n + ': ' + (mapa[n].partner_nombre || '');
+    }).join(' · ');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof MO_ITEMS !== 'undefined') {
+    initGlobalPanel();
+    if (typeof IA_NODO_LIDER !== 'undefined' && Object.keys(IA_NODO_LIDER).length > 0) {
+      aplicarIANodoLider();
+    }
+  }
+});
+</script>
+{% endif %}
+
+{# ── Tabla MAT ── #}
+{% if checks_mat %}
+{% set mat_liquidables = checks_mat | selectattr('liquidable') | list %}
+<div class="card">
+  <h2>Materiales ({{ checks_mat|length }} filas)</h2>
+
+  <form method="POST" action="{{ url_for('liquidador2.liquidar', sid=sid) }}" id="form-liquidar-mat">
+  <table id="tabla-mat">
+    <thead>
+      <tr>
+        <th style="width:36px;">
+          {% if mat_liquidables %}
+          <input type="checkbox" id="chk-mat-all" title="Seleccionar todas"
+                 onchange="toggleAllMat(this)" style="cursor:pointer;">
+          {% endif %}
+        </th>
+        <th>Nodo</th><th>PRO SGS</th><th>Codigo</th><th>Descripcion</th><th>Lider a liquidar</th>
+        <th>SIP Cant.</th><th>SGS Excel</th><th>SGS Real</th><th>Devuelto</th>
+        <th>Avance UI</th><th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for mc in checks_mat %}
+    {% set mat = mc.mat %}
+    {% set liquidable = mc.liquidable | default(false) %}
+    <tr {% if liquidable %}class="fila-liquidable"{% endif %}>
+      <td>
+        {% if liquidable %}
+        <input type="checkbox" name="idx_mat" value="{{ loop.index0 }}"
+               class="chk-mat" style="cursor:pointer;">
+        {% endif %}
+      </td>
+      <td>{{ mat.nodo }}</td>
+      <td>
+        {% if mc.pro_code %}
+          <span style="font-size:0.8rem;">{{ mc.pro_code }}</span><br>
+          <span style="color:#888;font-size:0.75rem;">{{ mc.pnombre[:40] if mc.pnombre else '' }}</span>
+        {% else %}—{% endif %}
+      </td>
+      <td><strong>{{ mat.codigo }}</strong></td>
+      <td style="font-size:0.8rem;">{{ mat.descripcion[:35] if mat.descripcion else '—' }}</td>
+      <td style="font-size:0.8rem;position:relative;">
+        {% if mc.partner_splits and mc.partner_splits|length == 1 %}
+          {% set midx = loop.index0 %}
+          {% set _lider = mc.partner_splits.keys()|list|first %}
+          {% set _qty   = mc.partner_splits.values()|list|first %}
+          {% set _bans  = mc.ban_despacho %}
+          <input type="hidden" name="mat_lider_modo_{{ midx }}" value="uno::{{ _lider }}">
+          <strong>{{ _lider }}</strong>
+          <details class="ban-info">
+            <summary title="Ver razón">ⓘ</summary>
+            <div class="ban-popup">
+              <strong>{{ _lider }}</strong><br>
+              {% if _bans %}Salió por: <em>{{ _bans|join(', ') }}</em><br>{% endif %}
+              {{ _qty|int }}u despachada{{ 's' if _qty|int != 1 else '' }} → se liquida a este líder.
+              {% if mc.ban_devolucion %}<br><span style="color:#c0392b;">Dev: {{ mc.ban_devolucion|join(', ') }}</span>{% endif %}
+            </div>
+          </details>
+          <br><span style="color:#777;font-size:0.72rem;">{{ _bans|join(', ') if _bans else 'desde bandeja de despacho' }}</span>
+
+        {% elif mc.partner_splits and mc.partner_splits|length > 1 %}
+          {% for p, q in mc.partner_splits.items() %}
+            {% set _pbans = (mc.ban_by_lider or {}).get(p, []) %}
+            <strong>{{ p.split()[0] }}</strong>
+            <details class="ban-info">
+              <summary title="Ver razón">ⓘ</summary>
+              <div class="ban-popup">
+                <strong>{{ p }}</strong><br>
+                {% if _pbans %}Salió por: <em>{{ _pbans|join(', ') }}</em><br>{% endif %}
+                {{ q|int }}u netas → se liquida a este líder.
+              </div>
+            </details>
+            <span style="color:#888;">({{ q|int }}u)</span>{% if not loop.last %} +<br>{% endif %}
+          {% endfor %}
+          <br><span style="color:#777;font-size:0.72rem;">split auto por bandeja</span>
+
+        {% elif mc.partner_nombre %}
+          {% set _bans = mc.ban_despacho %}
+          <strong>{{ mc.partner_nombre }}</strong>
+          <details class="ban-info">
+            <summary title="Ver razón">ⓘ</summary>
+            <div class="ban-popup">
+              <strong>{{ mc.partner_nombre }}</strong><br>
+              {% if _bans %}Salió por: <em>{{ _bans|join(', ') }}</em><br>{% endif %}
+              Único líder en bandeja de despacho.
+              {% if mc.ban_devolucion %}<br><span style="color:#c0392b;">Dev: {{ mc.ban_devolucion|join(', ') }}</span>{% endif %}
+            </div>
+          </details>
+          <br><span style="color:#777;font-size:0.74rem;">{{ _bans|join(', ') if _bans else 'desde bandeja de despacho' }}</span>
+
+        {% else %}
+          <span class="badge badge-error">Sin lider</span><br>
+          <span style="color:#777;font-size:0.74rem;">no se liquida automatico</span>
+        {% endif %}
+      </td>
+      <td style="text-align:right">{{ mat.sip_cant if mat.sip_cant is not none else '—' }}</td>
+      <td style="text-align:right">{{ mat.sgs_neto_excel }}</td>
+      <td style="text-align:right">
+        {{ mc.sgs_neto if mc.sgs_neto is not none else '—' }}
+        {% if mc.diferencia and mc.diferencia != 0 %}
+          <br><span style="color:#e74c3c;font-size:0.75rem;">diff={{ mc.diferencia }}</span>
+        {% endif %}
+      </td>
+      <td style="text-align:right">{{ mc.sgs_devuelto if mc.sgs_devuelto is not none else '—' }}</td>
+      <td style="text-align:right">{{ mc.advance_real if mc.advance_real is not none else '—' }}</td>
+      <td>
+        {% if mc.estado == 'ya_liquidado' %}
+          <span class="badge badge-gray">Ya liquidado</span>
+        {% elif mc.estado == 'ok' %}
+          <span class="badge badge-ok">Pendiente</span>
+        {% elif mc.estado == 'avance_parcial' %}
+          <span class="badge badge-warn">Parcial</span>
+        {% elif mc.estado == 'descuadre' %}
+          <span class="badge badge-error">Descuadre</span>
+        {% elif mc.estado in ('sin_mov', 'sin_mov_ok') %}
+          <span class="badge badge-blue">Sin mov.</span>
+        {% elif mc.estado == 'devolucion' %}
+          <span class="badge badge-gray">Devolución</span>
+        {% elif mc.estado == 'devolucion_sgs' %}
+          <span class="badge badge-error">Bloqueado devolución SGS</span>
+        {% elif mc.estado == 'no_encontrado' %}
+          <span class="badge badge-error">No encontrado</span>
+        {% else %}
+          <span class="badge badge-gray">{{ mc.estado }}</span>
+        {% endif %}
+        {% if mc.errores %}
+          <ul class="errores">{% for e in mc.errores %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% endif %}
+        {% if mc.advertencias %}
+          <ul class="warns">{% for w in mc.advertencias %}<li>{{ w }}</li>{% endfor %}</ul>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  {% if bloqueo_mat %}
+  <div id="bloqueo-mat-banner" style="margin-top:18px;padding:14px 18px;background:#fde8e8;border:2px solid #e74c3c;border-radius:8px;">
+    <strong style="color:#c0392b;font-size:1rem;">Bloqueo: {{ bloqueo_mat }} material(es) no encontrado(s) con cantidad real</strong>
+    <p style="margin:6px 0 4px;color:#7b241c;font-size:0.87rem;">
+      El sistema no pudo ubicar estos materiales en ningún proyecto SGS. Esto suele ocurrir cuando
+      el nodo del Excel es un número individual (ej: <strong>3</strong>) pero SGS solo tiene un proyecto
+      multi-nodo (ej: <strong>N3_N4</strong> o <strong>NODO 1 AL NODO 6</strong>) que cubre ese rango.<br>
+      <strong>No se puede liquidar hasta resolver la asignación de nodos.</strong>
+    </p>
+    <button type="button" onclick="abrirReporteAuditoria()" style="margin-top:6px;padding:6px 14px;background:#c0392b;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:0.85rem;">
+      Informe técnico
+    </button>
+  </div>
+  {% endif %}
+
+  {% if mat_liquidables %}
+  <div style="margin-top:14px;display:flex;align-items:center;gap:14px;">
+    <span id="lbl-mat-sel" style="font-size:0.85rem;color:#555;">0 seleccionadas</span>
+    <button type="submit" id="btn-liquidar-mat" class="btn btn-success" disabled
+            {% if bloqueo_mat %}title="Bloqueado: hay materiales no encontrados"{% endif %}
+            onclick="return confirmarLiquidarMat()">
+      Liquidar materiales →
+    </button>
+    {% if not bloqueo_mat %}
+    <button type="button" onclick="abrirReporteAuditoria()" style="padding:7px 14px;background:#5d6d7e;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:0.82rem;">
+      Diagnóstico técnico
+    </button>
+    {% endif %}
+  </div>
+  {% endif %}
+  </form>
+</div>
+
+{# ── Modal veredicto de bloqueo (auto-popup, no requiere click) ──────────── #}
+{% if bloqueo_mat %}
+<div id="modal-veredicto-bloqueo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:10000;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:10px;padding:26px;max-width:620px;width:92%;max-height:85vh;overflow:auto;box-shadow:0 8px 40px rgba(0,0,0,.35);border-top:6px solid #c0392b;">
+    <strong style="font-size:1.15rem;color:#c0392b;">ATENCIÓN — esto NO es "ya liquidado"</strong>
+    {# Clasificar tipo de fallo para el mensaje principal y el fallback estático #}
+    {% set _mne_tipo_b = mat_no_encontrados | selectattr('pro_code') | list %}
+    {% set _mne_tipo_a = mat_no_encontrados | rejectattr('pro_code') | list %}
+    <p style="margin:10px 0;font-size:0.92rem;color:#222;">
+      <strong>{{ bloqueo_mat }} material(es)</strong> de esta planilla tienen cantidad real en el Excel
+      pero
+      {% if _mne_tipo_b | length > 0 and _mne_tipo_a | length == 0 %}
+        el sistema <strong>no los encontró en la lista de materiales del proyecto SGS</strong> (el proyecto sí fue ubicado).
+      {% elif _mne_tipo_a | length > 0 and _mne_tipo_b | length == 0 %}
+        el sistema <strong>NO encontró el proyecto SGS</strong> para el nodo indicado.
+      {% else %}
+        el sistema no los pudo ubicar en SGS (causas mixtas — ver detalle).
+      {% endif %}
+      Es un fallo que requiere revisión — muy distinto a un material ya liquidado antes (eso es inofensivo de saltar).
+    </p>
+    <div style="background:#f9f9f9;border:1px solid #ddd;border-radius:6px;padding:12px 14px;margin:10px 0;font-size:0.86rem;color:#333;">
+      {% if veredicto_bloqueo_mat %}
+        <p style="margin:0 0 8px;"><strong>Diagnóstico:</strong> {{ veredicto_bloqueo_mat.diagnostico }}</p>
+        <p style="margin:0;"><strong>Qué hacer:</strong> {{ veredicto_bloqueo_mat.accion_requerida }}</p>
+      {% elif _mne_tipo_b | length > 0 and _mne_tipo_a | length == 0 %}
+        <p style="margin:0 0 8px;"><strong>Diagnóstico probable:</strong> el proyecto SGS fue encontrado
+          correctamente ({% for ck in _mne_tipo_b[:2] %}{{ ck.pro_code }}{% if not loop.last %}, {% endif %}{% endfor %})
+          pero el código SAP no aparece en su lista de materiales (<em>project.material</em>).</p>
+        <p style="margin:0;"><strong>Qué hacer:</strong> entra a SGS al proyecto indicado → pestaña Materiales
+          y verifica que el código existe. Si no está, el material puede pertenecer a un sub-proyecto diferente
+          o no fue cargado en el BOM.</p>
+      {% else %}
+        <p style="margin:0 0 8px;"><strong>Diagnóstico probable:</strong> el nodo del Excel no tiene un proyecto
+          individual en SGS (puede existir solo como proyecto multi-nodo/cable, ej: N3_N4, NODO 1 AL NODO 6)
+          o hay un error en el nodo/código SAP.</p>
+        <p style="margin:0;"><strong>Qué hacer:</strong> verifica en SGS a qué proyecto corresponden el nodo
+          y los códigos antes de continuar con la liquidación.</p>
+      {% endif %}
+    </div>
+    <p style="margin:0 0 14px;font-size:0.8rem;color:#7b241c;font-weight:600;">
+      No se puede liquidar materiales hasta resolver esto. El botón de liquidar materiales queda bloqueado.
+    </p>
+    <div style="display:flex;gap:10px;">
+      <button onclick="cerrarModalVeredicto(); abrirReporteAuditoria();" style="padding:8px 16px;background:#c0392b;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
+        Informe técnico
+      </button>
+      <button onclick="cerrarModalVeredicto()" style="padding:8px 16px;background:#eee;border:none;border-radius:6px;cursor:pointer;">
+        Entendido, lo reviso
+      </button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Modal informe de diagnóstico ───────────────────────────────────────── #}
+<div id="modal-auditoria" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:10px;padding:24px;max-width:680px;width:94%;max-height:80vh;display:flex;flex-direction:column;gap:12px;box-shadow:0 8px 40px rgba(0,0,0,.3);">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <strong style="font-size:1.05rem;">Informe de diagnóstico</strong>
+      <button onclick="cerrarModalAuditoria()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;line-height:1;">×</button>
+    </div>
+    <p style="margin:0;font-size:0.83rem;color:#555;">Este informe queda guardado en el servidor (Registros de SGO7). Puedes copiarlo para enviarlo a soporte:</p>
+    <textarea id="txt-reporte-auditoria" readonly
+      style="flex:1;min-height:320px;font-family:monospace;font-size:0.78rem;border:1px solid #ccc;border-radius:6px;padding:10px;resize:vertical;background:#f9f9f9;"></textarea>
+    <div style="display:flex;gap:10px;">
+      <button onclick="copiarReporte()" style="padding:8px 18px;background:#2ecc71;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
+        Copiar al portapapeles
+      </button>
+      <button onclick="cerrarModalAuditoria()" style="padding:8px 14px;background:#eee;border:none;border-radius:6px;cursor:pointer;">
+        Cerrar
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+var _noEncontrados = {{ mat_no_encontrados | tojson }};
+var _lcl = {{ s.get('odm_global','') | tojson }};
+var _pdl = {{ s.get('pdl','') | tojson }};
+var _resumenMat = {{ resumen_mat | tojson }};
+var _checksMatCount = {{ checks_mat | length }};
+
+function _generarReporteAuditoria() {
+  var hoy = new Date().toISOString().slice(0,10);
+  var lineas = [];
+  lineas.push("=== REPORTE DE VERIFICACIÓN SGS UI ===");
+  lineas.push("Fecha: " + hoy);
+  lineas.push("LCL/DF: " + (_lcl || '—'));
+  lineas.push("PDL: " + (_pdl || '—'));
+  lineas.push("");
+  lineas.push("RESUMEN MATERIALES:");
+  lineas.push("  Total items: " + _checksMatCount);
+  if (_resumenMat) {
+    Object.entries(_resumenMat).forEach(function(kv) {
+      lineas.push("  " + kv[0] + ": " + kv[1]);
+    });
+  }
+  lineas.push("");
+  if (_noEncontrados && _noEncontrados.length > 0) {
+    // Diferenciar tipo de fallo: A=sin proyecto, B=proyecto encontrado pero código no en BOM
+    var _tipoB = _noEncontrados.filter(function(ck){ return ck.pro_code; });
+    var _tipoA = _noEncontrados.filter(function(ck){ return !ck.pro_code; });
+    lineas.push("MATERIALES NO ENCONTRADOS (" + _noEncontrados.length + "):");
+    if (_tipoB.length > 0 && _tipoA.length === 0) {
+      lineas.push("  (Proyecto SGS encontrado, pero el código no existe en su lista de materiales)");
+    } else if (_tipoA.length > 0 && _tipoB.length === 0) {
+      lineas.push("  (No se pudo resolver el proyecto SGS para el nodo indicado)");
+    } else {
+      lineas.push("  (Causas mixtas — ver detalle por ítem)");
+    }
+    _noEncontrados.forEach(function(ck) {
+      var mat = ck.mat || {};
+      var errs = (ck.errores || []).join('; ');
+      var pro  = ck.pro_code ? ('  PRO=' + ck.pro_code) : '';
+      lineas.push("  Nodo=" + (mat.nodo||'?') + "  Cod=" + (mat.codigo||'?') +
+                  "  SGS_neto=" + (mat.sgs_neto_excel||0) + pro +
+                  "  Error: " + (errs||ck.estado||'no_encontrado'));
+    });
+    lineas.push("");
+    if (_tipoB.length > 0 && _tipoA.length === 0) {
+      lineas.push("DIAGNÓSTICO PROBABLE:");
+      lineas.push("  El proyecto SGS fue encontrado correctamente (ver PRO en tabla),");
+      lineas.push("  pero el código SAP no existe en su lista de materiales (project.material).");
+      lineas.push("  Causas posibles: el material pertenece a un sub-proyecto diferente,");
+      lineas.push("  no fue cargado en el BOM de este proyecto en SGS, o hay error en el código SAP.");
+      lineas.push("  Verifica en SGS > proyecto > Materiales que el código aparezca allí.");
+    } else if (_tipoA.length > 0 && _tipoB.length === 0) {
+      lineas.push("DIAGNÓSTICO PROBABLE:");
+      lineas.push("  El nodo del Excel existe en SGS como proyecto multi-nodo/cable");
+      lineas.push("  (ej: N3_N4, NODO 1 AL NODO 6) o el nodo no tiene proyecto asignado.");
+      lineas.push("  Verifica en SGS qué proyecto corresponde al nodo indicado.");
+    } else {
+      lineas.push("DIAGNÓSTICO PROBABLE (causas mixtas):");
+      lineas.push("  " + _tipoA.length + " ítem(s) sin proyecto resuelto para el nodo.");
+      lineas.push("  " + _tipoB.length + " ítem(s) con proyecto encontrado pero código ausente del BOM.");
+      lineas.push("  Revisa cada caso individualmente.");
+    }
+  } else {
+    lineas.push("No hay materiales bloqueados.");
+  }
+  lineas.push("");
+  lineas.push("Tabla MAT de la página:");
+  document.querySelectorAll('#tabla-mat tbody tr').forEach(function(tr) {
+    var cells = Array.from(tr.querySelectorAll('td')).map(function(td){ return td.innerText.trim().replace(/\n/g,' '); });
+    if (cells.length > 0) lineas.push("  " + cells.join(' | '));
+  });
+  return lineas.join("\n");
+}
+
+function abrirReporteAuditoria() {
+  document.getElementById('txt-reporte-auditoria').value = _generarReporteAuditoria();
+  sgo7GuardarInforme('verificacion', document.getElementById('txt-reporte-auditoria').value);
+  var m = document.getElementById('modal-auditoria');
+  m.style.display = 'flex';
+}
+function cerrarModalAuditoria() {
+  document.getElementById('modal-auditoria').style.display = 'none';
+}
+function cerrarModalVeredicto() {
+  var m = document.getElementById('modal-veredicto-bloqueo');
+  if (m) m.style.display = 'none';
+}
+function copiarReporte() {
+  var txt = document.getElementById('txt-reporte-auditoria');
+  txt.select();
+  document.execCommand('copy');
+  var btn = event.target;
+  var orig = btn.textContent;
+  btn.textContent = '✓ Copiado';
+  setTimeout(function(){ btn.textContent = orig; }, 2000);
+}
+// Cerrar modal al clicar fuera
+document.getElementById('modal-auditoria').addEventListener('click', function(e){
+  if (e.target === this) cerrarModalAuditoria();
+});
+{% if bloqueo_mat %}
+// Bloqueo duro: sobreescribir el enable del botón de liquidar mat
+window.addEventListener('DOMContentLoaded', function() {
+  var btn = document.getElementById('btn-liquidar-mat');
+  if (btn) {
+    btn.disabled = true;
+    btn.title = 'Bloqueado: ' + {{ bloqueo_mat }} + ' material(es) no encontrado(s)';
+  }
+  // Popup forzado — no requiere que el liquidador note la franja roja ni
+  // que la confunda con un material "ya liquidado" (estados muy distintos).
+  var mv = document.getElementById('modal-veredicto-bloqueo');
+  if (mv) mv.style.display = 'flex';
+});
+{% endif %}
+</script>
+
+<script>
+function onMatLiderModo(midx) { /* no-op: selector MAT eliminado */ }
+function toggleAllMat(master) {
+  document.querySelectorAll('.chk-mat').forEach(c => c.checked = master.checked);
+  actualizarContadorMat();
+}
+document.querySelectorAll('.chk-mat').forEach(c =>
+  c.addEventListener('change', actualizarContadorMat)
+);
+function actualizarContadorMat() {
+  const n = document.querySelectorAll('.chk-mat:checked').length;
+  document.getElementById('lbl-mat-sel').textContent = n + ' seleccionada' + (n !== 1 ? 's' : '');
+  const bloqueado = ({{ bloqueo_mat | default(0) }} > 0);
+  document.getElementById('btn-liquidar-mat').disabled = (n === 0 || !window._browserActivo || bloqueado);
+  if (typeof actualizarCombinado === 'function') actualizarCombinado();
+}
+function confirmarLiquidarMat() {
+  const n = document.querySelectorAll('.chk-mat:checked').length;
+  return confirm('Liquidar ' + n + ' material(es) en SGS?\n\nSe abrirá el navegador Playwright.');
+}
+</script>
+{% endif %}
+
+{% if mo_liquidables and mat_liquidables %}
+{# ── Barra combinada MO + MAT simultáneos ── #}
+<div id="bar-combinado"
+     style="display:none;margin-top:12px;padding:14px 18px;
+            background:linear-gradient(135deg,#0d3b26,#1a5c2e);
+            border-radius:10px;box-shadow:0 3px 12px rgba(0,0,0,0.18);
+            display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+  <div style="flex:1;min-width:200px;">
+    <div style="font-size:0.72rem;font-weight:700;color:#a5d6a7;text-transform:uppercase;
+                letter-spacing:.06em;margin-bottom:2px;">Liquidación simultánea</div>
+    <div id="lbl-combinado" style="font-size:1rem;font-weight:800;color:#fff;">
+      — MO + — materiales
+    </div>
+    <div style="font-size:0.72rem;color:#81c784;margin-top:2px;">
+      3 workers MO &amp; 4 workers MAT en paralelo · stagger 8s
+    </div>
+  </div>
+  <button id="btn-liquidar-combinado"
+          onclick="liquidarCombinado()"
+          style="background:#fff;color:#1a5c2e;border:none;border-radius:8px;
+                 padding:11px 24px;font-weight:800;font-size:0.92rem;
+                 cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,0.15);">
+    ⚡ Liquidar MO y MAT simultáneamente
+  </button>
+</div>
+
+<script>
+var _LIQUIDAR_COMBINADO_ACTION = "{{ url_for('liquidador2.liquidar', sid=sid) }}";
+
+function actualizarCombinado() {
+  var nMo  = document.querySelectorAll('.chk-mo:checked').length;
+  var nMat = document.querySelectorAll('.chk-mat:checked').length;
+  var bar  = document.getElementById('bar-combinado');
+  var lbl  = document.getElementById('lbl-combinado');
+  var btnC = document.getElementById('btn-liquidar-combinado');
+  if (!bar) return;
+  if (nMo > 0 && nMat > 0) {
+    bar.style.display = 'flex';
+    if (lbl) lbl.textContent = nMo + ' MO + ' + nMat + ' material' + (nMat !== 1 ? 'es' : '');
+  } else {
+    bar.style.display = 'none';
+  }
+  if (btnC) btnC.disabled = !window._browserActivo;
+}
+
+function liquidarCombinado() {
+  if (!window._browserActivo) {
+    alert('El navegador SGS no está activo.\nÁbrelo desde el menú principal y espera a que aparezca la sesión antes de liquidar.');
+    return;
+  }
+  var nMo  = document.querySelectorAll('.chk-mo:checked').length;
+  var nMat = document.querySelectorAll('.chk-mat:checked').length;
+  if (nMo === 0 || nMat === 0) return;
+  var sinLider = (typeof _filasMoSinLider === 'function') ? _filasMoSinLider() : [];
+  if (sinLider.length) { _alertaSinLider(sinLider); return; }
+  if (!confirm(
+    'Liquidar ' + nMo + ' actividad(es) MO + ' + nMat + ' material(es) en SGS de forma simultánea?\n\n' +
+    'Se usarán hasta 3 workers MO + 4 workers MAT en paralelo.\n' +
+    'No cerrar la ventana hasta que termine.')) return;
+
+  var form = document.createElement('form');
+  form.method = 'POST';
+  form.action = _LIQUIDAR_COMBINADO_ACTION;
+
+  // Índices MO seleccionados
+  document.querySelectorAll('.chk-mo:checked').forEach(function(c) {
+    var inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'idx_mo'; inp.value = c.value;
+    form.appendChild(inp);
+  });
+
+  // Hidden inputs de líderes MO: nombre, cédula (sin ella el servidor busca por
+  // nombre y puede caer en un homónimo) y flag de Modo Repetición.
+  document.querySelectorAll('[name^="mo_lider_idx_"], [name^="mo_lider_ced_"], [name="omitir_ya_liquidadas"]').forEach(function(h) {
+    var inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = h.name; inp.value = h.value;
+    form.appendChild(inp);
+  });
+
+  // Índices MAT seleccionados
+  document.querySelectorAll('.chk-mat:checked').forEach(function(c) {
+    var inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'idx_mat'; inp.value = c.value;
+    form.appendChild(inp);
+  });
+
+  // Hidden inputs de líderes MAT (mat_lider_modo_*)
+  document.querySelectorAll('[name^="mat_lider_modo_"]').forEach(function(h) {
+    var inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = h.name; inp.value = h.value;
+    form.appendChild(inp);
+  });
+
+  document.body.appendChild(form);
+  form.submit();
+}
+</script>
+{% endif %}
+
+<div style="display:flex;gap:12px;margin-top:8px;">
+  <a href="{{ url_for('liquidador2.subir') }}" class="btn btn-light">Subir otro Excel</a>
+</div>
+
+<script>
+// ── Estado del browser SGS — polling /pw_status ──────────────────────────────
+window._browserActivo = false;
+(function() {
+  var _dots = 0;
+  var _dotChars = ['.', '..', '...', ''];
+
+  function _refreshBotones() {
+    if (typeof actualizarContador    === 'function') actualizarContador();
+    if (typeof actualizarContadorMat === 'function') actualizarContadorMat();
+    if (typeof actualizarCombinado   === 'function') actualizarCombinado();
+  }
+
+  function _poll() {
+    fetch('/liquidador2/pw_status')
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        var activo  = !!(d.activa || d.alive);
+        var banner  = document.getElementById('browser-banner');
+        var dotsEl  = document.getElementById('browser-banner-dots');
+        var cambio  = activo !== window._browserActivo;
+        window._browserActivo = activo;
+        if (banner) banner.style.display = activo ? 'none' : 'flex';
+        if (cambio) _refreshBotones();
+        if (!activo && dotsEl) {
+          _dots = (_dots + 1) % _dotChars.length;
+          dotsEl.textContent = _dotChars[_dots];
+        }
+      })
+      .catch(function() { /* servidor caído — no cambiar estado */ });
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    _poll();                       // verificar inmediatamente al cargar
+    setInterval(_poll, 3000);      // luego cada 3s
+  });
+})();
+</script>
+
+{% endblock %}

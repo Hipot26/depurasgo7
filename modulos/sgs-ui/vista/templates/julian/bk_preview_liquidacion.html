@@ -1,0 +1,318 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Paso 6: Plan de Liquidación{% endblock %}
+
+{% block extra_head %}
+<style>
+  .diag-panel {
+    border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;
+    font-size: 0.85rem;
+  }
+  .diag-ok    { background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46; }
+  .diag-warn  { background: #fff3cd; border: 1px solid #ffc107; color: #78350f; }
+  .diag-error { background: #fee2e2; border: 1px solid #fca5a5; color: #7f1d1d; }
+  .diag-table { font-size: 0.80rem; margin-top: 8px; width: 100%; border-collapse: collapse; }
+  .diag-table th { background: rgba(0,0,0,0.06); padding: 4px 8px; text-align: left; }
+  .diag-table td { padding: 4px 8px; border-bottom: 1px solid rgba(0,0,0,0.07); }
+  .worker-card {
+    background: white; border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    margin-bottom: 16px; overflow: hidden;
+  }
+  .worker-hdr {
+    padding: 12px 20px; display: flex; align-items: center; gap: 12px;
+    font-weight: 700; font-size: 0.95rem;
+  }
+  .worker-hdr.visible  { background: #f0faf4; border-left: 4px solid #27ae60; color: #1a3e2e; }
+  .worker-hdr.paralelo { border-left: 4px solid #1565c0; }
+  .worker-hdr.paralelo.w0 { background: #e3f2fd; color: #1565c0; }
+  .worker-hdr.paralelo.w1 { background: #e8f5e9; color: #2e7d32; }
+  .worker-hdr.paralelo.w2 { background: #f3e5f5; color: #6a1b9a; }
+  .worker-items { padding: 0 20px 14px; }
+  .worker-items table { font-size: 0.85rem; }
+  .worker-items th { background: #f8f9fa; font-size: 0.78rem; }
+
+  .session-banner {
+    border-radius: 8px; padding: 12px 18px; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 12px; font-size: 0.88rem;
+  }
+  .session-ok   { background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46; }
+  .session-warn { background: #fff3cd; border: 1px solid #ffc107; color: #856404; }
+
+  .mo-card {
+    background: #f0faf4; border: 1px solid #c3e6cb; border-radius: 8px;
+    padding: 14px 20px; margin-bottom: 16px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div style="display:flex;align-items:center;gap:14px;margin-bottom:6px;">
+  <h1 style="font-size:1.25rem;margin:0;">Paso 6: Plan de Liquidación</h1>
+  <span style="color:#888;font-size:0.82rem;">{{ s.filename }}</span>
+</div>
+<p style="color:#666;font-size:0.87rem;margin-bottom:20px;">
+  Revisa qué se va a liquidar y cómo se distribuye entre los workers antes de ejecutar.
+</p>
+
+{# ── Banner estado de sesión ── #}
+<div class="session-banner {{ 'session-ok' if session_ok else 'session-warn' }}">
+  <span style="font-size:1.2rem;">{{ 'Candado:' if session_ok else '⚠' }}</span>
+  <div>
+    <strong>Sesión:</strong> {{ session_msg }}
+    {% if session_ok %}
+      <br><span style="font-size:0.8rem;opacity:0.8;">
+        Los workers heredan las cookies del browser visible — SGS solo verá una sesión activa.
+      </span>
+    {% else %}
+      <br><span style="font-size:0.8rem;opacity:0.8;">
+        Cada worker hará login por separado. Abre el browser en la pantalla de verificación para activar sesión compartida.
+      </span>
+    {% endif %}
+  </div>
+</div>
+
+{# ── MO ── #}
+{% if items_mo %}
+<div class="mo-card">
+  <strong style="color:#1a3e2e;">Mano de Obra ({{ items_mo|length }}) — browser visible</strong>
+  <table style="margin-top:10px;">
+    <thead><tr>
+      <th>Código actividad</th><th>PRO</th><th>Nodo</th><th>Lider</th><th style="text-align:right;">Cantidad</th>
+    </tr></thead>
+    <tbody>
+    {% for it in items_mo %}
+    <tr>
+      <td><strong>{{ it.act_code }}</strong></td>
+      <td style="font-size:0.8rem;">{{ it.pro_code }}</td>
+      <td>{{ it.nodo }}</td>
+      <td style="font-size:0.8rem;">
+        {{ it.partner_nombre or '—' }}
+        {% if it.split %}
+          <br><span style="color:#777;font-size:0.74rem;">Parte {{ it.split.parte }} ({{ it.split.pct }}%)</span>
+        {% endif %}
+      </td>
+      <td style="text-align:right;">{{ it.cantidad }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{# ── MAT workers ── #}
+{% if items_mat %}
+<div style="margin-bottom:8px;display:flex;align-items:center;gap:12px;">
+  <strong style="font-size:0.95rem;color:#1a3e2e;">
+    Materiales ({{ items_mat|length }}) —
+    {% if usar_paralelo %}
+      {{ chunks_mat|length }} worker(s) paralelo(s) headless
+    {% else %}
+      browser visible
+    {% endif %}
+  </strong>
+  {% if usar_paralelo %}
+  <span style="background:#e3f2fd;color:#1565c0;border-radius:12px;
+               padding:3px 10px;font-size:0.78rem;font-weight:700;">
+    Paralelo × {{ chunks_mat|length }}
+  </span>
+  {% endif %}
+</div>
+
+{% for chunk in chunks_mat %}
+<div class="worker-card">
+  <div class="worker-hdr {{ 'paralelo w' ~ chunk.worker_id if usar_paralelo else 'visible' }}">
+    {% if usar_paralelo %}
+      <span style="font-size:1.1rem;">⚡</span>
+      Worker {{ chunk.worker_id }}
+      <span style="font-weight:400;font-size:0.82rem;opacity:0.8;">
+        — {{ chunk.mats|length }} material(es)
+        {% if session_ok %}· sesión heredada{% else %}· login propio{% endif %}
+      </span>
+    {% else %}
+      <span style="font-size:1.1rem;"></span>
+      Browser visible
+      <span style="font-weight:400;font-size:0.82rem;opacity:0.8;">— 1 material</span>
+    {% endif %}
+  </div>
+  <div class="worker-items">
+    <table>
+      <thead><tr>
+        <th>Código SAP</th><th>Descripción</th><th>Nodo</th>
+        <th>PRO</th><th style="text-align:right;">Cantidad</th>
+        <th style="border-left:2px solid #fde68a;">Lider</th>
+        <th>Bandeja(s)</th>
+      </tr></thead>
+      <tbody>
+      {% for it in chunk.mats %}
+      <tr>
+        <td>
+          {% if it.es_custodia %}
+            <strong>{{ it.codigo_sgs }}</strong>
+            <span style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;
+                         border-radius:4px;font-size:0.65rem;font-weight:800;
+                         padding:1px 5px;margin-left:3px;"
+                  title="Variante custodia — Playwright navegará al pm_id de '{{ it.codigo_sgs }}'">
+              CUSTODIA
+            </span>
+            <div style="font-size:0.68rem;color:#92400e;">Excel: {{ it.codigo }}</div>
+          {% else %}
+            <strong>{{ it.codigo }}</strong>
+          {% endif %}
+        </td>
+        <td style="color:#555;font-size:0.8rem;">{{ it.descripcion }}</td>
+        <td>{{ it.nodo }}</td>
+        <td style="font-size:0.8rem;">{{ it.pro_code }}</td>
+        <td style="text-align:right;font-weight:700;">{{ it.cantidad }}</td>
+        {# ── Lider + justificación ── #}
+        <td style="border-left:2px solid #fde68a;white-space:nowrap;">
+          {% if it.partner_nombre %}
+            <span style="background:#fef9c3;color:#78350f;border-radius:8px;
+                         padding:2px 8px;font-size:0.78rem;font-weight:700;"
+                  title="Lider tomado de la bandeja de despacho que contiene {{ it.codigo }}{% if it.bandeja_despacho %} ({{ it.bandeja_despacho }}){% endif %}">
+              {{ it.partner_nombre.split()[-1] if it.partner_nombre else '—' }}
+            </span>
+            <div style="font-size:0.7rem;color:#92400e;margin-top:2px;max-width:140px;
+                        white-space:normal;line-height:1.3;">
+              {{ it.partner_nombre }}
+            </div>
+          {% else %}
+            <span style="color:#ccc;font-size:0.78rem;">—</span>
+            <div style="font-size:0.68rem;color:#e74c3c;margin-top:1px;">
+              ⚠ sin lider
+            </div>
+          {% endif %}
+        </td>
+        <td style="font-size:0.75rem;color:#555;max-width:150px;line-height:1.5;">
+          {% if it.bandeja_despacho %}
+            {% for ban in it.bandeja_despacho.split(', ') %}
+              <span style="display:inline-block;background:#e3f2fd;color:#1565c0;
+                           border-radius:8px;padding:1px 7px;margin:1px 1px;
+                           font-size:0.72rem;font-weight:600;white-space:nowrap;">
+                {{ ban }}
+              </span>
+            {% endfor %}
+            <div style="font-size:0.67rem;color:#888;margin-top:2px;">
+              ← bandeja que determina el lider
+            </div>
+          {% else %}
+            <span style="color:#ccc;">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{# ── Diagnóstico P3 → P6 ── #}
+{% if idx_mat %}
+<div class="diag-panel {{ 'diag-error' if nodos_faltantes_p6 else 'diag-ok' }}" style="margin-top:24px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+    <strong style="font-size:0.92rem;">
+      {{ '⚠ Trazabilidad P3→P6: materiales faltantes' if nodos_faltantes_p6 else '✓ Trazabilidad P3→P6: todos los nodos presentes' }}
+    </strong>
+  </div>
+
+  <div style="display:flex;gap:24px;flex-wrap:wrap;font-size:0.8rem;margin-bottom:10px;">
+    <span><strong>Seleccionados Paso 3:</strong>
+      {% for n in p3_nodos %}<span style="background:rgba(0,0,0,0.08);border-radius:4px;padding:1px 6px;margin:0 2px;">{{ n }}</span>{% endfor %}
+      ({{ p3_nodos|length }} nodo(s))
+    </span>
+    <span><strong>En plan Paso 6:</strong>
+      {% for n in p6_nodos %}<span style="background:rgba(0,0,0,0.08);border-radius:4px;padding:1px 6px;margin:0 2px;">{{ n }}</span>{% endfor %}
+      ({{ p6_nodos|length }} nodo(s))
+    </span>
+  </div>
+
+  {% if nodos_faltantes_p6 %}
+  <p style="margin:0 0 8px;font-weight:700;">
+    Nodos seleccionados que NO aparecen en el plan:
+    {% for n in nodos_faltantes_p6 %}<span style="background:#fca5a5;border-radius:4px;padding:1px 7px;margin:0 3px;">{{ n }}</span>{% endfor %}
+  </p>
+
+  {% for excl in diag_exclusiones %}
+  <div style="margin-bottom:12px;">
+    <strong>{{ excl.nodo }}{% if excl.pro_code %} — {{ excl.pro_code }}{% endif %}</strong>
+    <table class="diag-table">
+      <thead><tr>
+        <th>Código SAP</th><th>pm_id</th><th>Estado P3</th><th>Motivo de exclusión</th>
+      </tr></thead>
+      <tbody>
+      {% for m in excl.mats %}
+      <tr>
+        <td><strong>{{ m.codigo }}</strong></td>
+        <td style="color:#888;">{{ m.pm_id or '—' }}</td>
+        <td>{{ m.estado or '—' }}</td>
+        <td style="color:#7f1d1d;">{{ m.razon }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" style="color:#999;">Sin materiales registrados en sesión para este nodo.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if bloqueados_diag %}
+  <div style="margin-top:10px;">
+    <strong>Bloqueados por validación SGS (devuelto / doble avance):</strong>
+    <table class="diag-table" style="margin-top:4px;">
+      <thead><tr><th>Código</th><th>Motivo</th></tr></thead>
+      <tbody>
+      {% for b in bloqueados_diag %}
+      <tr>
+        <td><strong>{{ b.codigo_sgs or b.codigo }}</strong></td>
+        <td style="color:#7f1d1d;">{{ b.error or b.msg or '—' }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ── Formulario de confirmación — pasa los idx al liquidar real ── #}
+<form method="POST" action="{{ url_for('julian.liquidar', sid=sid) }}" id="form-confirmar">
+  {% for idx in idx_mo %}
+    <input type="hidden" name="idx_mo" value="{{ idx }}">
+  {% endfor %}
+  {% for idx in idx_mat %}
+    <input type="hidden" name="idx_mat" value="{{ idx }}">
+  {% endfor %}
+</form>
+
+{% if hay_mismatch %}
+<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;
+            padding:12px 16px;margin-top:16px;font-size:0.85rem;color:#78350f;">
+  <strong>⚠ Mismatch P3→P6:</strong> Hay nodos o materiales seleccionados en Paso 3 que no
+  aparecen en el plan de liquidación. Revisa el diagnóstico de arriba antes de continuar.
+  <br><label style="display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer;">
+    <input type="checkbox" id="chk-mismatch-ok"
+           onchange="document.getElementById('btn-ejecutar').disabled = !this.checked;">
+    <span>Entiendo la diferencia y autorizo continuar con los <strong>{{ items_mat|length }} material(es) en el plan</strong>.</span>
+  </label>
+</div>
+{% endif %}
+
+<div style="display:flex;gap:12px;margin-top:20px;align-items:center;">
+  <button type="submit" form="form-confirmar" id="btn-ejecutar"
+          class="btn btn-success"
+          {% if hay_mismatch %}disabled{% endif %}
+          onclick="return confirm('Confirmar liquidación?\n\nSe abrirá Playwright. No cerrar hasta que termine.')">
+    Ejecutar liquidación →
+  </button>
+  <a href="{{ url_for('julian.resumen', sid=sid) }}" class="btn btn-light">
+    ← Volver y cambiar selección
+  </a>
+  <span style="font-size:0.82rem;color:#888;margin-left:8px;">
+    {{ (items_mo|length) + (items_mat|length) }} item(s) en total
+  </span>
+</div>
+
+{% endblock %}

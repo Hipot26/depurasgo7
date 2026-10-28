@@ -1,0 +1,104 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Auditoría de Líderes y Materiales — SGS UI{% endblock %}
+
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:flex-end;">
+  <h1 style="font-size:1.5rem; margin-bottom:10px;">Auditoría de Líderes y Materiales</h1>
+  <a href="{{ request.referrer or url_for('julian.balance_sgs', sid=sid) }}" class="btn btn-light" style="margin-bottom:10px;">
+    &larr; Volver
+  </a>
+</div>
+
+<p style="margin-bottom: 20px; font-size: 0.9rem; color: #555;">
+  Esta pantalla analiza todos los materiales detectados para el proyecto. Compara <strong>A quién se le despachó</strong> el material desde el almacén (Bandeja) frente a <strong>A quién se le registró el consumo</strong>.
+</p>
+
+<div class="card" style="background:white; border-radius:10px; box-shadow:0 2px 12px rgba(0,0,0,0.08); padding: 20px;">
+  <h2>Materiales del Proyecto ({{ checks_mat|length }})</h2>
+  
+  <div style="overflow-x:auto;">
+  <table style="width:100%; border-collapse:collapse; font-size:0.84rem; margin-top: 15px;">
+    <thead>
+      <tr style="background:#2d5a42; color:white;">
+        <th style="padding:9px 12px; text-align:left;">Código</th>
+        <th style="padding:9px 12px; text-align:left;">Descripción</th>
+        <th style="padding:9px 12px; text-align:right;">Despachado</th>
+        <th style="padding:9px 12px; text-align:right;">Advance Real</th>
+        <th style="padding:9px 12px; text-align:left;">Líderes Despacho (Dueño Bandeja)</th>
+        <th style="padding:9px 12px; text-align:left;">Líderes Liquidación (Consumo)</th>
+        <th style="padding:9px 12px; text-align:left;">Diagnóstico / Alertas</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for mc in checks_mat %}
+      
+      {# Lógica de cruce y alerta #}
+      {% set desp = mc.get('lideres_despacho', []) %}
+      {% set liq = mc.get('lideres_liquidacion', []) %}
+      
+      {% set malos = [] %}
+      {% for l in liq %}
+        {% if l not in desp %}
+          {% set _ = malos.append(l) %}
+        {% endif %}
+      {% endfor %}
+      
+      {% set tiene_descuadre = malos|length > 0 %}
+      
+      <tr style="border-bottom:1px solid #f0f0f0; {% if tiene_descuadre %}background:#fff0f0;{% endif %}">
+        <td style="padding:9px 12px;"><strong>{{ mc.mat.codigo }}</strong></td>
+        <td style="padding:9px 12px; font-size:0.8rem;">{{ mc.mat.descripcion[:40] if mc.mat.descripcion else '—' }}</td>
+        
+        <td style="padding:9px 12px; text-align:right;">
+          {{ "%.2f"|format(mc.get('sgs_despachado')) if mc.get('sgs_despachado') is not none else '—' }}
+        </td>
+        <td style="padding:9px 12px; text-align:right;">
+          {{ "%.2f"|format(mc.get('advance_real')) if mc.get('advance_real') is not none else '—' }}
+        </td>
+        
+        <td style="padding:9px 12px; font-size:0.8rem;">
+          {% if desp %}
+            <ul style="margin:0; padding-left:14px;">
+              {% for d in desp %}<li>{{ d }}</li>{% endfor %}
+            </ul>
+          {% else %}
+            <span style="color:#888;">N/A</span>
+          {% endif %}
+        </td>
+        
+        <td style="padding:9px 12px; font-size:0.8rem;">
+          {% if liq %}
+            <ul style="margin:0; padding-left:14px;">
+              {% for l in liq %}
+                <li style="{% if l in malos %}color:#c62828; font-weight:bold;{% endif %}">{{ l }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <span style="color:#888;">Aún sin liquidar</span>
+          {% endif %}
+        </td>
+        
+        <td style="padding:9px 12px; font-size:0.85rem;">
+          {% if tiene_descuadre %}
+            <strong style="color:#c62828;">⚠ ALERTA:</strong><br>
+            Se le liquidó a <strong>{{ malos|join(', ') }}</strong><br>
+            pero debías liquidarlo a la bandeja de <strong>{{ desp|join(', ') if desp else 'NADIE (Sin stock)' }}</strong>
+          {% elif not desp and not liq %}
+            <span style="color:#888;">Sin movimientos</span>
+          {% else %}
+            <span style="color:#2e7d32;">✓ Ok o Pendiente normal</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      
+      {% if not checks_mat %}
+      <tr>
+        <td colspan="7" style="text-align:center; padding: 20px;">No hay materiales para analizar en este plan.</td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% block title %}Verificar Cierre - SGS UI{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+  <div>
+    <h1 style="font-size:1.3rem;margin:0;">Verificacion de cierre rapido</h1>
+    <p style="margin:6px 0 0;color:#888;font-size:0.85rem;">{{ s.filename }}</p>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <a href="{{ url_for('resultado', sid=sid) }}" class="btn">Volver a resultados</a>
+    <a href="{{ url_for('cierre_rapido', sid=sid, fecha=meta.fecha_input, pdl=meta.pdl_esperado) }}" class="btn btn-success">
+      Reconsultar SGS
+    </a>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:16px;">
+  <form method="GET" action="{{ url_for('cierre_rapido', sid=sid) }}"
+        style="display:flex;gap:14px;align-items:end;flex-wrap:wrap;">
+    <div>
+      <label style="display:block;font-size:0.78rem;color:#666;margin-bottom:4px;">Fecha esperada</label>
+      <input type="date" name="fecha" value="{{ meta.fecha_input }}"
+             style="padding:8px 10px;border:1px solid #d9d9d9;border-radius:6px;min-width:170px;">
+    </div>
+    <div style="min-width:260px;flex:1;">
+      <label style="display:block;font-size:0.78rem;color:#666;margin-bottom:4px;">PDL esperado</label>
+      <input type="text" name="pdl" value="{{ meta.pdl_esperado }}"
+             placeholder="CDOPPI..."
+             style="padding:8px 10px;border:1px solid #d9d9d9;border-radius:6px;width:100%;">
+    </div>
+    <button type="submit" class="btn btn-primary">Verificar</button>
+  </form>
+  <div style="margin-top:12px;font-size:0.84rem;color:#666;display:flex;gap:18px;flex-wrap:wrap;">
+    <span><strong>Estado esperado:</strong> {{ meta.estado_esperado }}</span>
+    <span><strong>Fecha UI:</strong> {{ meta.fecha_ui }}</span>
+    <span><strong>PDL:</strong> {{ meta.pdl_esperado or "Sin PDL cargado" }}</span>
+  </div>
+</div>
+
+<div class="stat-row" style="margin-bottom:18px;">
+  <div class="stat blue">
+    <div class="num">{{ meta.total }}</div><div class="lbl">Identificados</div>
+  </div>
+  <div class="stat gray">
+    <div class="num">{{ meta.elegibles }}</div><div class="lbl">Elegibles</div>
+  </div>
+  <div class="stat {{ 'red' if meta.pendientes else 'gray' }}">
+    <div class="num">{{ meta.pendientes }}</div><div class="lbl">Pendientes</div>
+  </div>
+  <div class="stat {{ 'green' if meta.listos else 'gray' }}">
+    <div class="num">{{ meta.listos }}</div><div class="lbl">Listos</div>
+  </div>
+  <div class="stat gray">
+    <div class="num">{{ meta.referencia }}</div><div class="lbl">Solo referencia</div>
+  </div>
+</div>
+
+{% if not rows %}
+  <div class="card">
+    <p style="margin:0;color:#666;">
+      No se encontraron proyectos identificados en esta sesion. Primero verifica o liquida el archivo y luego vuelve a este panel.
+    </p>
+  </div>
+{% else %}
+  <form method="POST" action="{{ url_for('cierre_rapido', sid=sid) }}">
+    <input type="hidden" name="fecha" value="{{ meta.fecha_input }}">
+    <input type="hidden" name="pdl" value="{{ meta.pdl_esperado }}">
+
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+      <button type="submit" class="btn btn-primary">
+        Corregir seleccionados
+      </button>
+      <button type="button" id="mark-pending" class="btn">
+        Marcar pendientes
+      </button>
+      <button type="button" id="clear-selection" class="btn">
+        Limpiar seleccion
+      </button>
+      <span style="font-size:0.82rem;color:#777;">
+        Puedes corregir cualquier proyecto identificado en la tabla. La correccion usa la UI visible de SGS.
+      </span>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:44px;"><input type="checkbox" id="toggle-all"></th>
+            <th>Proyecto</th>
+            <th>Contexto</th>
+            <th>PDL</th>
+            <th>Fechas</th>
+            <th>Estado</th>
+            <th>Situacion</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr style="background:
+              {% if row.panel_estado == 'pendiente' %}#fff8e1
+              {% elif row.panel_estado == 'ok' %}#f3fbf5
+              {% else %}#fafafa{% endif %};">
+            <td>
+              {% if row.elegible %}
+                <input type="checkbox" name="pid" value="{{ row.pid }}"
+                       data-pending="{{ 1 if row.necesita_actualizacion else 0 }}"
+                       {% if row.preseleccionado %}checked{% endif %}>
+              {% else %}
+                <span style="color:#bbb;">-</span>
+              {% endif %}
+            </td>
+            <td>
+              <div style="font-weight:700;color:#1f1f1f;">
+                [{{ row.pro_code or ("PID " ~ row.pid) }}] {{ row.nombre }}
+              </div>
+              <div style="font-size:0.81rem;color:#666;margin-top:3px;">
+                DF {{ row.order_number }} | Nodo(s): {{ row.nodos_txt }}
+              </div>
+              <div style="font-size:0.81rem;color:#888;margin-top:3px;">
+                Fuentes: {{ row.fuentes_txt }}
+              </div>
+            </td>
+            <td style="font-size:0.83rem;line-height:1.55;">
+              <div><strong>Cliente:</strong> {{ row.customer }}</div>
+              <div><strong>Contrato:</strong> {{ row.contract }}</div>
+              <div><strong>Territorio:</strong> {{ row.department }}</div>
+            </td>
+            <td style="font-size:0.83rem;line-height:1.55;">
+              <div><strong>Actual:</strong> {{ row.pdl_actual }}</div>
+              <div><strong>Esperado:</strong> {{ row.pdl_esperado }}</div>
+              <div style="margin-top:4px;">
+                <span style="display:inline-block;padding:2px 8px;border-radius:999px;
+                             background:{{ '#dff3e3' if row.pdl_ok else '#fde2e1' }};
+                             color:{{ '#216e39' if row.pdl_ok else '#b42318' }};
+                             font-size:0.76rem;font-weight:700;">
+                  {{ 'OK' if row.pdl_ok else 'Pendiente' }}
+                </span>
+              </div>
+            </td>
+            <td style="font-size:0.83rem;line-height:1.5;">
+              <div><strong>{{ row.fechas_ok_count }}/{{ row.fechas_total }}</strong> campos OK</div>
+              <div style="color:#666;">Esperado: {{ row.fecha_esperada_ui }}</div>
+              {% if row.fechas_diferentes %}
+                <div style="margin-top:6px;color:#8a4b08;">
+                  {% for diff in row.fechas_diferentes[:3] %}
+                    <div>{{ diff.label }}: {{ diff.actual }}</div>
+                  {% endfor %}
+                  {% if row.fechas_diferentes|length > 3 %}
+                    <div>+{{ row.fechas_diferentes|length - 3 }} campo(s) mas</div>
+                  {% endif %}
+                </div>
+              {% else %}
+                <div style="margin-top:6px;color:#216e39;">Todo alineado</div>
+              {% endif %}
+            </td>
+            <td style="font-size:0.83rem;line-height:1.55;">
+              <div><strong>Actual:</strong> {{ row.estado_actual }}</div>
+              <div><strong>Esperado:</strong> {{ row.estado_esperado }}</div>
+              <div style="margin-top:4px;">
+                <span style="display:inline-block;padding:2px 8px;border-radius:999px;
+                             background:{{ '#dff3e3' if row.status_ok else '#fde2e1' }};
+                             color:{{ '#216e39' if row.status_ok else '#b42318' }};
+                             font-size:0.76rem;font-weight:700;">
+                  {{ 'OK' if row.status_ok else 'Pendiente' }}
+                </span>
+              </div>
+            </td>
+            <td style="font-size:0.83rem;line-height:1.5;">
+              <div>
+                <span style="display:inline-block;padding:4px 10px;border-radius:999px;
+                             background:
+                               {% if row.panel_estado == 'pendiente' %}#fdecc8
+                               {% elif row.panel_estado == 'ok' %}#dff3e3
+                               {% else %}#eceff3{% endif %};
+                             color:
+                               {% if row.panel_estado == 'pendiente' %}#8a4b08
+                               {% elif row.panel_estado == 'ok' %}#216e39
+                               {% else %}#475467{% endif %};
+                             font-size:0.76rem;font-weight:700;">
+                  {{ row.panel_label }}
+                </span>
+              </div>
+              <div style="margin-top:6px;color:#666;">
+                {{ 'Liquidado OK en la sesion' if row.liquidado_ok else 'Identificado en la sesion' }}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+
+  <script>
+  (() => {
+    const all = document.getElementById('toggle-all');
+    const markPending = document.getElementById('mark-pending');
+    const clearBtn = document.getElementById('clear-selection');
+    const boxes = () => Array.from(document.querySelectorAll('input[name="pid"]'));
+
+    if (all) {
+      all.addEventListener('change', () => {
+        boxes().forEach(cb => { cb.checked = all.checked; });
+      });
+    }
+
+    if (markPending) {
+      markPending.addEventListener('click', () => {
+        boxes().forEach(cb => { cb.checked = cb.dataset.pending === '1'; });
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        boxes().forEach(cb => { cb.checked = false; });
+      });
+    }
+  })();
+  </script>
+{% endif %}
+
+{% endblock %}

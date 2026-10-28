@@ -1,0 +1,19 @@
+{
+  "liquidador": "LIQUIDADOR",
+  "liquidador_nombre_sgs": "APELLIDO APELLIDO NOMBRE NOMBRE",
+  "sgs_uid_liquidador": 0,
+  "liquidadores_equipo": ["APELLIDO APELLIDO", "APELLIDO2 APELLIDO2"],
+  "supervisores_equipo": ["SUPERVISOR_1", "SUPERVISOR_2", "SUPERVISOR_3"],
+  "mapa_supervisor": {
+    "FRAGMENTO_NOMBRE_SGS": "SUPERVISOR_1"
+  },
+  "mapa_proyecto_supervisor": {
+    "PRO-000000": "SUPERVISOR_2"
+  },
+  "mapa_lider_supervisor": {
+    "APELLIDO APELLIDO LIDER": "SUPERVISOR_3"
+  },
+  "responsables_no_supervisor": ["FRAGMENTO_NOMBRE_SGS"],
+  "departamentos_equipo": ["DEPARTAMENTO_1", "DEPARTAMENTO_2"],
+  "departamentos_compartidos": ["DEPARTAMENTO_2"]
+}

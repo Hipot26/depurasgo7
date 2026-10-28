@@ -1,0 +1,222 @@
+{% extends "liquidador2/base.html" %}
+{% block title %}Análisis / Pruebas — Liquidador2{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+  <h1 style="font-size:1.3rem;margin:0;">Análisis y Pruebas — Liquidador2</h1>
+  <a href="{{ url_for('liquidador2.subir') }}" class="btn btn-light" style="font-size:0.82rem;">
+    ← Volver al liquidador
+  </a>
+</div>
+
+{# ── Formulario de configuración ── #}
+<div class="card" id="card-config" style="{{ 'display:none' if estado.running else '' }}">
+  <h2 style="margin-bottom:12px;">Prueba Dry-Run — Material</h2>
+  <p style="font-size:0.85rem;color:#555;margin-bottom:16px;">
+    Abre Chromium visible, navega al form del material, rellena la cantidad
+    y <strong>pausa antes de GUARDAR</strong> para que puedas inspeccionar el formulario.
+    No escribe nada en SGS.
+  </p>
+  <form id="form-ejecutar">
+    <div class="alert alert-info" style="font-size:0.84rem;margin-bottom:14px;">
+      Modo lista: solo inspecciona la vista <code>project.material</code> y registra columnas,
+      botones visibles, datos de la fila objetivo y screenshot. No escribe en SGS.
+    </div>
+    {# ── Modo ── #}
+    <div style="display:flex;gap:10px;margin-bottom:16px;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;
+                    padding:8px 16px;border-radius:8px;border:2px solid #1a1a2e;
+                    background:#1a1a2e;color:#fff;font-weight:700;font-size:0.88rem;">
+        <input type="radio" name="modo" value="lista" checked style="accent-color:#fff;">
+        Vista Lista del Proyecto
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;
+                    padding:8px 16px;border-radius:8px;border:2px solid #ccc;
+                    background:#fff;color:#555;font-size:0.88rem;">
+        <input type="radio" name="modo" value="lista2" style="accent-color:#1a1a2e;">
+        2 pestanas lista
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;
+                    padding:8px 16px;border-radius:8px;border:2px solid #ccc;
+                    background:#fff;color:#555;font-size:0.88rem;">
+        <input type="radio" name="modo" value="modal2" style="accent-color:#1a1a2e;">
+        2 modales dry-run
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;
+                    padding:8px 16px;border-radius:8px;border:2px solid #ccc;
+                    background:#fff;color:#555;font-size:0.88rem;" id="lbl-form">
+        <input type="radio" name="modo" value="form" style="accent-color:#1a1a2e;">
+        Form del material (dry-run)
+      </label>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 120px 1fr;gap:12px;margin-bottom:16px;">
+      <div>
+        <label style="font-size:0.8rem;color:#888;display:block;margin-bottom:4px;">Proyecto (código/número)</label>
+        <input name="pro_buscar" value="{{ cfg.pro_buscar }}"
+               style="width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;color:#888;display:block;margin-bottom:4px;">Código material SAP</label>
+        <input name="codigo_mat" value="{{ cfg.codigo_mat }}"
+               style="width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;color:#888;display:block;margin-bottom:4px;">Cantidad</label>
+        <input name="cantidad" type="number" step="0.0001" value="{{ cfg.cantidad }}"
+               style="width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;">
+      </div>
+      <div>
+        <label style="font-size:0.8rem;color:#888;display:block;margin-bottom:4px;">Partner (opcional)</label>
+        <input name="partner" value="{{ cfg.partner }}" placeholder="dejar vacío para rellenar a mano"
+               style="width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:0.9rem;">
+      </div>
+    </div>
+
+    <button type="submit" id="btn-ejecutar"
+            style="background:#1a1a2e;color:#fff;border:none;padding:10px 28px;
+                   border-radius:7px;font-size:0.95rem;font-weight:700;cursor:pointer;">
+      ▶ Ejecutar prueba
+    </button>
+    <span style="font-size:0.8rem;color:#aaa;margin-left:12px;">
+      Se abrirá una ventana de Chromium visible.
+    </span>
+  </form>
+</div>
+
+{# ── Panel de ejecución ── #}
+<div class="card" id="card-running" style="{{ '' if estado.running else 'display:none' }}">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span id="phase-badge" class="badge badge-blue" style="font-size:0.85rem;">
+        {{ estado.phase }}
+      </span>
+      <span id="phase-label" style="font-size:0.88rem;color:#555;"></span>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button id="btn-descartar" onclick="descartar()"
+              style="display:none;background:#e74c3c;color:#fff;border:none;padding:8px 20px;
+                     border-radius:6px;font-weight:700;cursor:pointer;font-size:0.88rem;">
+        ✕ Cerrar browser
+      </button>
+      <button onclick="resetUI()"
+              style="background:#eee;color:#555;border:none;padding:8px 16px;
+                     border-radius:6px;font-size:0.82rem;cursor:pointer;">
+        Nueva prueba
+      </button>
+    </div>
+  </div>
+
+  {# Log en tiempo real #}
+  <div id="log-area"
+       style="background:#0d1117;color:#c9d1d9;font-family:monospace;font-size:0.82rem;
+              border-radius:8px;padding:14px 16px;min-height:280px;max-height:520px;
+              overflow-y:auto;white-space:pre-wrap;line-height:1.6;">
+    {% for line in estado.logs %}{{ line }}
+{% endfor %}
+  </div>
+</div>
+
+{# ── Instrucciones ── #}
+<div class="card" style="background:#f8f9fa;margin-top:16px;">
+  <h2 style="font-size:0.95rem;">Qué hace esta prueba</h2>
+  <ol style="font-size:0.85rem;color:#555;line-height:1.8;margin:0;padding-left:20px;">
+    <li>Consulta SGS vía API para encontrar el <code>pm_id</code> del material.</li>
+    <li>Abre Chromium <strong>visible</strong> (headless=False) y hace login.</li>
+    <li>Navega al form del material — lee <code>Pendiente DOM</code> y <code>Devuelto DOM</code>.</li>
+    <li>Entra en modo edición → clica <em>Agregar una línea</em> → rellena la cantidad.</li>
+    <li><strong>Pausa</strong> — el form queda abierto. Puedes inspeccionar el dropdown, el campo de partner, el pendiente.</li>
+    <li>Pulsas <em>Descartar y cerrar</em> → el script hace click en DESCARTAR y cierra el browser.</li>
+  </ol>
+  <p style="font-size:0.82rem;color:#e74c3c;margin-top:10px;margin-bottom:0;">
+    ⚠ <strong>NO guarda nada</strong> — jamás hace click en GUARDAR.
+  </p>
+</div>
+
+<script>
+var _polling = null;
+
+document.getElementById("form-ejecutar").addEventListener("submit", function(e) {
+  e.preventDefault();
+  var data = new FormData(this);
+  fetch("{{ url_for('liquidador2.analisis_ejecutar') }}", {method:"POST", body: data})
+    .then(r => r.json())
+    .then(function(res) {
+      if (!res.ok) { alert(res.msg); return; }
+      document.getElementById("card-config").style.display  = "none";
+      document.getElementById("card-running").style.display = "";
+      startPolling();
+    });
+});
+
+function startPolling() {
+  if (_polling) clearInterval(_polling);
+  _polling = setInterval(pollEstado, 900);
+}
+
+function pollEstado() {
+  fetch("{{ url_for('liquidador2.analisis_estado') }}")
+    .then(r => r.json())
+    .then(function(d) {
+      // Actualizar log
+      var la = document.getElementById("log-area");
+      la.textContent = d.logs.join("\n");
+      la.scrollTop   = la.scrollHeight;
+
+      // Badge de fase
+      var badge = document.getElementById("phase-badge");
+      var label = document.getElementById("phase-label");
+      badge.textContent = d.phase;
+      badge.className   = "badge " + phaseClass(d.phase);
+
+      // Botón descartar: visible solo en pausa
+      var btnD = document.getElementById("btn-descartar");
+      if (d.phase === "paused") {
+        btnD.style.display = "inline-block";
+        label.textContent  = "Formulario abierto — inspecciona el browser";
+      } else if (d.phase === "running") {
+        btnD.style.display = "none";
+        label.textContent  = "Ejecutando...";
+      } else {
+        btnD.style.display = "none";
+        label.textContent  = "";
+        if (!d.running) {
+          clearInterval(_polling);
+          _polling = null;
+        }
+      }
+    });
+}
+
+function phaseClass(phase) {
+  if (phase === "paused")  return "badge badge-ok";
+  if (phase === "error")   return "badge badge-error";
+  if (phase === "done")    return "badge badge-gray";
+  return "badge badge-blue";
+}
+
+function descartar() {
+  fetch("{{ url_for('liquidador2.analisis_descartar') }}", {method:"POST"})
+    .then(r => r.json())
+    .then(function(res) {
+      document.getElementById("btn-descartar").style.display = "none";
+      document.getElementById("phase-label").textContent = res.msg || "";
+    });
+}
+
+function resetUI() {
+  clearInterval(_polling);
+  _polling = null;
+  document.getElementById("card-config").style.display  = "";
+  document.getElementById("card-running").style.display = "none";
+}
+
+// Si venimos con prueba en curso, arrancar polling
+{% if estado.running %}
+  document.getElementById("card-config").style.display  = "none";
+  document.getElementById("card-running").style.display = "";
+  startPolling();
+{% endif %}
+</script>
+
+{% endblock %}

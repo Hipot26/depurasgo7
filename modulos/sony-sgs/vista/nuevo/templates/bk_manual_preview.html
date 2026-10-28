@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vista Previa — Balance SGS Manual</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+  background: #f0f2f5; min-height: 100vh;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 32px 16px;
+}
+.card {
+  background: #fff; border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.12);
+  padding: 32px 44px; width: 1040px; max-width: 98vw;
+}
+.steps { display: flex; align-items: center; margin-bottom: 28px; }
+.step { display: flex; flex-direction: column; align-items: center; flex: 1; }
+.step-circle {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+}
+.step-circle.done { background: #375623; color: #fff; }
+.step-circle.active { background: #375623; color: #fff; }
+.step-label { font-size: 10px; color: #666; margin-top: 4px; text-align: center; }
+.step-label.active { color: #375623; font-weight: 700; }
+.step-line { flex: 1; height: 2px; }
+.step-line.done { background: #375623; }
+.step-line.pend { background: #e0e0e0; }
+
+/* Header del proyecto */
+.proj-header {
+  background: linear-gradient(135deg, #375623 0%, #4a7230 100%);
+  border-radius: 8px; padding: 18px 22px; margin-bottom: 20px; color: #fff;
+}
+.proj-lcl { font-size: 22px; font-weight: 700; letter-spacing: .04em; }
+.proj-meta { font-size: 12px; color: #c8e6b8; margin-top: 6px; display: flex; gap: 14px; flex-wrap: wrap; }
+.proj-meta span { background: rgba(255,255,255,.12); padding: 2px 8px; border-radius: 10px; }
+
+/* Stats */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 22px; }
+.stat-box {
+  background: #f8f9fb; border-radius: 7px; padding: 12px 14px;
+  text-align: center; border: 1.5px solid #e0e4e8;
+}
+.stat-box.total { background: #375623; color: #fff; border-color: #375623; }
+.stat-num { font-size: 22px; font-weight: 700; }
+.stat-lbl { font-size: 11px; color: #888; margin-top: 2px; }
+.stat-box.total .stat-lbl { color: #c8e6b8; }
+
+/* Secciones */
+.section-hdr {
+  font-size: 13px; font-weight: 700; color: #375623;
+  margin: 18px 0 10px; display: flex; align-items: center; gap: 10px;
+}
+.badge {
+  background: #E2EFDA; color: #375623; font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: 10px;
+}
+
+.tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.tbl th { background: #375623; color: #fff; padding: 7px 8px; text-align: center; }
+.tbl td { padding: 7px 8px; border-bottom: 1px solid #eee; }
+.tbl tr:nth-child(even) td { background: #f8f9fb; }
+.tbl td.c { text-align: center; }
+.tbl td.r { text-align: right; }
+.tbl .foot td { background: #FFE699; font-weight: 700; border-top: 2px solid #ccc; }
+
+/* Materiales Excel-style */
+.nodo-blk { margin-bottom: 22px; border-radius: 6px; border: 1px solid #d0d8e0; }
+.nodo-blk-hdr {
+  background: #1F3864; color: #fff; font-weight: 700;
+  padding: 7px 12px; font-size: 12px; letter-spacing: .02em;
+  border-radius: 5px 5px 0 0;
+  position: sticky; top: 0; z-index: 3;
+}
+.mat-tbl { width: 100%; border-collapse: collapse; font-size: 11px; }
+.mat-tbl th {
+  background: #375623; color: #fff; padding: 6px 6px; text-align: center; font-size: 11px;
+  position: sticky; top: 31px; z-index: 2;
+}
+.mat-tbl td { padding: 5px 6px; border-bottom: 1px solid rgba(0,0,0,.06); }
+.mat-tbl td.c { text-align: center; }
+.mat-tbl td.r { text-align: right; }
+.mat-filter-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.mat-filter-input {
+  flex: 1; min-width: 200px; padding: 7px 12px;
+  border: 1.5px solid #d4e6cc; border-radius: 6px; font-size: 12px;
+}
+.mat-filter-input:focus { outline: none; border-color: #375623; }
+.color-legend { display: flex; gap: 6px; flex-wrap: wrap; font-size: 11px; align-items: center; }
+.cl {
+  padding: 3px 10px; border-radius: 4px; border: 1.5px solid rgba(0,0,0,.12);
+  cursor: pointer; font-size: 11px; font-weight: 600; background: inherit;
+  transition: box-shadow .15s, opacity .15s, border-color .15s;
+  user-select: none;
+}
+.cl:hover { opacity: .82; border-color: rgba(0,0,0,.28); }
+.cl.activo { box-shadow: 0 0 0 2.5px #375623; border-color: #375623; font-weight: 700; }
+.cl-limpiar {
+  font-size: 11px; color: #888; cursor: pointer; text-decoration: underline;
+  display: none; margin-left: 4px;
+}
+.cl-limpiar.visible { display: inline; }
+
+/* Nodo subheader en tabla materiales (legacy) */
+.nodo-hdr td {
+  background: #1F3864; color: #fff; font-weight: 700;
+  padding: 5px 8px;
+}
+
+.no-mat { color: #888; font-size: 12px; font-style: italic; padding: 10px 0; }
+
+.btn-row { display: flex; gap: 10px; margin-top: 20px; }
+.btn {
+  padding: 12px 18px; font-size: 13px; font-weight: 700;
+  border: none; border-radius: 6px; cursor: pointer; transition: background .2s; text-decoration: none;
+  display: flex; align-items: center; justify-content: center;
+}
+.btn-back { background: #f0f2f5; color: #555; border: 1.5px solid #ccc; flex: 0 0 auto; }
+.btn-back:hover { background: #e0e4e8; }
+.btn-gen { background: #375623; color: #fff; flex: 1; font-size: 14px; }
+.btn-gen:hover { background: #4a7230; }
+.btn-gen:disabled { background: #aaa; cursor: not-allowed; }
+.btn-save { background: #fff; color: #375623; border: 1.5px solid #375623; flex: 0 0 auto; }
+.btn-save:hover { background: #f0f7ec; }
+.btn-save:disabled { opacity: .65; cursor: default; }
+.btn-rean { background: #1F3864; color: #fff; flex: 0 0 auto; }
+.btn-rean:hover { background: #2a4a80; }
+.btn-rean:disabled { background: #aaa; cursor: not-allowed; }
+.flash-ok {
+  background: #C6EFCE; color: #1e4620; border: 1.5px solid #375623;
+  border-radius: 8px; padding: 10px 14px; font-size: 13px; font-weight: 600;
+  margin-bottom: 14px;
+}
+.flash-err {
+  background: #FFC7CE; color: #7a1420; border: 1.5px solid #b91c1c;
+  border-radius: 8px; padding: 10px 14px; font-size: 13px; font-weight: 600;
+  margin-bottom: 14px;
+}
+#save-msg {
+  display: none; background: #E2EFDA; color: #375623; border: 1.5px solid #a9c894;
+  border-radius: 8px; padding: 10px 14px; font-size: 12.5px; margin-top: 12px;
+}
+
+.spinner { display: none; text-align: center; margin-top: 12px; color: #555; }
+
+/* Sección pendientes */
+.pend-hdr {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: #fff8f0; border: 2px solid #f59e0b;
+  border-radius: 8px; padding: 12px 16px;
+  margin-top: 28px; cursor: pointer; user-select: none;
+  transition: background .15s;
+}
+.pend-hdr:hover { background: #fff3e0; }
+.pend-title { font-size: 14px; font-weight: 700; color: #92400e; }
+.pend-badge-red {
+  background: #FFC7CE; color: #9b1c1c; font-size: 11px; font-weight: 700;
+  padding: 2px 10px; border-radius: 10px;
+}
+.pend-badge-ok {
+  background: #C6EFCE; color: #375623; font-size: 11px; font-weight: 700;
+  padding: 2px 10px; border-radius: 10px;
+}
+.pend-body {
+  border: 1.5px solid #f59e0b; border-top: none;
+  border-radius: 0 0 8px 8px; padding: 14px 16px 16px;
+  background: #fffdf8;
+}
+.pend-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.pend-tbl th { background: #92400e; color: #fff; padding: 6px 8px; text-align: center; font-size: 11px; }
+.pend-tbl th.pend-col { background: #b45309; }
+.pend-tbl td { padding: 6px 8px; border-bottom: 1px solid #f0e6d3; vertical-align: middle; }
+.pend-tbl td.c { text-align: center; }
+.pend-tbl td.r { text-align: right; }
+.pend-tbl tr:nth-child(even) td { background: rgba(245,158,11,.04); }
+.pend-val { font-weight: 700; color: #9b1c1c; }
+
+/* Hojas del Excel */
+.sheets-legend {
+  margin-top: 20px; padding: 12px 14px;
+  background: #f8f9fb; border-radius: 6px; font-size: 12px;
+}
+.sheets-legend strong { display: block; margin-bottom: 8px; color: #333; }
+.sheet-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="steps">
+    <div class="step"><div class="step-circle done">✓</div><div class="step-label">Datos del proyecto</div></div>
+    <div class="step-line done"></div>
+    <div class="step"><div class="step-circle done">✓</div><div class="step-label">MO + Materiales</div></div>
+    <div class="step-line done"></div>
+    <div class="step"><div class="step-circle active">3</div><div class="step-label active">Vista previa</div></div>
+  </div>
+
+  {% if reanalisis %}
+  <div class="flash-ok">✓ SGS reconsultado — bandejas, despachos y devoluciones actualizados al momento.</div>
+  {% elif reanalisis_error %}
+  <div class="flash-err">⚠ No se pudo reconsultar SGS: {{ reanalisis_error }} — se muestran los datos anteriores.</div>
+  {% endif %}
+
+  <!-- Header del proyecto -->
+  <div class="proj-header">
+    <div class="proj-lcl">{{ sesion.lcl_odm }}</div>
+    <div class="proj-meta">
+      <span>{{ sesion.padre.get('code', '—') }}</span>
+      {% set sup = sesion.padre.get('responsible_id') %}
+      {% if sup %}<span>Supervisor: {{ sup[1] if sup is iterable and sup|length >= 2 else sup }}</span>{% endif %}
+      {% if sesion.get('pdl') %}<span>PDL: {{ sesion.pdl }}</span>{% endif %}
+      <span>{{ sesion.creado_at }}</span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  {% set _nodos_mat = sesion.get('nodos_mat', []) %}
+  {% set n_nodos = _nodos_mat|length %}
+  {% set n_mat_total = namespace(v=0) %}
+  {% for nodo in _nodos_mat %}
+    {% set n_mat_total.v = n_mat_total.v + nodo.get('liq_materiales', [])|length %}
+  {% endfor %}
+  {% set total_mo_pesos = sesion.rows_mo|sum(attribute='subtotal') %}
+  <div class="stats">
+    <div class="stat-box">
+      <div class="stat-num">{{ sesion.rows_mo|length }}</div>
+      <div class="stat-lbl">Actividades MO</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num">{{ n_nodos }}</div>
+      <div class="stat-lbl">Nodos SGS</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num">{{ n_mat_total.v }}</div>
+      <div class="stat-lbl">Materiales SGS</div>
+    </div>
+    <div class="stat-box total">
+      <div class="stat-num" style="font-size:15px">${{ '{:,.0f}'.format(total_mo_pesos) }}</div>
+      <div class="stat-lbl">Valor total MO</div>
+    </div>
+  </div>
+
+  <!-- Tabla MO -->
+  <div class="section-hdr">
+    ⚡ Mano de Obra
+    <span class="badge">{{ sesion.rows_mo|length }} actividades</span>
+    <a href="/manual/mo/{{ sid }}" style="margin-left:auto;font-size:11px;color:#375623;text-decoration:none">✏ Editar</a>
+  </div>
+
+  {% if sesion.rows_mo %}
+  <table class="tbl">
+    <tr><th>Nodo</th><th>Código QP</th><th>Descripción</th><th>UM</th><th>Precio Unit.</th><th>Cant.</th><th>Subtotal</th></tr>
+    {% for r in sesion.rows_mo %}
+    <tr>
+      <td class="c">{{ r.nodo }}</td>
+      <td class="c">{{ r.qp }}</td>
+      <td style="font-size:11px">{{ r.get('desc','') or '—' }}</td>
+      <td class="c">{{ r.get('unidad','C/U') }}</td>
+      <td class="r" style="font-size:11px">{{ '${:,.0f}'.format(r.get('precio_unit',0)) if r.get('precio_unit',0) else '—' }}</td>
+      <td class="c">{{ r.cantidad }}</td>
+      <td class="r" style="font-weight:700">{{ '${:,.0f}'.format(r.get('subtotal',0)) if r.get('subtotal',0) else '—' }}</td>
+    </tr>
+    {% endfor %}
+    {% set total_cant = sesion.rows_mo|sum(attribute='cantidad') %}
+    {% set total_sub  = sesion.rows_mo|sum(attribute='subtotal') %}
+    <tr class="foot">
+      <td colspan="5">TOTAL MO</td>
+      <td class="c">{{ total_cant }}</td>
+      <td class="r">${{ '{:,.0f}'.format(total_sub) }}</td>
+    </tr>
+  </table>
+  {% else %}
+  <div class="no-mat">Sin actividades de MO.</div>
+  {% endif %}
+
+  <!-- Tabla Materiales por nodo — vista idéntica al Excel -->
+  <div class="section-hdr" style="margin-top:22px">
+    📦 Materiales SGS
+    <span class="badge">{{ preview_materiales|length if preview_materiales else 0 }} nodo(s)</span>
+    <a href="/manual/paso2/{{ sid }}" style="margin-left:auto;font-size:11px;color:#375623;text-decoration:none">✏ Editar</a>
+  </div>
+
+  {% if preview_materiales %}
+  <div class="mat-filter-bar">
+    <div class="color-legend">
+      <button class="cl" data-filtro="OK"        style="background:#C6EFCE" onclick="filtrarEstado(this)">OK</button>
+      <button class="cl" data-filtro="PENDIENTE" style="background:#FFEB9C" onclick="filtrarEstado(this)">PENDIENTE</button>
+      <button class="cl" data-filtro="DESCUADRE" style="background:#FFC7CE" onclick="filtrarEstado(this)">DESCUADRE</button>
+      <button class="cl" data-filtro="DEVOLUCION" style="background:#DEEBF7" onclick="filtrarEstado(this)">DEVOLUCIÓN</button>
+      <button class="cl" data-filtro="SIN MOV"  style="background:#F2F2F2" onclick="filtrarEstado(this)">SIN MOV</button>
+      <span class="cl-limpiar" id="cl-limpiar" onclick="limpiarFiltroEstado()">× limpiar filtro</span>
+    </div>
+    <input type="text" class="mat-filter-input" id="mat-filter"
+           placeholder="Buscar SAP, descripción o nodo…"
+           oninput="filtrarMateriales(this.value)">
+  </div>
+
+  <div id="mat-container">
+  {% for nd in preview_materiales %}
+  <div class="nodo-blk" id="nblk-{{ loop.index }}"
+       data-nodo="{{ nd.code|lower }} {{ nd.num|lower }} {{ nd.nombre_completo|lower }}">
+    <div class="nodo-blk-hdr">
+      [{{ nd.code }}] &nbsp; {{ nd.nombre_completo }}
+    </div>
+    <table class="mat-tbl">
+      <thead>
+        <tr>
+          <th style="width:28px">#</th>
+          <th style="width:90px">Código SAP</th>
+          <th>Descripción</th>
+          <th style="width:100px">Bdjas Desp.</th>
+          <th style="width:90px">Bdjas Dev.</th>
+          <th style="width:62px">Despachos</th>
+          <th style="width:62px">Devol.</th>
+          <th style="width:62px">Bal. Neto</th>
+          <th style="width:72px">Consumido</th>
+          <th style="width:95px">Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in nd.filas %}
+        <tr class="mat-row" data-search="{{ f.sap }} {{ f.desc|lower }}"
+            data-estado="{{ f.estado }}"
+            style="background:#{{ f.color }}">
+          <td class="c">{{ loop.index }}</td>
+          <td class="c" style="font-family:monospace">{{ f.sap }}</td>
+          <td>{{ f.desc }}</td>
+          <td class="c" style="font-size:10px">{{ f.ban_desp }}</td>
+          <td class="c" style="font-size:10px">{{ f.ban_dev }}</td>
+          <td class="c">{{ f.tray }}</td>
+          <td class="c">{{ f.devoluciones }}</td>
+          <td class="c" style="font-weight:700">{{ f.neto }}</td>
+          <td class="c">{{ f.consumido }}</td>
+          <td class="c" style="font-weight:600">{{ f.estado }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="subtot-row" style="background:#FFE699;font-weight:700">
+          <td colspan="5" style="text-align:right;padding-right:10px">Subtotal Nodo {{ nd.num }}</td>
+          <td class="c">{{ nd.totales.tray }}</td>
+          <td class="c">{{ nd.totales.dev }}</td>
+          <td class="c">{{ nd.totales.neto }}</td>
+          <td class="c">{{ nd.totales.cons }}</td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+  </div>
+  {% else %}
+  <div class="no-mat">Sin datos de materiales SGS.</div>
+  {% endif %}
+
+  <!-- Líderes -->
+  {% if sesion.get('lideres') %}
+  <div class="section-hdr" style="margin-top:22px">
+    👤 Distribución por Líderes
+    <span class="badge">{{ sesion.lideres|length }} líder(es)</span>
+  </div>
+  <table class="tbl">
+    <tr><th style="width:36px">#</th><th style="width:120px">Cédula</th><th>Nombre del Líder</th><th style="width:100px">% del Total</th></tr>
+    {% for l in sesion.lideres %}
+    <tr>
+      <td class="c">{{ loop.index }}</td>
+      <td class="c" style="font-family:monospace">{{ l.cedula or '—' }}</td>
+      <td>{{ l.nombre }}</td>
+      <td class="c" style="font-weight:700">{{ l.pct }}%</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  <!-- ═══ MATERIALES PENDIENTES ═══ -->
+  {# Calcular pendientes usando lógica de liquidador2: pendiente = neto - consumido > 0 #}
+  {% set _p = namespace(items=[], nodos=0) %}
+  {% for nd in preview_materiales %}
+    {% set _nd_pend = namespace(count=0) %}
+    {% for f in nd.filas %}
+      {% set _pv = (f.neto - f.consumido) if (f.neto and f.neto > 0) else 0 %}
+      {% if _pv > 0 or 'PENDIENTE' in f.estado or 'BAJO LIQ' in f.estado %}
+        {% set _nd_pend.count = _nd_pend.count + 1 %}
+        {% set _ = _p.items.append({'nodo': nd.num, 'code': nd.code, 'nombre': nd.nombre_completo,
+                                    'sap': f.sap, 'desc': f.desc,
+                                    'neto': f.neto, 'consumido': f.consumido,
+                                    'pv': _pv if _pv > 0 else f.neto,
+                                    'estado': f.estado, 'color': f.color}) %}
+      {% endif %}
+    {% endfor %}
+    {% if _nd_pend.count > 0 %}{% set _p.nodos = _p.nodos + 1 %}{% endif %}
+  {% endfor %}
+
+  {% if preview_materiales %}
+  <div class="pend-hdr" onclick="togglePend(this)">
+    <span class="pend-title">⚠ Materiales Pendientes de Liquidar</span>
+    {% if _p.items|length > 0 %}
+      <span class="pend-badge-red">{{ _p.items|length }} material(es) en {{ _p.nodos }} nodo(s)</span>
+    {% else %}
+      <span class="pend-badge-ok">✓ Sin pendientes — todo liquidado</span>
+    {% endif %}
+    <span style="margin-left:auto;font-size:12px;color:#92400e;font-weight:600" data-tog>▼ Ver detalle</span>
+  </div>
+
+  {% if _p.items|length > 0 %}
+  <div class="pend-body" id="pend-body" style="display:none">
+    <div style="font-size:12px;color:#92400e;margin-bottom:10px">
+      Estos materiales tienen balance neto despachado mayor al consumido registrado en SGS.
+      Usa esta tabla para identificar qué falta liquidar antes de cerrar el balance.
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+      <input type="text" class="mat-filter-input" style="max-width:320px"
+             id="pend-search" placeholder="Buscar SAP, descripción o nodo…"
+             oninput="filtrarPendientes(this.value)">
+      <span style="font-size:11px;color:#888" id="pend-count-lbl">{{ _p.items|length }} materiales</span>
+    </div>
+    <table class="pend-tbl" id="pend-tbl">
+      <thead>
+        <tr>
+          <th style="width:52px">Nodo</th>
+          <th style="width:90px">PRO</th>
+          <th style="width:88px">Código SAP</th>
+          <th>Descripción</th>
+          <th style="width:62px">Bal. Neto</th>
+          <th style="width:68px">Consumido</th>
+          <th class="pend-col" style="width:74px">Pendiente</th>
+          <th style="width:100px">Estado SGS</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in _p.items %}
+        <tr data-ps="{{ it.sap|lower }} {{ it.desc|lower }} {{ it.nodo|lower }}">
+          <td class="c" style="font-weight:700">{{ it.nodo }}</td>
+          <td class="c" style="font-size:10px;font-family:monospace">{{ it.code }}</td>
+          <td class="c" style="font-family:monospace">{{ it.sap }}</td>
+          <td style="font-size:11px">{{ it.desc }}</td>
+          <td class="c">{{ it.neto }}</td>
+          <td class="c">{{ it.consumido }}</td>
+          <td class="c pend-val">{{ it.pv }}</td>
+          <td class="c" style="font-size:11px;font-weight:600;color:#92400e">{{ it.estado }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="pend-body" id="pend-body" style="display:none">
+    <div style="font-size:13px;color:#375623;padding:10px 0">
+      ✓ Todos los materiales están correctamente liquidados o sin movimiento.
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  <!-- Hojas del Excel -->
+  <div class="sheets-legend">
+    <strong>Hojas del Excel generado</strong>
+    <div class="sheet-row"><div class="dot" style="background:#375623"></div> MO_MANUAL — actividades de mano de obra + distribución por líderes</div>
+    <div class="sheet-row"><div class="dot" style="background:#375623"></div> SGS_BALANCE — bandejas vs liquidación por nodo (con colores de estado)</div>
+    <div class="sheet-row"><div class="dot" style="background:#1F3864"></div> CRUCE_MAT —
+      {% if sesion.modo_mat == 'manual_sap' %}comparativa materiales manuales vs SGS{% else %}resumen SGS neto vs consumido{% endif %}
+    </div>
+  </div>
+
+  <!-- Botones -->
+  <form method="POST" action="/manual/generar/{{ sid }}" id="frm-gen">
+    <div class="btn-row">
+      <a class="btn btn-back" href="/manual/paso2/{{ sid }}">← Editar MO / Materiales</a>
+      <button type="button" class="btn btn-save" id="btn-save" onclick="guardarBalance()">💾 Guardar</button>
+      <button type="submit" class="btn btn-rean" id="btn-rean"
+              formaction="/manual/reanalizar/{{ sid }}" formmethod="post"
+              onclick="_reanClick = true">⟳ Reanalizar SGS</button>
+      <button type="submit" class="btn btn-gen" id="btn-gen">
+        ⬇ Descargar Excel
+      </button>
+    </div>
+    <div class="spinner" id="sp">Generando Excel…</div>
+    <div id="save-msg"></div>
+  </form>
+
+</div>
+
+<script>
+var _reanClick = false;
+document.getElementById('frm-gen').addEventListener('submit', function() {
+  document.getElementById('btn-gen').disabled  = true;
+  document.getElementById('btn-rean').disabled = true;
+  var sp = document.getElementById('sp');
+  sp.textContent = _reanClick
+    ? 'Reconsultando SGS — bandejas, despachos y devoluciones frescas… (puede tardar un momento)'
+    : 'Generando Excel…';
+  sp.style.display = 'block';
+});
+
+function guardarBalance() {
+  var btn = document.getElementById('btn-save');
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+  fetch('/manual/guardar/{{ sid }}', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      btn.disabled = false;
+      if (d.ok) {
+        btn.textContent = '✓ Guardado';
+        var m = document.getElementById('save-msg');
+        m.innerHTML = '✓ Balance guardado: <strong>' + d.resumen + '</strong>. ' +
+          'Puedes cerrar el navegador — cuando el almacén haga lo suyo, retómalo en ' +
+          '<strong>Inicio → Balance SGS Puro → ⟳ Retomar balance guardado</strong>.';
+        m.style.display = 'block';
+        setTimeout(function() { btn.textContent = '💾 Guardar'; }, 5000);
+      } else {
+        btn.textContent = '💾 Guardar';
+        alert('No se pudo guardar: ' + (d.error || 'error desconocido'));
+      }
+    })
+    .catch(function() {
+      btn.disabled = false;
+      btn.textContent = '💾 Guardar';
+      alert('Error de red al guardar — revisa la conexión.');
+    });
+}
+
+var _estadoFiltro = null;
+
+function matchEstado(estado, filtro) {
+  var e = (estado || '').toUpperCase();
+  switch (filtro) {
+    case 'OK':        return e === 'OK';
+    case 'PENDIENTE': return e === 'PENDIENTE' || e.indexOf('BAJO LIQ') !== -1;
+    case 'DESCUADRE': return e.indexOf('SOBRE LIQ') !== -1;
+    case 'DEVOLUCION': return e.indexOf('DEVOLUCION') !== -1;
+    case 'SIN MOV':   return e === 'SIN MOV';
+    default:          return true;
+  }
+}
+
+function filtrarEstado(btn) {
+  var key = btn.getAttribute('data-filtro');
+  if (_estadoFiltro === key) {
+    limpiarFiltroEstado();
+    return;
+  }
+  _estadoFiltro = key;
+  document.querySelectorAll('.cl[data-filtro]').forEach(function(b) {
+    b.classList.toggle('activo', b.getAttribute('data-filtro') === key);
+  });
+  var lbl = document.getElementById('cl-limpiar');
+  if (lbl) lbl.classList.add('visible');
+  filtrarMateriales(document.getElementById('mat-filter') ? document.getElementById('mat-filter').value : '');
+}
+
+function limpiarFiltroEstado() {
+  _estadoFiltro = null;
+  document.querySelectorAll('.cl[data-filtro]').forEach(function(b) { b.classList.remove('activo'); });
+  var lbl = document.getElementById('cl-limpiar');
+  if (lbl) lbl.classList.remove('visible');
+  filtrarMateriales(document.getElementById('mat-filter') ? document.getElementById('mat-filter').value : '');
+}
+
+function filtrarMateriales(q) {
+  q = (q || '').toLowerCase().trim();
+  var bloques = document.querySelectorAll('.nodo-blk');
+  bloques.forEach(function(blk) {
+    var nodoData = (blk.getAttribute('data-nodo') || '').toLowerCase();
+    var nodoTextMatch = !q || nodoData.includes(q);
+    var rowMatch = false;
+    blk.querySelectorAll('.mat-row').forEach(function(row) {
+      var s = (row.getAttribute('data-search') || '').toLowerCase();
+      var estado = row.getAttribute('data-estado') || '';
+      var textOk  = !q || nodoTextMatch || s.includes(q);
+      var estadoOk = !_estadoFiltro || matchEstado(estado, _estadoFiltro);
+      var show = textOk && estadoOk;
+      row.style.display = show ? '' : 'none';
+      if (show) rowMatch = true;
+    });
+    var subtot = blk.querySelector('.subtot-row');
+    if (subtot) subtot.style.display = rowMatch ? '' : 'none';
+    blk.style.display = rowMatch ? '' : 'none';
+  });
+}
+
+// ── Materiales Pendientes ─────────────────────────────────────────────────────
+function togglePend(hdr) {
+  var body = document.getElementById('pend-body');
+  var tog  = hdr.querySelector('[data-tog]');
+  if (!body) return;
+  var open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : '';
+  if (tog) tog.textContent = open ? '▼ Ver detalle' : '▲ Ocultar';
+}
+
+function filtrarPendientes(q) {
+  q = (q || '').toLowerCase().trim();
+  var rows = document.querySelectorAll('#pend-tbl tbody tr');
+  var visible = 0;
+  rows.forEach(function(row) {
+    var s = (row.getAttribute('data-ps') || '').toLowerCase();
+    var show = !q || s.includes(q);
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  var lbl = document.getElementById('pend-count-lbl');
+  if (lbl) lbl.textContent = (q ? visible + ' de ' + rows.length : rows.length) + ' materiales';
+}
+</script>
+</body>
+</html>

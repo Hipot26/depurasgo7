@@ -1,0 +1,90 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Liquidando Lote — SGS UI{% endblock %}
+{% block content %}
+
+<div class="card" style="max-width:640px;margin:40px auto;">
+  <h2>Liquidando lote...</h2>
+  <p style="color:#666;margin-bottom:20px;font-size:0.9rem;">
+    {{ s.filename }} — {{ s.rows_mo|length }} filas, {{ s.dfs_unicos|length }} DFs
+  </p>
+
+  <div id="barra-contenedor" style="background:#f0f2f5;border-radius:8px;height:18px;
+                                     overflow:hidden;margin-bottom:14px;">
+    <div id="barra" style="height:100%;width:0%;background:#27ae60;
+                            transition:width 0.4s;border-radius:8px;"></div>
+  </div>
+
+  <div id="estado-txt" style="font-size:0.9rem;color:#555;margin-bottom:18px;">
+    Iniciando...
+  </div>
+
+  <div id="lista-items" style="max-height:300px;overflow-y:auto;font-size:0.82rem;"></div>
+
+  <div style="margin-top:20px;display:flex;gap:10px;">
+    <form method="post" action="{{ url_for('julian_lote.cancelar', sid=sid) }}">
+      <button type="submit" class="btn btn-danger" id="btn-cancelar">Cancelar</button>
+    </form>
+    <a id="btn-resultado" href="{{ url_for('julian_lote.resultado', sid=sid) }}"
+       class="btn btn-success" style="display:none;">Ver resultado</a>
+  </div>
+</div>
+
+<script>
+const SID = "{{ sid }}";
+const URL_PROGRESO  = "{{ url_for('julian_lote.progreso', sid=sid) }}";
+const URL_RESULTADO = "{{ url_for('julian_lote.resultado', sid=sid) }}";
+
+function iconoEstado(est) {
+  if (est === "ok")        return '<span style="color:#27ae60;">✓</span>';
+  if (est === "error")     return '<span style="color:#e74c3c;">✗</span>';
+  if (est === "corriendo") return '<span style="color:#2980b9;">⟳</span>';
+  return '<span style="color:#aaa;">·</span>';
+}
+
+async function poll() {
+  try {
+    const r = await fetch(URL_PROGRESO);
+    const d = await r.json();
+
+    const total  = d.total  || 0;
+    const hechos = d.hechos || 0;
+    const pct    = total > 0 ? Math.round(hechos / total * 100) : 0;
+
+    document.getElementById("barra").style.width = pct + "%";
+    document.getElementById("estado-txt").textContent =
+      `${hechos} / ${total} ítems — ${pct}% — errores: ${d.errores || 0}`;
+
+    // Lista de items
+    if (d.items && d.items.length) {
+      const lines = d.items.map((it, i) =>
+        `<div style="padding:2px 0;">${iconoEstado(it.estado)} [${i}] ${it.error || it.estado}</div>`
+      ).join("");
+      document.getElementById("lista-items").innerHTML = lines;
+    }
+
+    if (d.error_global) {
+      document.getElementById("estado-txt").innerHTML =
+        `<span style="color:#e74c3c;">Error global: ${d.error_global}</span>`;
+    }
+
+    if (d.estado === "listo" || d.estado === "cancelado") {
+      document.getElementById("btn-cancelar").disabled = true;
+      document.getElementById("btn-resultado").style.display = "inline-block";
+      document.getElementById("estado-txt").textContent =
+        d.estado === "cancelado"
+          ? "Cancelado — " + hechos + " ítems procesados."
+          : `Listo — ${hechos - (d.errores||0)} OK, ${d.errores||0} errores.`;
+      // Auto-redirect en 3s
+      setTimeout(() => { window.location = URL_RESULTADO; }, 3000);
+      return;
+    }
+  } catch(e) {
+    document.getElementById("estado-txt").textContent = "Error de conexión, reintentando...";
+  }
+  setTimeout(poll, 2000);
+}
+
+poll();
+</script>
+
+{% endblock %}

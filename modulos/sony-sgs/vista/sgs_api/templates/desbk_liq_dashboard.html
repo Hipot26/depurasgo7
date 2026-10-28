@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ERP Liquidador</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Calibri, Candara, sans-serif;
+      background: #f0f3f7;
+      color: #1a1a1a;
+      min-height: 100vh;
+    }
+
+    /* ── Topbar ── */
+    .topbar {
+      background: #1F3864;
+      padding: 0 28px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .topbar h1 {
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: .4px;
+    }
+    .topbar .right { display: flex; align-items: center; gap: 16px; }
+    .topbar .badge-fase {
+      background: #2e75b6;
+      color: #fff;
+      font-size: .72rem;
+      padding: 3px 10px;
+      border-radius: 10px;
+    }
+    .topbar a.logout {
+      color: #a8bcd4;
+      text-decoration: none;
+      font-size: .82rem;
+    }
+    .topbar a.logout:hover { color: #fff; }
+
+    /* ── Layout ── */
+    .main { max-width: 900px; margin: 32px auto; padding: 0 20px; }
+
+    /* ── Upload card ── */
+    .upload-card {
+      background: #fff;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      padding: 32px 36px;
+      margin-bottom: 24px;
+    }
+    .upload-card h2 {
+      color: #1F3864;
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .upload-card p {
+      color: #555;
+      font-size: .88rem;
+      margin-bottom: 22px;
+      line-height: 1.5;
+    }
+
+    .drop-zone {
+      border: 2.5px dashed #b0c4de;
+      border-radius: 6px;
+      padding: 36px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      background: #f7fafd;
+    }
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: #2e75b6;
+      background: #eef4fb;
+    }
+    .drop-zone .icon { font-size: 2.5rem; margin-bottom: 10px; }
+    .drop-zone .label {
+      font-size: .95rem;
+      color: #2e75b6;
+      font-weight: 600;
+    }
+    .drop-zone .sub {
+      font-size: .8rem;
+      color: #888;
+      margin-top: 4px;
+    }
+
+    input[type="file"] { display: none; }
+
+    .file-selected {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background: #e8f4e8;
+      border: 1.5px solid #4caf50;
+      border-radius: 5px;
+      padding: 10px 14px;
+      margin-top: 12px;
+      font-size: .88rem;
+      color: #2e7d32;
+    }
+    .file-selected .fname { font-weight: 600; word-break: break-all; }
+
+    .btn-upload {
+      margin-top: 18px;
+      padding: 11px 28px;
+      background: #1F3864;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: .95rem;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .btn-upload:hover { background: #2e75b6; }
+    .btn-upload:disabled { background: #aaa; cursor: not-allowed; }
+
+    /* ── Formato esperado ── */
+    .format-card {
+      background: #fff;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      padding: 24px 36px;
+      margin-bottom: 24px;
+    }
+    .format-card h3 {
+      color: #1F3864;
+      font-size: .95rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    table.fmt {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .83rem;
+    }
+    table.fmt th {
+      background: #1F3864;
+      color: #fff;
+      padding: 7px 12px;
+      text-align: left;
+      font-weight: 600;
+    }
+    table.fmt td {
+      padding: 6px 12px;
+      border-bottom: 1px solid #e8edf3;
+      color: #444;
+    }
+    table.fmt tr:last-child td { border-bottom: none; }
+    table.fmt tr:nth-child(even) td { background: #f6f8fb; }
+    .req { color: #c00; font-weight: 700; }
+
+    /* ── Log ── */
+    .log-card {
+      background: #fff;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      padding: 20px 36px;
+    }
+    .log-card h3 {
+      color: #1F3864;
+      font-size: .9rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+    .log-list {
+      font-family: "Consolas", "Courier New", monospace;
+      font-size: .75rem;
+      color: #444;
+      list-style: none;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .log-list li {
+      padding: 3px 0;
+      border-bottom: 1px solid #f0f0f0;
+      word-break: break-all;
+    }
+    .log-list li:first-child { border-top: 1px solid #f0f0f0; }
+
+    /* ── Error banner ── */
+    .err-banner {
+      background: #fde8e8;
+      border-left: 4px solid #c00;
+      color: #7b0000;
+      padding: 12px 16px;
+      border-radius: 3px;
+      font-size: .88rem;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>ERP — Sistema Liquidador</h1>
+  <div class="right">
+    <span class="badge-fase">Fase 1 — Importar y Verificar</span>
+    <a href="{{ url_for('liquidacion.logout') }}" class="logout">Cerrar sesión</a>
+  </div>
+</div>
+
+<div class="main">
+
+  {% if error %}
+  <div class="err-banner">{{ error }}</div>
+  {% endif %}
+
+  <!-- Upload card -->
+  <div class="upload-card">
+    <h2>Suba su plantilla aquí</h2>
+    <p>
+      Cargue el archivo <strong>balance_integrado_XXXX.xlsx</strong> o cualquier
+      plantilla con columnas <strong>PRO / CODIGO / CANTIDAD</strong>.<br>
+      El sistema leerá, validará y mostrará un resumen antes de ejecutar cualquier acción.
+    </p>
+
+    <form method="post" action="{{ url_for('liquidacion.upload') }}"
+          enctype="multipart/form-data" id="uploadForm">
+      <input type="file" name="archivo" id="fileInput" accept=".xlsx">
+
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+        <div class="icon">📂</div>
+        <div class="label">Haga clic o arrastre el archivo aquí</div>
+        <div class="sub">Solo archivos .xlsx</div>
+      </div>
+
+      <div class="file-selected" id="fileSelected">
+        <span>📄</span>
+        <span class="fname" id="fileName"></span>
+      </div>
+
+      <button class="btn-upload" type="submit" id="btnUpload" disabled>
+        Cargar y analizar plantilla
+      </button>
+    </form>
+  </div>
+
+  <!-- Formato esperado -->
+  <div class="format-card">
+    <h3>Formato esperado de la plantilla</h3>
+    <table class="fmt">
+      <tr>
+        <th>Columna</th>
+        <th>Ejemplo</th>
+        <th>Requerida</th>
+        <th>Descripción</th>
+      </tr>
+      <tr>
+        <td><strong>PRO</strong></td>
+        <td>PRO-052365</td>
+        <td class="req">Sí</td>
+        <td>Código del proyecto en ERP</td>
+      </tr>
+      <tr>
+        <td><strong>CODIGO</strong></td>
+        <td>QP1071</td>
+        <td class="req">Sí</td>
+        <td>Código de prestación / actividad</td>
+      </tr>
+      <tr>
+        <td><strong>CANTIDAD</strong></td>
+        <td>1</td>
+        <td class="req">Sí</td>
+        <td>Cantidad a liquidar (número)</td>
+      </tr>
+      <tr>
+        <td><strong>DESCRIPCION</strong></td>
+        <td>Instalación cruceta</td>
+        <td>No</td>
+        <td>Referencia visual (ignorada por el motor)</td>
+      </tr>
+      <tr>
+        <td><strong>LIDER</strong></td>
+        <td>CARDENAS P.</td>
+        <td>No</td>
+        <td>Si está vacío, el sistema usa el líder del proyecto</td>
+      </tr>
+    </table>
+    <p style="margin-top:10px;font-size:.78rem;color:#888;">
+      El sistema también detecta automáticamente el formato <em>SIP_MANO_OBRA</em> de balance_integrado.
+    </p>
+  </div>
+
+  <!-- Log de actividad -->
+  {% if log_lines %}
+  <div class="log-card">
+    <h3>Actividad reciente</h3>
+    <ul class="log-list">
+      {% for line in log_lines %}
+      <li>{{ line }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+  const input    = document.getElementById("fileInput");
+  const selected = document.getElementById("fileSelected");
+  const fname    = document.getElementById("fileName");
+  const btn      = document.getElementById("btnUpload");
+  const drop     = document.getElementById("dropZone");
+
+  input.addEventListener("change", () => {
+    if (input.files.length > 0) {
+      fname.textContent = input.files[0].name;
+      selected.style.display = "flex";
+      btn.disabled = false;
+    }
+  });
+
+  drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("dragover"); });
+  drop.addEventListener("dragleave", ()  => drop.classList.remove("dragover"));
+  drop.addEventListener("drop", e => {
+    e.preventDefault();
+    drop.classList.remove("dragover");
+    if (e.dataTransfer.files.length > 0) {
+      input.files = e.dataTransfer.files;
+      fname.textContent = input.files[0].name;
+      selected.style.display = "flex";
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById("uploadForm").addEventListener("submit", () => {
+    btn.disabled = true;
+    btn.textContent = "Cargando...";
+  });
+</script>
+
+</body>
+</html>

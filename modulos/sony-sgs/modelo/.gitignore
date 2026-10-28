@@ -1,0 +1,85 @@
+# Dependencias y cache Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Carpetas generadas por planilla (17079/, 17082/, etc.)
+[0-9]*/
+
+# Archivos Excel y HTML generados en la raiz
+*.xls
+*.xlsx
+*.html
+!nuevo/templates/*.html
+
+# Archivos SGS subidos temporalmente
+_sgs_temp/
+
+# Archivos SGS de ejemplo/datos reales
+SGS/
+
+# Credenciales y sesion
+config.json
+sipwebora_session.py
+
+# Configuracion local de Claude
+.claude/
+
+# --- SGO7: git de producción sin remoto (16 oct 2026). Ni secretos ni datos en el repositorio. ---
+# Secretos y credenciales
+.env*
+*.env
+config*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+.agente_token
+*.token
+credentials*
+storage_state*.json
+cookies*.json
+sipwebora_session.py
+# Entornos, dependencias y builds
+venv/
+.venv/
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+frontend/dist/
+# Datos, sesiones y perfiles del navegador, certificados generados, logs
+data/
+logs/
+*.log
+whatsapp-bot/auth/
+*sesiones*/
+*_sesion*/
+*profile*/
+*perfil*/
+*_certs/
+almacen_data/
+input/
+input_presupuesto/
+output/
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+# Copias de seguridad de parches
+*.bak*
+.backup_*/
+# Configuración local de herramientas
+.claude/
+# Código HTML que el .gitignore original tapaba con *.html (16 oct 2026)
+!nuevo/*.html
+!sgs_api/templates/*.html
+
+# excluidos en la revisión del índice (16 oct 2026): posibles credenciales, datos o más de 5 MB
+/ecosystem.config.js
+/nuevo/templates/app.py
+/reparar_330661.py
+/reparar_batch.py
+/reparar_nodo2.py
+/snapshot_nodo1.py

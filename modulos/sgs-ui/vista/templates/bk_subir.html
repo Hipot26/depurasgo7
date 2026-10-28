@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Subir Excel — SGS UI{% endblock %}
+{% block content %}
+<div class="card" style="max-width:500px;margin:60px auto;">
+  <h2>Subir plantilla Excel</h2>
+  <p style="color:#666;margin-bottom:20px;font-size:0.9rem;">
+    El sistema detectara automaticamente las hojas de
+    <strong>Mano de Obra</strong> (SIP_MANO_OBRA) y
+    <strong>Materiales</strong> (CRUCE_LIQUIDADOR).
+  </p>
+  <form method="post" enctype="multipart/form-data">
+    <div style="border:2px dashed #ddd;border-radius:8px;padding:30px;text-align:center;margin-bottom:16px;background:#fafbfc;">
+      <input type="file" name="excel" accept=".xlsx,.xlsm,.xls"
+             style="font-size:0.9rem;" required>
+      <p style="margin-top:10px;color:#aaa;font-size:0.8rem;">.xlsx / .xlsm / .xls</p>
+    </div>
+    <button type="submit" class="btn btn-primary" style="width:100%">
+      Cargar y verificar contra SGS
+    </button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Formato RG02 · RG03 — {{ filename }}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Calibri, 'Segoe UI', Arial, sans-serif; background: #f0f2f5; padding: 26px 14px 60px; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  .head { background: #fff; border-radius: 10px; box-shadow: 0 3px 14px rgba(0,0,0,.10); padding: 22px 28px; margin-bottom: 16px; }
+  .head h1 { font-size: 17px; color: #7B3F00; display: flex; align-items: center; gap: 10px; }
+  .head .file { font-size: 12px; color: #666; margin-top: 3px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 8px; margin-top: 12px; }
+  .chip { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 10px; background: #f2ede6; color: #7B3F00; }
+  .chip b { font-weight: 700; }
+
+  .warn { margin-top: 14px; padding: 10px 14px; background: #fff8e1; border-left: 4px solid #e6a817;
+          border-radius: 4px; font-size: 12.5px; color: #7a5c00; }
+  .warn div + div { margin-top: 4px; }
+  .error-key { margin-top: 14px; padding: 10px 14px; background: #ffeaea; border-left: 4px solid #e53;
+               border-radius: 4px; font-size: 13px; color: #c00; }
+
+  .toolbar { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; align-items: center; }
+  .btn { padding: 10px 18px; color: #fff; border: none; border-radius: 6px;
+         font-size: 13px; font-weight: 600; cursor: pointer; transition: background .2s, opacity .2s; }
+  .btn:disabled { background: #aaa !important; cursor: not-allowed; }
+  .btn-gen { background: #7B3F00; } .btn-gen:hover { background: #9a5518; }
+  .btn-dl  { background: #1F3864; } .btn-dl:hover { background: #2E75B6; }
+  .btn-back { background: #e8ecf0; color: #555; } .btn-back:hover { background: #d0d5da; }
+  #progreso { font-size: 12.5px; color: #555; }
+
+  .foto-card { background: #fff; border-radius: 10px; box-shadow: 0 3px 14px rgba(0,0,0,.08);
+               padding: 18px 22px; margin-bottom: 14px; display: flex; gap: 20px; }
+  .foto-img { flex: 0 0 190px; }
+  .foto-img img { width: 190px; max-height: 260px; object-fit: cover; border-radius: 7px;
+                  border: 1px solid #e2e2e2; cursor: zoom-in; }
+  .foto-body { flex: 1; min-width: 0; }
+  .foto-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .foto-title h2 { font-size: 14px; color: #333; }
+  .tag { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 9px; }
+  .tag-nodo { background: #1F3864; color: #fff; }
+  .tag-pf { background: #eef2f7; color: #1F3864; }
+  .tag-qp { background: #E2EFDA; color: #375623; }
+  .tag-sin { background: #ffeaea; color: #c00; }
+  .coords { font-size: 11px; color: #999; margin-bottom: 8px; }
+
+  textarea { width: 100%; min-height: 118px; padding: 10px 12px; font-family: inherit; font-size: 12.5px;
+             line-height: 1.45; border: 1.5px solid #ccd; border-radius: 6px; resize: vertical; color: #222; }
+  textarea:focus { outline: none; border-color: #7B3F00; }
+  .fila-acciones { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .btn-mini { padding: 6px 14px; font-size: 12px; }
+  .estado { font-size: 11.5px; color: #888; }
+  .estado.err { color: #c00; }
+  .estado.ok { color: #375623; }
+
+  #lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.82); z-index: 1000;
+              align-items: center; justify-content: center; cursor: zoom-out; }
+  #lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <h1>📷 Formato RG02 · RG03 — Registro fotográfico</h1>
+    <div class="file">{{ filename }}</div>
+    <div class="meta">
+      {% if header.lcl %}<span class="chip">LCL <b>{{ header.lcl }}</b></span>{% endif %}
+      {% if header.ticket %}<span class="chip">Ticket <b>{{ header.ticket }}</b></span>{% endif %}
+      {% if header.cd %}<span class="chip"><b>{{ header.cd }}</b></span>{% endif %}
+      {% if header.circuito %}<span class="chip">Circuito <b>{{ header.circuito }}</b></span>{% endif %}
+      {% if header.municipio %}<span class="chip"><b>{{ header.municipio }}</b></span>{% endif %}
+      {% if header.vereda %}<span class="chip"><b>{{ header.vereda }}</b></span>{% endif %}
+      <span class="chip"><b>{{ bloques|length }}</b> fotos detectadas</span>
+    </div>
+
+    {% if rg02.descripcion_general %}
+    <div style="font-size:12px;color:#555;margin-top:12px"><strong>Descripción general (RG02):</strong> {{ rg02.descripcion_general }}</div>
+    {% endif %}
+    {% if rg02.observaciones %}
+    <div style="font-size:12px;color:#555;margin-top:4px"><strong>Observaciones (RG02):</strong> {{ rg02.observaciones }}</div>
+    {% endif %}
+
+    {% if advertencias %}
+    <div class="warn">
+      {% for a in advertencias %}<div>⚠ {{ a }}</div>{% endfor %}
+    </div>
+    {% endif %}
+
+    {% if not hay_api_key %}
+    <div class="error-key">La IA no está disponible: falta configurar <strong>ANTHROPIC_API_KEY</strong> en el servidor.
+      Puedes escribir las observaciones manualmente y descargar el archivo.</div>
+    {% endif %}
+
+    <div class="toolbar">
+      <button class="btn btn-gen" id="btn-todas" onclick="generarTodas()" {% if not hay_api_key %}disabled{% endif %}>⚡ Generar todas las descripciones</button>
+      <button class="btn btn-dl" onclick="descargar()">⬇ Descargar RG03 diligenciado</button>
+      <a href="/?tab=rg03"><button class="btn btn-back">← Nuevo análisis</button></a>
+      <span id="progreso"></span>
+    </div>
+  </div>
+
+  {% for b in bloques %}
+  <div class="foto-card" id="card-{{ b.n }}">
+    <div class="foto-img">
+      <img src="/rg03/foto/{{ sid }}/{{ b.n }}" alt="Foto {{ b.n }}" onclick="zoom(this.src)">
+    </div>
+    <div class="foto-body">
+      <div class="foto-title">
+        <h2>Foto {{ b.n }}</h2>
+        <span class="tag tag-nodo">Nodo {{ b.nodo or '?' }}</span>
+        {% if b.pf %}<span class="tag tag-pf">PF {{ b.pf }}</span>{% endif %}
+        {% set qps = nodos_qp.get(b.nodo) %}
+        {% if qps %}
+          {% for q in qps %}<span class="tag tag-qp">{{ q }}</span>{% endfor %}
+        {% else %}
+          <span class="tag tag-sin">sin prestaciones en RG02</span>
+        {% endif %}
+      </div>
+      <div class="coords">{{ b.cd }} · {{ b.lat }}, {{ b.lon }}</div>
+      <textarea id="txt-{{ b.n }}" placeholder="Observación de la foto {{ b.n }} — genera con IA o escribe manualmente">{{ textos.get(b.n, '') }}</textarea>
+      <div class="fila-acciones">
+        <button class="btn btn-gen btn-mini" id="btn-{{ b.n }}" onclick="generar({{ b.n }})" {% if not hay_api_key %}disabled{% endif %}>✨ Generar</button>
+        <span class="estado" id="est-{{ b.n }}"></span>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+</div>
+
+<div id="lightbox" onclick="this.style.display='none'"><img id="lightbox-img" src=""></div>
+
+<form id="frm-dl" method="POST" action="/rg03/descargar/{{ sid }}" style="display:none">
+  <input type="hidden" name="textos" id="inp-textos">
+</form>
+
+<script>
+  var FOTOS = [{% for b in bloques %}{{ b.n }}{% if not loop.last %},{% endif %}{% endfor %}];
+  var NODOS = {{ nodos_orden | tojson }};
+
+  function zoom(src) {
+    document.getElementById('lightbox-img').src = src;
+    document.getElementById('lightbox').style.display = 'flex';
+  }
+
+  function setEstado(n, clase, texto) {
+    var est = document.getElementById('est-' + n);
+    est.className = 'estado' + (clase ? ' ' + clase : '');
+    est.textContent = texto;
+  }
+
+  async function generar(n) {
+    // Regenera UNA foto — el servidor envía toda la secuencia del nodo
+    // como contexto visual para mantener la coherencia del flujo.
+    var btn = document.getElementById('btn-' + n);
+    btn.disabled = true;
+    setEstado(n, '', 'Analizando la secuencia del nodo…');
+    try {
+      var r = await fetch('/rg03/api/generar/{{ sid }}/' + n, {method: 'POST'});
+      var j = await r.json();
+      if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
+      document.getElementById('txt-' + n).value = j.texto;
+      setEstado(n, 'ok', '✓ Generada — revisa y edita si hace falta');
+      return true;
+    } catch (e) {
+      setEstado(n, 'err', '✗ ' + e.message);
+      return false;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function generarTodas() {
+    // Una llamada por NODO con todas sus fotos (flujo de sucesos coherente).
+    var btn = document.getElementById('btn-todas');
+    var prog = document.getElementById('progreso');
+    btn.disabled = true;
+    var ok = 0, total = FOTOS.length;
+    for (var i = 0; i < NODOS.length; i++) {
+      var nd = NODOS[i];
+      prog.textContent = 'Analizando nodo ' + nd.nodo + ' (' + nd.fotos.length +
+                         ' fotos como secuencia) — ' + (i + 1) + ' de ' + NODOS.length + '…';
+      nd.fotos.forEach(function(n) { setEstado(n, '', 'En la secuencia del nodo ' + nd.nodo + '…'); });
+      try {
+        var r = await fetch('/rg03/api/generar-nodo/{{ sid }}/' + encodeURIComponent(nd.nodo), {method: 'POST'});
+        var j = await r.json();
+        if (!r.ok || j.error) throw new Error(j.error || ('HTTP ' + r.status));
+        nd.fotos.forEach(function(n) {
+          if (j.textos[String(n)]) {
+            document.getElementById('txt-' + n).value = j.textos[String(n)];
+            setEstado(n, 'ok', '✓ Generada — revisa y edita si hace falta');
+            ok++;
+          } else {
+            setEstado(n, 'err', '✗ La IA no devolvió esta foto — usa ✨ Generar');
+          }
+        });
+      } catch (e) {
+        nd.fotos.forEach(function(n) { setEstado(n, 'err', '✗ ' + e.message); });
+      }
+    }
+    prog.textContent = 'Listo: ' + ok + ' de ' + total + ' descripciones generadas.';
+    btn.disabled = false;
+  }
+
+  function descargar() {
+    var textos = {};
+    FOTOS.forEach(function(n) {
+      var v = document.getElementById('txt-' + n).value.trim();
+      if (v) textos[n] = v;
+    });
+    if (Object.keys(textos).length === 0) {
+      alert('No hay ninguna observación escrita todavía — genera o escribe al menos una.');
+      return;
+    }
+    document.getElementById('inp-textos').value = JSON.stringify(textos);
+    document.getElementById('frm-dl').submit();
+  }
+</script>
+</body>
+</html>

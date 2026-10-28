@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ERP Liquidador — Verificación ERP</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Calibri, Candara, sans-serif; background: #f0f3f7; color: #1a1a1a; }
+
+    .topbar {
+      background: #1F3864; padding: 0 28px; height: 52px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar h1 { color: #fff; font-size: 1rem; font-weight: 700; }
+    .topbar .right { display: flex; align-items: center; gap: 14px; }
+    .topbar a { color: #a8bcd4; text-decoration: none; font-size: .82rem; }
+    .topbar a:hover { color: #fff; }
+    .badge-ok  { background: #375623; color: #fff; font-size: .72rem; padding: 3px 10px; border-radius: 10px; }
+    .badge-err { background: #c00;    color: #fff; font-size: .72rem; padding: 3px 10px; border-radius: 10px; }
+    .badge-warn{ background: #856404; color: #fff; font-size: .72rem; padding: 3px 10px; border-radius: 10px; }
+
+    .main { max-width: 1300px; margin: 28px auto; padding: 0 20px; }
+
+    .card {
+      background: #fff; border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      padding: 28px 32px; margin-bottom: 20px;
+    }
+    .card h2 { color: #1F3864; font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
+    .card .meta { font-size: .82rem; color: #777; margin-bottom: 18px; }
+
+    /* Resumen */
+    .summary-row { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+    .sumbox { flex: 1; min-width: 110px; border-radius: 5px; padding: 12px 16px; text-align: center; }
+    .sumbox .num { font-size: 1.6rem; font-weight: 700; }
+    .sumbox .lbl { font-size: .75rem; margin-top: 2px; }
+    .sumbox.green  { background: #e2f0d9; color: #375623; }
+    .sumbox.red    { background: #fde8e8; color: #7b0000; }
+    .sumbox.yellow { background: #fff3cd; color: #856404; }
+    .sumbox.blue   { background: #dce8f5; color: #1F3864; }
+
+    /* Banner resultado global */
+    .result-banner {
+      border-radius: 5px; padding: 14px 20px; margin-bottom: 22px;
+      display: flex; align-items: center; gap: 12px; font-size: .92rem; font-weight: 600;
+    }
+    .result-banner.ok  { background: #e2f0d9; border-left: 5px solid #375623; color: #375623; }
+    .result-banner.err { background: #fde8e8; border-left: 5px solid #c00;    color: #7b0000; }
+    .result-banner.done{ background: #dce8f5; border-left: 5px solid #1F3864; color: #1F3864; }
+    .result-banner .icon { font-size: 1.4rem; }
+
+    /* Instrucción de checks */
+    .check-instruction {
+      background: #fff8e1; border: 1px solid #f0c040;
+      border-radius: 5px; padding: 12px 18px; margin-bottom: 18px;
+      font-size: .86rem; color: #856404; display: flex; align-items: center; gap: 10px;
+    }
+
+    /* Tabla de verificación */
+    .verify-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+    .verify-table th {
+      background: #1F3864; color: #fff;
+      padding: 9px 10px; text-align: left; font-weight: 600;
+      white-space: nowrap;
+    }
+    .verify-table th.center { text-align: center; }
+    .verify-table td {
+      padding: 9px 10px; border-bottom: 1px solid #e8edf3; vertical-align: middle;
+    }
+    .verify-table tr:last-child td { border-bottom: none; }
+    .verify-table tr.row-ok  { border-left: 4px solid #4caf50; }
+    .verify-table tr.row-err { border-left: 4px solid #f44336; }
+    .verify-table tr.row-warn{ border-left: 4px solid #f0c040; }
+
+    /* Cabecera de grupo PRO */
+    .verify-table tr.pro-group-hdr td {
+      background: #1F3864; color: #fff;
+      padding: 7px 12px; font-size: .8rem; font-weight: 700;
+      letter-spacing: .3px; border-left: none;
+    }
+    .verify-table tr.pro-group-hdr .pro-badge {
+      background: #fff; color: #1F3864;
+      border-radius: 3px; padding: 1px 7px;
+      font-size: .78rem; font-weight: 800; margin-right: 8px;
+    }
+    .verify-table tr.pro-group-hdr .pro-nombre {
+      color: #a8bcd4; font-weight: 400; font-size: .77rem; margin-left: 6px;
+    }
+
+    .code { font-family: "Consolas", monospace; font-weight: 600; font-size: .85rem; }
+    .pro-code { color: #1F3864; }
+    .act-code { color: #375623; }
+    .df-code  { color: #555; font-size: .78rem; }
+    .nodo-val { color: #1F3864; font-weight: 600; }
+
+    /* Sub-info under main cell value */
+    .sub { font-size: .73rem; color: #777; margin-top: 2px; line-height: 1.3; }
+
+    /* Errores/advertencias inline */
+    .inline-errs { margin-top: 4px; }
+    .inline-errs .e {
+      background: #fde8e8; color: #7b0000;
+      font-size: .75rem; padding: 2px 7px; border-radius: 3px;
+      margin-bottom: 2px; display: block;
+    }
+    .inline-errs .e::before { content: "✗ "; }
+    .inline-errs .w {
+      background: #fff8e1; color: #856404;
+      font-size: .75rem; padding: 2px 7px; border-radius: 3px;
+      margin-bottom: 2px; display: block;
+    }
+    .inline-errs .w::before { content: "⚠ "; }
+
+    /* Checkbox de aprobación */
+    .check-cell { text-align: center; }
+    .check-wrap { display: inline-flex; align-items: center; justify-content: center; }
+    .check-wrap input[type="checkbox"] {
+      width: 18px; height: 18px; cursor: pointer; accent-color: #375623;
+    }
+    .check-na {
+      font-size: .75rem; color: #c00; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .5px;
+    }
+    .row-confirmed td { background: #f4faf0; }
+
+    /* Actividad existente */
+    .act-existing {
+      font-size: .75rem; color: #555; background: #f0f3f7;
+      border-radius: 3px; padding: 3px 7px; margin-top: 4px; display: inline-block;
+    }
+    .act-existing strong { color: #1F3864; }
+    .act-new {
+      font-size: .75rem; color: #375623; background: #e2f0d9;
+      border-radius: 3px; padding: 2px 7px; margin-top: 4px; display: inline-block;
+    }
+
+    /* Botones */
+    .actions { display: flex; gap: 12px; align-items: center; margin-top: 28px; flex-wrap: wrap; }
+    .btn-execute {
+      padding: 12px 32px; background: #375623; color: #fff;
+      border: none; border-radius: 4px; font-size: 1rem;
+      font-family: inherit; font-weight: 700; cursor: pointer;
+      transition: background .2s, opacity .2s; letter-spacing: .3px;
+    }
+    .btn-execute:disabled {
+      background: #9cbe8c; cursor: not-allowed; opacity: .7;
+    }
+    .btn-execute:not(:disabled):hover { background: #4a7030; }
+    .btn-secondary {
+      padding: 11px 20px; background: #fff; color: #1F3864;
+      border: 1.5px solid #1F3864; border-radius: 4px;
+      font-size: .9rem; font-family: inherit; font-weight: 600;
+      cursor: pointer; text-decoration: none; display: inline-block;
+    }
+    .btn-secondary:hover { background: #f0f3f7; }
+
+    /* Bloqueado */
+    .blocked-msg {
+      background: #fde8e8; border: 1.5px solid #f44336;
+      border-radius: 5px; padding: 18px 24px; text-align: center;
+      color: #7b0000; font-size: .9rem; margin-top: 16px;
+    }
+    .blocked-msg .big { font-size: 1.4rem; margin-bottom: 6px; }
+
+    /* Confirmado */
+    .confirm-success {
+      background: #e2f0d9; border: 1.5px solid #375623;
+      border-radius: 5px; padding: 22px 28px; text-align: center; color: #375623;
+    }
+    .confirm-success .big { font-size: 1.8rem; margin-bottom: 8px; }
+    .confirm-success h3 { font-size: 1.1rem; margin-bottom: 6px; }
+    .confirm-success p { font-size: .88rem; margin-top: 6px; color: #555; }
+
+    /* Contador de checks */
+    #checks-counter {
+      font-size: .85rem; color: #555; margin-left: 4px;
+    }
+    #checks-counter.all-done { color: #375623; font-weight: 700; }
+
+    .caution-note {
+      font-size: .78rem; color: #888; margin-top: 10px; line-height: 1.5;
+    }
+    .caution-note strong { color: #c00; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>ERP — Sistema Liquidador</h1>
+  <div class="right">
+    {% if confirmado is defined and confirmado %}
+      <span class="badge-ok">Orden enviada</span>
+    {% elif s.all_ok %}
+      <span class="badge-ok">Verificación OK</span>
+    {% elif s.checks|selectattr('ok','equalto',false)|list|length > 0 %}
+      <span class="badge-err">Errores detectados</span>
+    {% else %}
+      <span class="badge-warn">Con advertencias</span>
+    {% endif %}
+    <a href="{{ url_for('liquidacion.preview', sid=sid) }}">← Vista previa</a>
+    <a href="{{ url_for('liquidacion.logout') }}">Cerrar sesión</a>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- ── CONFIRMACIÓN EXITOSA ──────────────────────────────────────── -->
+  {% if confirmado is defined and confirmado %}
+  <div class="card">
+    <div class="confirm-success">
+      <div class="big">✅</div>
+      <h3>Orden de liquidación enviada</h3>
+      <p>
+        {{ s.checks|length }} prestaciones aprobadas manualmente.<br>
+        El motor de liquidación ejecutará el proceso en segundo plano.
+      </p>
+      <p style="margin-top:14px;">
+        <strong>Archivo:</strong> {{ s.filename }}<br>
+        <strong>Enviado:</strong> {{ s.confirmado_at }}
+      </p>
+    </div>
+    <div class="actions" style="margin-top:20px;">
+      <a href="{{ url_for('liquidacion.dashboard') }}" class="btn-secondary">Volver al inicio</a>
+    </div>
+  </div>
+  {% else %}
+
+  <!-- ── VERIFICACIÓN ──────────────────────────────────────────────── -->
+  <div class="card">
+    <h2>Verificación contra ERP</h2>
+    <p class="meta">
+      Archivo: <strong>{{ s.filename }}</strong> &nbsp;|&nbsp;
+      {{ s.checks|length }} filas verificadas
+    </p>
+
+    <!-- Resumen numérico -->
+    {% set n_ok   = s.checks|selectattr('ok','equalto',true)|list|length %}
+    {% set n_err  = s.checks|selectattr('ok','equalto',false)|list|length %}
+    {% set n_warn = s.checks|selectattr('advertencias','ne',[])|list|length %}
+
+    <div class="summary-row">
+      <div class="sumbox green">
+        <div class="num">{{ n_ok }}</div>
+        <div class="lbl">Filas OK</div>
+      </div>
+      {% if n_err %}
+      <div class="sumbox red">
+        <div class="num">{{ n_err }}</div>
+        <div class="lbl">Con errores</div>
+      </div>
+      {% endif %}
+      {% if n_warn %}
+      <div class="sumbox yellow">
+        <div class="num">{{ n_warn }}</div>
+        <div class="lbl">Con advertencias</div>
+      </div>
+      {% endif %}
+      <div class="sumbox blue">
+        <div class="num">{{ s.checks|length }}</div>
+        <div class="lbl">Total</div>
+      </div>
+    </div>
+
+    <!-- Banner resultado global -->
+    {% if n_err == 0 %}
+    <div class="result-banner ok">
+      <span class="icon">✅</span>
+      <span>Todas las filas pasaron la verificación ERP. Revisa la tabla y aprueba cada fila para habilitar la orden.</span>
+    </div>
+    {% elif s.mo_ya_liquidada %}
+    <div class="result-banner done">
+      <span class="icon">ℹ</span>
+      <div>
+        <strong>Mano de obra ya liquidada al 100%.</strong>
+        Las {{ s.checks|length }} actividades detectadas ya tienen avance completo en ERP.
+        No es posible liquidar MO nuevamente — puedes continuar con la verificación de materiales.
+      </div>
+    </div>
+    {% else %}
+    <div class="result-banner err">
+      <span class="icon">🚫</span>
+      <span>
+        Se encontraron <strong>{{ n_err }} error(es)</strong>.
+        Corrige la plantilla y vuelve a cargarla para poder proceder.
+      </span>
+    </div>
+    {% endif %}
+
+    {% if confirm_error is defined %}
+    <div class="result-banner err" style="margin-bottom:12px;">
+      <span class="icon">⚠</span>
+      <span>{{ confirm_error }}</span>
+    </div>
+    {% endif %}
+
+    <!-- Alerta doble liquidación -->
+    {% if s.doble_liq_riesgo %}
+    <div class="result-banner err" style="margin-bottom:14px;">
+      <span class="icon">⛔</span>
+      <div>
+        <strong>Posible doble liquidación detectada:</strong>
+        {{ s.doble_liq_n }} de {{ s.checks|length }} actividades ya tienen avance registrado en ERP.
+        Verifica que esta plantilla no haya sido liquidada anteriormente por otra vía antes de continuar.
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Estado materiales aprobados -->
+    {% if s.mat_ok %}
+    <div class="result-banner ok" style="margin-bottom:14px;">
+      <span class="icon">✅</span>
+      <span>Materiales verificados y aprobados — {{ s.mat_confirmado_at }}</span>
+    </div>
+    {% endif %}
+
+    <!-- Instrucción checks (solo si no hay errores) -->
+    {% if n_err == 0 %}
+    <div class="check-instruction">
+      <span>📋</span>
+      <span>
+        Revisa cada fila — confirma que el <strong>DF detectado</strong>, el <strong>Nodo ERP</strong>
+        y el <strong>PRO asociado</strong> son correctos antes de marcar el check.
+        La orden de liquidación se habilita solo cuando <strong>todas las filas</strong> estén aprobadas.
+      </span>
+    </div>
+    {% endif %}
+
+    <!-- ── TABLA DE VERIFICACIÓN MANUAL ─────────────────────────────── -->
+    <form id="confirm-form" method="POST"
+          action="{{ url_for('liquidacion.confirmar', sid=sid) }}">
+
+      <table class="verify-table">
+        <thead>
+          <tr>
+            <th style="width:30px" class="center">#</th>
+            <th>DF / LCL detectado</th>
+            <th>Nodo ERP</th>
+            <th>PRO asociado</th>
+            <th>Código</th>
+            <th class="center">Cantidad</th>
+            <th>Supervisor</th>
+            <th>Líder</th>
+            <th class="center" style="min-width:46px;">✓</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set ns = namespace(i=0) %}
+          {% for pro_code, grupo in s.checks | groupby('pro_code') %}
+
+          {# ── Cabecera de grupo PRO ─────────────────────────────────────── #}
+          {% set primer = grupo | first %}
+          <tr class="pro-group-hdr">
+            <td colspan="9">
+              <span class="pro-badge">{{ pro_code or '—' }}</span>
+              {% if primer.nodo_sgs is defined and primer.nodo_sgs %}{{ primer.nodo_sgs }}{% endif %}
+              <span class="pro-nombre">
+                {{ primer.pnombre[:70] if primer.pnombre is defined else '' }}
+              </span>
+            </td>
+          </tr>
+
+          {% for ck in grupo %}
+          {% set has_err = ck.errores|length > 0 %}
+          <tr class="{% if has_err %}row-err{% elif ck.advertencias %}row-warn{% else %}row-ok{% endif %}"
+              id="row-{{ ns.i }}">
+
+            <!-- # -->
+            <td style="color:#888;font-size:.75rem;text-align:center;">{{ ns.i + 1 }}</td>
+
+            <!-- DF / LCL detectado -->
+            <td>
+              <div class="code df-code">
+                {{ ck.df_detectado if ck.df_detectado is defined else ck.row.pro }}
+              </div>
+              {% if ck.df_nodos is defined and ck.df_nodos|length > 1 %}
+              <div class="sub">{{ ck.df_nodos|length }} nodos encontrados</div>
+              {% endif %}
+            </td>
+
+            <!-- Nodo ERP -->
+            <td>
+              {% if ck.nodo_sgs is defined and ck.nodo_sgs %}
+                <span class="nodo-val">{{ ck.nodo_sgs }}</span>
+              {% elif ck.pnombre is defined %}
+                <span class="nodo-val" style="font-size:.78rem;">{{ ck.pnombre[:40] }}</span>
+              {% else %}
+                <span style="color:#c00;font-size:.75rem;">—</span>
+              {% endif %}
+            </td>
+
+            <!-- PRO asociado -->
+            <td>
+              {% if ck.pro_code is defined and ck.pro_code %}
+                <div class="code pro-code">{{ ck.pro_code }}</div>
+              {% else %}
+                <span style="color:#c00;font-size:.75rem;">No resuelto</span>
+              {% endif %}
+              {% if ck.pnombre is defined %}
+              <div class="sub">{{ ck.pnombre[:50] }}</div>
+              {% endif %}
+              <!-- Actividad existente / nueva -->
+              {% if ck.act_existente is defined %}
+              <div class="act-existing">
+                Proy: <strong>{{ ck.act_existente.amount }}</strong>
+                &nbsp;·&nbsp;Avance: <strong>{{ ck.act_existente.advance }}</strong>
+                &nbsp;·&nbsp;Saldo: <strong>{{ ck.act_existente.balance }}</strong>
+              </div>
+              {% elif ck.ok %}
+              <div class="act-new">Nueva actividad</div>
+              {% endif %}
+            </td>
+
+            <!-- Código actividad -->
+            <td>
+              <div class="code act-code">{{ ck.row.codigo }}</div>
+              {% if ck.cat_nom is defined %}
+              <div class="sub">{{ ck.cat_nom[:50] }}</div>
+              {% endif %}
+            </td>
+
+            <!-- Cantidad -->
+            <td style="text-align:center;font-weight:700;color:#444;">
+              {{ ck.row.cantidad }}
+            </td>
+
+            <!-- Supervisor -->
+            <td>
+              {% if ck.supervisor is defined and ck.supervisor %}
+                <span style="font-size:.83rem;">{{ ck.supervisor }}</span>
+              {% else %}
+                <span class="sub">—</span>
+              {% endif %}
+            </td>
+
+            <!-- Líder -->
+            <td>
+              {% if ck.partner_nombre is defined %}
+                <span style="font-size:.83rem;">{{ ck.partner_nombre }}</span>
+              {% elif ck.row.lider %}
+                <span style="font-size:.83rem;color:#777;">{{ ck.row.lider }}</span>
+              {% else %}
+                <span class="sub">—</span>
+              {% endif %}
+            </td>
+
+            <!-- Check de aprobación manual -->
+            <td class="check-cell">
+              {% if has_err %}
+                <span class="check-na">✗</span>
+              {% else %}
+                <div class="check-wrap">
+                  <input type="checkbox"
+                         name="confirmado"
+                         value="{{ ns.i }}"
+                         data-idx="{{ ns.i }}"
+                         onchange="actualizarChecks()"
+                         title="Aprobar fila {{ ns.i + 1 }}">
+                </div>
+              {% endif %}
+              <!-- Errores / advertencias inline -->
+              {% if has_err or ck.advertencias %}
+              <div class="inline-errs" style="text-align:left;margin-top:4px;">
+                {% for e in ck.errores %}<span class="e">{{ e }}</span>{% endfor %}
+                {% for w in ck.advertencias %}<span class="w">{{ w }}</span>{% endfor %}
+              </div>
+              {% endif %}
+            </td>
+
+          </tr>
+          {% set ns.i = ns.i + 1 %}
+          {% endfor %}  {# fin grupo PRO #}
+          {% endfor %}  {# fin groupby #}
+        </tbody>
+      </table>
+
+      <!-- ── ACCIONES ─────────────────────────────────────────────── -->
+      {% if n_err == 0 %}
+      <div class="actions">
+        <button type="submit" class="btn-execute" id="btn-enviar" disabled>
+          Enviar orden de liquidación
+        </button>
+        <span id="checks-counter">0 / {{ s.checks|length }} aprobados</span>
+        {% if s.mat_rows %}
+          {% if s.mat_ok %}
+          <span style="background:#e2f0d9;color:#375623;padding:4px 12px;border-radius:3px;font-size:.82rem;font-weight:700;">
+            ✓ Materiales aprobados
+          </span>
+          {% else %}
+          <a href="{{ url_for('liquidacion.materiales', sid=sid) }}" class="btn-secondary"
+             style="background:#fff3cd;border-color:#856404;color:#856404;">
+            Verificar Materiales →
+          </a>
+          {% endif %}
+        {% endif %}
+        <a href="{{ url_for('liquidacion.preview', sid=sid) }}" class="btn-secondary">
+          ← Vista previa
+        </a>
+      </div>
+      <p class="caution-note">
+        <strong>Margen de error = 0.</strong>
+        Cada check es tu aprobación explícita de que el DF, Nodo y PRO son correctos para esa fila.
+        La orden solo se envía cuando todas las filas están aprobadas.
+      </p>
+      {% elif s.mo_ya_liquidada %}
+
+      <!-- ── MO YA LIQUIDADA: flujo solo materiales ────────────────────── -->
+      {% if s.mat_ok %}
+      <div class="result-banner ok" style="margin-top:16px;">
+        <span class="icon">✅</span>
+        <span>Materiales verificados y aprobados ({{ s.mat_confirmado_at }}).</span>
+      </div>
+      <div class="actions" style="margin-top:8px;">
+        <button type="submit" class="btn-execute"
+                formaction="{{ url_for('liquidacion.confirmar_materiales', sid=sid) }}">
+          Confirmar materiales
+        </button>
+        <a href="{{ url_for('liquidacion.dashboard') }}" class="btn-secondary">
+          Cancelar
+        </a>
+      </div>
+      <p class="caution-note" style="margin-top:10px;">
+        Esto registra que revisaste y confirmaste los materiales en ERP.
+        La mano de obra no se toca — ya está liquidada.
+      </p>
+
+      {% else %}
+      <div class="actions" style="margin-top:18px;">
+        {% if s.mat_rows %}
+        <a href="{{ url_for('liquidacion.materiales', sid=sid) }}" class="btn-execute"
+           style="background:#1F3864;">
+          Verificar Materiales →
+        </a>
+        {% else %}
+        <span style="font-size:.88rem;color:#777;">
+          No hay hoja CRUCE_SERGIO en este archivo — no hay materiales que verificar.
+        </span>
+        {% endif %}
+        <a href="{{ url_for('liquidacion.dashboard') }}" class="btn-secondary">
+          Cargar nueva plantilla
+        </a>
+      </div>
+      <p class="caution-note" style="margin-top:10px;">
+        La mano de obra ya fue liquidada. Verifica los materiales para completar el proceso.
+      </p>
+      {% endif %}
+
+      {% else %}
+      <div class="blocked-msg">
+        <div class="big">🔒</div>
+        <strong>Ejecución bloqueada.</strong><br>
+        Corrige los errores en la plantilla y vuelve a cargarla.
+      </div>
+      <div class="actions" style="margin-top:16px;">
+        <a href="{{ url_for('liquidacion.dashboard') }}" class="btn-secondary">
+          Cargar nueva plantilla
+        </a>
+        <a href="{{ url_for('liquidacion.preview', sid=sid) }}" class="btn-secondary">
+          Ver datos parseados
+        </a>
+      </div>
+      {% endif %}
+
+    </form>
+
+  </div>
+  {% endif %} {# end confirmado/verificacion #}
+
+</div>
+
+<script>
+  {% if n_err is defined and n_err == 0 %}
+  const TOTAL_FILAS = {{ s.checks|length }};
+
+  function actualizarChecks() {
+    const marcadas = document.querySelectorAll(
+      'input[name="confirmado"]:checked'
+    ).length;
+    const btn = document.getElementById('btn-enviar');
+    const counter = document.getElementById('checks-counter');
+    counter.textContent = marcadas + ' / ' + TOTAL_FILAS + ' aprobados';
+    if (marcadas === TOTAL_FILAS) {
+      btn.disabled = false;
+      counter.classList.add('all-done');
+    } else {
+      btn.disabled = true;
+      counter.classList.remove('all-done');
+    }
+    // Highlight confirmed rows
+    document.querySelectorAll('input[name="confirmado"]').forEach(cb => {
+      const tr = cb.closest('tr');
+      if (cb.checked) tr.classList.add('row-confirmed');
+      else tr.classList.remove('row-confirmed');
+    });
+  }
+  {% endif %}
+</script>
+
+</body>
+</html>

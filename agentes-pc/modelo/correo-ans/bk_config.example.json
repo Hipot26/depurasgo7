@@ -1,0 +1,7 @@
+{
+  "api_url": "https://<servidor>/api",
+  "token": "<WHATSAPP_BOT_TOKEN del servidor>",
+  "categoria": "ANS",
+  "sin_etiqueta": false,
+  "dias_sin_etiqueta": 10
+}

@@ -1,0 +1,1811 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verificador de Proyectos SGS</title>
+<style>
+  :root {
+    --bg:        #0f1117;
+    --surface:   #1a1d27;
+    --surface2:  #22263a;
+    --border:    #2e3354;
+    --accent:    #4f7ef8;
+    --accent2:   #6ee7b7;
+    --danger:    #f87171;
+    --warn:      #fbbf24;
+    --ok:        #34d399;
+    --text:      #e2e8f0;
+    --muted:     #64748b;
+    --radius:    10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; }
+
+  /* ── Header ─── */
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; gap: 14px; }
+  header .logo { font-size: 20px; font-weight: 700; color: var(--accent); letter-spacing: -.5px; }
+  header .subtitle { color: var(--muted); font-size: 12px; }
+  .user-chip { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .user-chip span { background: #1e293b; border: 1px solid var(--border); border-radius: 20px; padding: 4px 14px; font-size: 12px; color: var(--accent2); }
+  .logout-btn { background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 8px; padding: 5px 12px; font-size: 12px; cursor: pointer; text-decoration: none; transition: color .15s, border-color .15s; }
+  .logout-btn:hover { color: var(--danger); border-color: var(--danger); }
+
+  /* ── Tabs ─── */
+  /* El contenido usa todo el ancho de la pantalla: la tabla del modo
+     automático tiene 12 columnas y a 1200px quedaba comprimida contra dos
+     franjas vacías. El tope alto solo evita que en un monitor ultrapanorámico
+     las líneas se vuelvan ilegibles de tan largas. */
+  main { width: 100%; max-width: 2400px; margin: 0 auto; padding: 28px clamp(16px, 2.2vw, 40px); }
+  /* Los campos de escritura no ganan nada con 2000px de ancho. */
+  .input-panel textarea, .input-panel .hint, .input-panel h2 { max-width: 1000px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+  .tab-btn { background: transparent; border: none; color: var(--muted); font-size: 13px; font-weight: 600; padding: 10px 20px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .15s, border-color .15s; }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-btn:hover:not(.active) { color: var(--text); }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* ── Panel de entrada manual ─── */
+  .input-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 24px; }
+  .input-panel h2 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .hint { color: var(--muted); font-size: 12px; margin-bottom: 14px; line-height: 1.6; }
+  .hint code { background: var(--surface2); padding: 1px 6px; border-radius: 4px; font-family: 'Cascadia Code', monospace; color: var(--accent2); font-size: 11px; }
+  textarea#codigos { width: 100%; min-height: 100px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: 'Cascadia Code', monospace; font-size: 13px; padding: 10px 14px; resize: vertical; outline: none; transition: border-color .2s; }
+  textarea#codigos:focus { border-color: var(--accent); }
+  textarea#codigos::placeholder { color: var(--muted); }
+
+  /* ── Panel automático ─── */
+  .auto-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 24px; }
+  .auto-panel h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+  .selector-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .selector-field { display: flex; flex-direction: column; gap: 5px; }
+  .selector-field label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  select.sel { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; padding: 8px 12px; outline: none; cursor: pointer; }
+  select.sel:focus { border-color: var(--accent); }
+
+  /* ── Botones ─── */
+  .btn-row { display: flex; gap: 10px; margin-top: 14px; align-items: center; }
+  button.primary { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 9px 22px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+  button.primary:hover { opacity: .87; }
+  button.primary:disabled { opacity: .4; cursor: not-allowed; }
+  button.secondary { background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 8px; padding: 9px 16px; font-size: 13px; cursor: pointer; transition: color .15s, border-color .15s; }
+  button.secondary:hover { color: var(--text); border-color: var(--accent); }
+
+  /* ── Spinner ─── */
+  .spinner { display: none; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+  .spinner.active { display: flex; }
+  .spin { width: 16px; height: 16px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Error global ─── */
+  .error-box { display: none; background: rgba(248,113,113,.1); border: 1px solid var(--danger); border-radius: var(--radius); padding: 12px 16px; color: var(--danger); margin-bottom: 18px; font-size: 13px; }
+
+  /* ── Summary cards (auto) ─── */
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; }
+  .stat-card .label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 6px; }
+  .stat-card .value { font-size: 28px; font-weight: 800; font-family: 'Cascadia Code', monospace; }
+  .stat-card .sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  /* Con la pantalla ancha cada tarjeta pasa de ~250px a ~450px y el número
+     apilado dejaba la mitad derecha en blanco. A partir de ahí el rótulo va a
+     la izquierda y la cifra a la derecha, que llena la tarjeta. */
+  @media (min-width: 1100px) {
+    .stat-card { display: grid; grid-template-columns: 1fr auto;
+                 grid-template-areas: "label value" "sub value";
+                 align-items: center; column-gap: 18px; }
+    .stat-card .label { grid-area: label; margin-bottom: 2px; }
+    .stat-card .sub   { grid-area: sub;   margin-top: 0; }
+    .stat-card .value { grid-area: value; font-size: 34px; line-height: 1; }
+  }
+  .val-ok { color: var(--ok); }
+  .val-warn { color: var(--warn); }
+  .val-muted { color: var(--muted); }
+  .val-total { color: var(--accent); }
+
+  /* ── Tabla automático ─── */
+  .auto-table-wrap { overflow-x: auto; }
+  table.auto-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.auto-table th { background: var(--surface2); color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 9px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  table.auto-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  table.auto-table tr:last-child td { border-bottom: none; }
+  table.auto-table tr:hover td { background: rgba(79,126,248,.04); }
+  /* Reparto del ancho extra: las columnas de dato corto se quedan en su
+     tamaño y el sobrante va a "Proyecto padre" y "Nodos / Materiales", que
+     son las que de verdad tienen contenido que mostrar. */
+  table.auto-table th:nth-child(1),  table.auto-table td:nth-child(1)  { width: 34px; }
+  table.auto-table th:nth-child(2),  table.auto-table td:nth-child(2)  { width: 60px; }
+  table.auto-table th:nth-child(3),  table.auto-table td:nth-child(3)  { width: 108px; }
+  table.auto-table th:nth-child(4),  table.auto-table td:nth-child(4)  { width: 150px; }
+  table.auto-table th:nth-child(5),  table.auto-table td:nth-child(5)  { width: 105px; }
+  table.auto-table th:nth-child(6),  table.auto-table td:nth-child(6)  { width: auto; min-width: 195px; }
+  /* min-width en las columnas de nombres: sin él, cuando la tabla no cabe el
+     navegador las aplasta y un nombre largo de supervisor cae en cuatro líneas.
+     Antes se rompa la línea horizontal (que ya tiene scroll propio). */
+  table.auto-table th:nth-child(7),  table.auto-table td:nth-child(7)  { width: 170px; min-width: 158px; }
+  table.auto-table th:nth-child(8),  table.auto-table td:nth-child(8)  { width: 118px; }
+  table.auto-table th:nth-child(9),  table.auto-table td:nth-child(9)  { width: 90px; }
+  table.auto-table th:nth-child(10), table.auto-table td:nth-child(10) { width: 105px; }
+  table.auto-table th:nth-child(11), table.auto-table td:nth-child(11) { width: 175px; min-width: 162px; }
+  table.auto-table th:nth-child(12), table.auto-table td:nth-child(12) { width: auto; min-width: 260px; }
+
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .badge-ok   { background: rgba(52,211,153,.12); color: var(--ok); border: 1px solid rgba(52,211,153,.25); }
+  .badge-warn { background: rgba(251,191,36,.10); color: var(--warn); border: 1px solid rgba(251,191,36,.25); }
+  .badge-none { background: rgba(100,116,139,.10); color: var(--muted); border: 1px solid rgba(100,116,139,.2); }
+
+  .code-mono { font-family: 'Cascadia Code', monospace; font-size: 12px; }
+  .nodo-pills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .nodo-pill { font-size: 10px; padding: 2px 7px; border-radius: 4px; font-family: monospace; }
+  .pill-ok   { background: rgba(52,211,153,.1);  color: var(--ok);   }
+  .pill-warn { background: rgba(251,191,36,.1);  color: var(--warn); }
+  /* Nodo con material que salió de almacén después del mes analizado: no puede
+     entrar en esta liquidación, así que se separa del ámbar de "pendiente". */
+  .pill-late { background: rgba(239,68,68,.14); color: #fca5a5; border-color: rgba(239,68,68,.45) !important; }
+  .mat-late  { background: rgba(239,68,68,.14) !important; color: #fca5a5 !important;
+               text-decoration: line-through; text-decoration-color: rgba(239,68,68,.6); }
+  .salida-win { font-size: 10px; color: var(--muted); font-family: 'Cascadia Code', monospace; white-space: nowrap; }
+  .salida-win b { color: var(--accent2); font-weight: 600; }
+  .late-warn { color: #fca5a5; font-size: 10px; margin-top: 3px; }
+  .pill-none { background: rgba(100,116,139,.1); color: var(--muted);}
+
+  /* ── Detalle de pendientes (técnica liquidador2) ─── */
+  .pend-details { margin-top: 6px; }
+  .pend-details summary { cursor: pointer; font-size: 11px; color: var(--warn); user-select: none; list-style: none; }
+  .pend-details summary::-webkit-details-marker { display: none; }
+  .pend-details summary::before { content: '▸ '; }
+  .pend-details[open] summary::before { content: '▾ '; }
+  .pend-box { margin-top: 6px; border: 1px solid rgba(251,191,36,.25); border-radius: 6px; padding: 8px 10px; background: rgba(251,191,36,.05); display: flex; flex-direction: column; gap: 6px; }
+  .pend-row { display: flex; gap: 8px; align-items: baseline; font-size: 11px; }
+  .pend-nodo { font-family: monospace; color: var(--warn); min-width: 60px; font-weight: 600; }
+  .pend-mats { display: flex; flex-wrap: wrap; gap: 5px; }
+  .pend-mat { font-family: monospace; font-size: 10px; background: rgba(251,191,36,.12); color: var(--text); padding: 1px 6px; border-radius: 4px; }
+  .pend-mat b { color: var(--warn); }
+  .pend-mat { cursor: help; }
+  .pend-ban { cursor: help; opacity: .8; }
+
+  /* ── Tarjeta familia (manual) ─── */
+  .familia-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 22px; overflow: hidden; }
+  .familia-header { background: var(--surface2); border-bottom: 1px solid var(--border); padding: 14px 20px; display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+  .tag-input { background: rgba(79,126,248,.15); border: 1px solid rgba(79,126,248,.35); border-radius: 20px; padding: 2px 10px; font-size: 11px; color: var(--accent); white-space: nowrap; align-self: center; }
+  .pro-code { font-family: 'Cascadia Code', monospace; font-size: 14px; font-weight: 700; color: var(--accent2); }
+  .pro-name { font-size: 12px; color: var(--muted); flex: 1; }
+  .nodos-list { font-size: 11px; color: var(--muted); display: flex; gap: 5px; flex-wrap: wrap; align-self: center; margin-left: auto; }
+  .chip { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 2px 8px; font-family: monospace; font-size: 10px; }
+  .resumen-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0; border-bottom: 1px solid var(--border); }
+  .resumen-stat { padding: 12px 20px; border-right: 1px solid var(--border); }
+  .resumen-stat:last-child { border-right: none; }
+  .resumen-stat .label { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 3px; }
+  .resumen-stat .value { font-size: 16px; font-weight: 700; font-family: 'Cascadia Code', monospace; }
+  .resumen-stat .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .nodos-grid { display: grid; grid-template-columns: 1fr 1fr; }
+  @media(max-width:680px){ .nodos-grid { grid-template-columns: 1fr; } }
+  .col-section { padding: 16px 20px; border-right: 1px solid var(--border); }
+  .col-section:last-child { border-right: none; }
+  .col-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 12px; display: flex; align-items: center; gap: 5px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .dot-mo { background: var(--accent); } .dot-mat { background: var(--accent2); }
+  .nodo-row { display: flex; align-items: flex-start; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+  .nodo-row:last-child { border-bottom: none; }
+  .status-icon { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; margin-top: 1px; }
+  .icon-ok   { background: rgba(52,211,153,.15); color: var(--ok);   }
+  .icon-warn { background: rgba(251,191,36,.12); color: var(--warn); }
+  .icon-pend { background: rgba(248,113,113,.12); color: var(--danger); }
+  .icon-none { background: rgba(100,116,139,.12); color: var(--muted); }
+  .nodo-info { flex: 1; }
+  .nodo-info .nodo-code { font-family: monospace; font-size: 12px; font-weight: 600; }
+  .nodo-badge { display: inline-block; background: var(--surface2); border-radius: 4px; padding: 1px 5px; font-size: 10px; color: var(--muted); margin-left: 5px; vertical-align: middle; }
+  .nodo-detail { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.5; }
+  .nodo-detail .fecha { color: var(--accent2); }
+  .nodo-detail .pendiente { color: var(--warn); }
+  .nodo-detail .liquidado-val { color: var(--ok); }
+  .errores-section { border-top: 1px solid var(--border); padding: 12px 20px; }
+  .errores-section h4 { font-size: 11px; color: var(--danger); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 7px; }
+  .error-item { font-size: 12px; color: var(--muted); padding: 2px 0; }
+  #empty-state { text-align: center; padding: 50px 20px; color: var(--muted); }
+  #empty-state .big-icon { font-size: 44px; opacity: .4; margin-bottom: 10px; }
+
+  .ok     { color: var(--ok);     }
+  .warn   { color: var(--warn);   }
+  .danger { color: var(--danger); }
+  .muted  { color: var(--muted);  }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── Consulta individual — tabla de nodos ─── */
+  .consulta-input-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 24px; }
+  .consulta-input-wrap h2 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .search-row { display: flex; gap: 10px; margin-top: 14px; align-items: flex-start; }
+  .search-row textarea { flex: 1; min-height: 90px; background: #0f1117; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; font-family: 'Cascadia Code', monospace; padding: 10px 14px; outline: none; transition: border-color .2s; resize: vertical; }
+  .search-row textarea:focus { border-color: var(--accent); }
+  .search-row textarea::placeholder { color: var(--muted); }
+  .search-row .btn-col { display: flex; flex-direction: column; gap: 8px; }
+
+  .familia-consulta { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 20px; overflow: hidden; }
+  .consulta-header { background: var(--surface2); border-bottom: 1px solid var(--border); padding: 14px 20px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .consulta-header .pro-code { font-family: 'Cascadia Code', monospace; font-size: 15px; font-weight: 700; color: var(--accent2); }
+  .consulta-header .pro-name { font-size: 12px; color: var(--muted); flex: 1; }
+  .consulta-header .sgs-btn { background: rgba(79,126,248,.15); border: 1px solid rgba(79,126,248,.35); border-radius: 6px; color: var(--accent); font-size: 11px; font-weight: 600; padding: 4px 10px; text-decoration: none; transition: background .15s; }
+  .consulta-header .sgs-btn:hover { background: rgba(79,126,248,.3); }
+  .consulta-header .n-nodos { font-size: 11px; color: var(--muted); }
+
+  table.nodo-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.nodo-table th { background: var(--surface2); color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; padding: 8px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  table.nodo-table td { padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  table.nodo-table tr:last-child td { border-bottom: none; }
+  table.nodo-table tr:hover td { background: rgba(79,126,248,.04); }
+  .nodo-num { display: inline-flex; align-items: center; justify-content: center; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; font-family: monospace; font-size: 11px; font-weight: 700; padding: 2px 7px; color: var(--muted); min-width: 32px; }
+  .open-sgs { display: inline-flex; align-items: center; gap: 4px; background: rgba(79,126,248,.1); border: 1px solid rgba(79,126,248,.25); border-radius: 6px; color: var(--accent); font-size: 11px; padding: 3px 9px; text-decoration: none; transition: background .15s; white-space: nowrap; }
+  .open-sgs:hover { background: rgba(79,126,248,.25); }
+  .mo-val { font-family: monospace; font-size: 12px; }
+
+  /* ── Links SGS ─── */
+  a.sgs-link { color: inherit; text-decoration: none; }
+  a.sgs-link:hover { text-decoration: underline; opacity: .8; }
+
+  /* ── Cruce Excel tab ─── */
+  .upload-panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:24px; margin-bottom:24px; }
+  .upload-panel h2 { font-size:15px; font-weight:600; margin-bottom:6px; }
+  .upload-zone { border:2px dashed var(--border); border-radius:10px; padding:32px 24px; text-align:center; cursor:pointer; transition:border-color .2s, background .2s; margin:14px 0; }
+  .upload-zone:hover, .upload-zone.drag-over { border-color:var(--accent); background:rgba(79,126,248,.04); }
+  .upload-zone .icon { font-size:36px; margin-bottom:8px; opacity:.6; }
+  .upload-zone .label { font-size:13px; color:var(--muted); }
+  .upload-zone .file-name { font-size:13px; color:var(--accent2); font-weight:600; margin-top:6px; }
+  input#inp-excel { display:none; }
+  .cruce-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:18px; }
+  .cruce-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px 18px; }
+  .cruce-card .label { font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-bottom:5px; }
+  .cruce-card .value { font-size:26px; font-weight:800; font-family:'Cascadia Code',monospace; }
+  .cruce-table-wrap { overflow-x:auto; }
+  table.cruce-table { width:100%; border-collapse:collapse; font-size:12px; }
+  table.cruce-table th { background:var(--surface2); color:var(--muted); font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; padding:7px 12px; text-align:left; border-bottom:1px solid var(--border); white-space:nowrap; }
+  table.cruce-table td { padding:7px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  table.cruce-table tr:last-child td { border-bottom:none; }
+  table.cruce-table tr:hover td { background:rgba(79,126,248,.03); }
+  .estado-pill { display:inline-flex; align-items:center; gap:4px; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:700; white-space:nowrap; }
+  .ep-completo     { background:rgba(52,211,153,.12); color:var(--ok);     border:1px solid rgba(52,211,153,.25); }
+  .ep-pend-mat     { background:rgba(251,191,36,.10); color:var(--warn);   border:1px solid rgba(251,191,36,.25); }
+  .ep-pend-mo      { background:rgba(248,113,113,.10); color:var(--danger); border:1px solid rgba(248,113,113,.25); }
+  .ep-sin-mo       { background:rgba(248,113,113,.10); color:var(--danger); border:1px solid rgba(248,113,113,.25); }
+  .ep-no-encontrado{ background:rgba(100,116,139,.12); color:var(--muted);  border:1px solid rgba(100,116,139,.2); }
+  .ep-error        { background:rgba(248,113,113,.08); color:var(--danger); border:1px solid rgba(248,113,113,.2); }
+
+  /* ── Excel bar ─── */
+  .xls-bar { display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+  .xls-bar span { font-size:11px; color:var(--muted); }
+  .xls-btn { display:inline-flex; align-items:center; gap:5px; padding:6px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; transition:opacity .15s; }
+  .xls-btn:hover { opacity:.82; }
+  .xls-det  { background:#1a3a1a; color:#6ee7b7; border:1px solid #16a34a; }
+  .xls-res  { background:#1a2a3a; color:#93c5fd; border:1px solid #2563eb; }
+  .xls-plan { background:#2a1f3d; color:#c4b5fd; border:1px solid #7c3aed; }
+  .xls-btn:disabled { opacity:.35; cursor:not-allowed; }
+  .xls-btn:disabled:hover { opacity:.35; }
+
+  /* ── Selección de proyectos para la plantilla de materiales ─── */
+  .sel-cell { text-align:center; width:34px; }
+  .sel-cell input[type=checkbox] { width:15px; height:15px; cursor:pointer; accent-color:var(--accent); }
+  .sel-cell input[type=checkbox]:disabled { cursor:not-allowed; opacity:.25; }
+  tr.row-sel td { background:rgba(124,58,237,.10) !important; }
+  .sel-hint { font-size:11px; color:var(--muted); margin:8px 0 0; }
+  .sel-hint b { color:#c4b5fd; }
+
+  /* ── Filtro tipo proyecto ─── */
+  .tipo-filter { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+  .tipo-filter span { font-size: 11px; color: var(--muted); margin-right: 4px; }
+  .tipo-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; color: var(--muted); font-size: 12px; font-weight: 600; padding: 5px 14px; cursor: pointer; transition: all .15s; }
+  .tipo-btn:hover { color: var(--text); border-color: var(--accent); }
+  .tipo-btn.active { color: #fff; border-color: transparent; }
+  .tipo-btn.active.t-all  { background: var(--accent); }
+  .tipo-btn.active.t-prog { background: #7c3aed; border-color: #7c3aed; }
+  .tipo-btn.active.t-mi   { background: #0891b2; border-color: #0891b2; }
+  .tipo-tag { display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 5px; vertical-align: middle; }
+  .tipo-tag-prog { background: rgba(124,58,237,.15); color: #a78bfa; border: 1px solid rgba(124,58,237,.3); }
+  .tipo-tag-mi   { background: rgba(8,145,178,.15);  color: #67e8f9; border: 1px solid rgba(8,145,178,.3); }
+  .tipo-tag-otro { background: rgba(100,116,139,.12); color: var(--muted); border: 1px solid rgba(100,116,139,.2); }
+
+  /* ── Validado por correos ─── */
+  .vc-filtro { font-size: 12px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+  .vc-vacio { text-align: center; color: var(--muted); padding: 50px 0; }
+  .vc-fam { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; }
+  .vc-fam[open] { border-color: var(--accent); }
+  .vc-fam > summary { list-style: none; cursor: pointer; padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+  .vc-fam > summary::-webkit-details-marker { display: none; }
+  .vc-cod { font-family: 'Cascadia Code', monospace; font-size: 14px; }
+  .vc-padres { color: var(--muted); font-size: 12px; font-family: 'Cascadia Code', monospace; }
+  .vc-kpi { margin-left: auto; font-weight: 700; color: var(--warn); font-size: 13px; white-space: nowrap; }
+  .vc-kpi.cero { color: var(--muted); font-weight: 600; }
+  .vc-mini { width: 100%; font-size: 11px; color: var(--muted); }
+  .vc-body { padding: 0 16px 14px; overflow-x: auto; }
+  .vc-correo { font-size: 12px; color: var(--muted); margin: 4px 0; line-height: 1.5; }
+  .vc-correo b { color: var(--text); font-weight: 600; }
+  .vc-frase { color: var(--accent2); font-style: italic; }
+  table.vc-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  table.vc-table th { background: var(--surface2); color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; padding: 7px 8px; text-align: left; white-space: nowrap; }
+  table.vc-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  table.vc-table td.n { text-align: right; font-family: 'Cascadia Code', monospace; white-space: nowrap; }
+  table.vc-table tr.vc-liq td { background: rgba(251,191,36,.05); }
+  .badge-bad { background: rgba(248,113,113,.10); color: var(--danger); border: 1px solid rgba(248,113,113,.3); }
+  .badge-info { background: rgba(79,126,248,.10); color: var(--accent); border: 1px solid rgba(79,126,248,.3); }
+  @media (max-width: 700px) { .vc-kpi { margin-left: 0; } }
+  .vc-btn { background: transparent; border: 1px solid var(--border); color: var(--accent); border-radius: 6px; padding: 2px 9px; font-size: 11px; font-weight: 600; cursor: pointer; margin-left: 6px; white-space: nowrap; }
+  .vc-btn:hover { border-color: var(--accent); }
+  tr.vc-porque td { padding: 0 8px 8px 8px; font-size: 11.5px; color: var(--muted); border-bottom: 1px solid var(--border); line-height: 1.5; }
+  tr.vc-porque-con td { border-bottom: none; }
+  .vc-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+  .vc-modal-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); width: min(1100px, 100%); max-height: 92vh; display: flex; flex-direction: column; }
+  .vc-modal-cab { padding: 14px 18px; border-bottom: 1px solid var(--border); font-size: 13px; line-height: 1.55; }
+  .vc-modal-cuerpo { flex: 1; min-height: 240px; overflow: auto; background: #fff; }
+  .vc-iframe { width: 100%; height: 62vh; border: 0; background: #fff; display: block; }
+  .vc-modal-pie { padding: 10px 18px; border-top: 1px solid var(--border); display: flex; gap: 10px; align-items: center; }
+  .vc-modal-msg { flex: 1; font-size: 12px; color: var(--muted); }
+  .vc-aviso, .vc-err { padding: 24px; color: #333; font-size: 13px; }
+  .vc-err { color: #b91c1c; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">Verificador SGS</div>
+    <div class="subtitle">Estado de liquidación · Mano de Obra &amp; Materiales</div>
+  </div>
+  <div class="user-chip">
+    <span>{{ usuario }}</span>
+    <a href="/verificador/logout" class="logout-btn">Salir</a>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── Tabs ─── -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('manual',this)">Verificación Manual</button>
+    <button class="tab-btn"        onclick="switchTab('auto',this)">Automático por Mes</button>
+    <button class="tab-btn"        onclick="switchTab('correos',this)">Validado por correos</button>
+    <button class="tab-btn"        onclick="switchTab('consulta',this)">Consulta Individual</button>
+    <button class="tab-btn"        onclick="switchTab('cruce',this)">Cruce Excel</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════ TAB MANUAL -->
+  <div id="tab-manual" class="tab-pane active">
+    <div class="input-panel">
+      <h2>Ingresa los códigos de proyecto a verificar</h2>
+      <p class="hint">Un código por línea o separados por coma. Acepta:
+        <code>DF202664418010</code> · <code>PRO-055452</code> · <code>PRO-055453</code> (hijo → detecta padre) · <code>6300985782</code>
+      </p>
+      <textarea id="codigos" placeholder="DF202664418010&#10;PRO-055453&#10;PRO-001234"></textarea>
+      <div class="btn-row">
+        <button class="primary" id="btn-verificar" onclick="verificar()">Verificar proyectos</button>
+        <button class="secondary" onclick="limpiarManual()">Limpiar</button>
+        <div class="spinner" id="spin-manual"><div class="spin"></div>Consultando SGS…</div>
+      </div>
+    </div>
+    <div class="error-box" id="err-manual"></div>
+    <div id="resultados-manual">
+      <div id="empty-state"><div class="big-icon"></div><p>Ingresa códigos de proyecto para verificar su estado</p></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════ TAB AUTO -->
+  <div id="tab-auto" class="tab-pane">
+    <div class="auto-panel">
+      <h2>Análisis automático del mes</h2>
+      <div class="selector-row">
+        <div class="selector-field">
+          <label>Mes</label>
+          <select class="sel" id="sel-mes">
+            <option value="1">Enero</option><option value="2">Febrero</option>
+            <option value="3">Marzo</option><option value="4">Abril</option>
+            <option value="5">Mayo</option><option value="6">Junio</option>
+            <option value="7">Julio</option><option value="8">Agosto</option>
+            <option value="9">Septiembre</option><option value="10">Octubre</option>
+            <option value="11">Noviembre</option><option value="12">Diciembre</option>
+          </select>
+        </div>
+        <div class="selector-field">
+          <label>Año</label>
+          <select class="sel" id="sel-año"></select>
+        </div>
+        <div class="btn-row" style="margin-top:0;flex-wrap:wrap">
+          <button class="primary" id="btn-auto" onclick="analizarMes()">Analizar</button>
+          <button class="xls-btn xls-det" id="btn-xls-mes" onclick="exportarAuto('mes')">Excel del mes</button>
+          <button class="xls-btn xls-res" id="btn-xls-año" onclick="exportarAuto('año')">Excel del año</button>
+          <button class="xls-btn xls-plan" id="btn-plantilla" onclick="descargarPlantillaMat()"
+                  disabled title="Marca proyectos con material pendiente en la tabla">
+            Plantilla materiales (0)</button>
+          <button class="xls-btn xls-plan" id="btn-ir-correos" onclick="irValidadoCorreos()"
+                  title="Lo que los correos mandaron a liquidar y SGS tiene sin liquidar, con plantilla para Liquidador 2">
+            Validado por correos</button>
+          <div class="spinner" id="spin-auto"><div class="spin"></div>Consultando SGS… (puede tardar ~30s)</div>
+          <div class="spinner" id="spin-xls"><div class="spin"></div><span id="spin-xls-txt">Generando Excel…</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="error-box" id="err-auto"></div>
+    <div id="resultados-auto">
+      <div id="empty-auto"><div class="big-icon"></div><p>Selecciona mes y año, luego haz clic en Analizar</p></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════ TAB VALIDADO POR CORREOS -->
+  <div id="tab-correos" class="tab-pane">
+    <div class="auto-panel">
+      <h2>Mandado a liquidar por correo y no liquidado</h2>
+      <p class="hint">Cruza los correos de <b>Centro MO</b> (presupuesto del supervisor y lo que el correo dice del
+        material) con SGS en vivo, en todos los proyectos padre del LCL. Regla: si el correo no dice «solo MO» o
+        «no liquidar material», el material estaba habilitado. El mes es el del correo.</p>
+      <div class="selector-row">
+        <div class="selector-field">
+          <label>Mes del correo</label>
+          <select class="sel" id="vc-mes">
+            <option value="1">Enero</option><option value="2">Febrero</option>
+            <option value="3">Marzo</option><option value="4">Abril</option>
+            <option value="5">Mayo</option><option value="6">Junio</option>
+            <option value="7">Julio</option><option value="8">Agosto</option>
+            <option value="9">Septiembre</option><option value="10">Octubre</option>
+            <option value="11">Noviembre</option><option value="12">Diciembre</option>
+            <option value="todos">Todos los meses</option>
+          </select>
+        </div>
+        <div class="selector-field">
+          <label>Año</label>
+          <select class="sel" id="vc-año"></select>
+        </div>
+        <div class="btn-row" style="margin-top:0;flex-wrap:wrap">
+          <button class="primary" id="btn-correos" onclick="analizarCorreos()">Analizar</button>
+          <button class="xls-btn xls-plan" id="btn-vc-plantilla" onclick="descargarValidado()" disabled
+                  title="Marca filas «Mandado y no liquidado»">Plantilla validada (0)</button>
+          <label class="vc-filtro"><input type="checkbox" id="vc-solo" checked onchange="vcFiltrar()">
+            solo códigos con algo por liquidar o revisar</label>
+          <div class="spinner" id="spin-correos"><div class="spin"></div>Leyendo Centro MO y SGS… (≈40 s por mes)</div>
+          <div class="spinner" id="spin-vc-xls"><div class="spin"></div>Generando Excel…</div>
+        </div>
+      </div>
+    </div>
+    <div class="error-box" id="err-correos"></div>
+    <div id="resultados-correos">
+      <div class="vc-vacio"><div class="big-icon"></div><p>Elige el mes y pulsa Analizar</p></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════ TAB CONSULTA -->
+  <div id="tab-consulta" class="tab-pane">
+    <div class="consulta-input-wrap">
+      <h2>Consulta individual de proyecto</h2>
+      <p class="hint">Ingresa cualquier código: <code>DF202664418010</code> · <code>6300985782</code> · <code>PRO-055452</code> · <code>CDOPP-12345</code> · <code>CDOPPI-6789</code></p>
+      <div class="search-row">
+        <textarea id="inp-consulta" placeholder="DF202664418010&#10;6300985782&#10;CDOPP2026R03914&#10;CDOPPI202678983&#10;PRO-055452&#10;&#10;Un código por línea o separados por coma" autocomplete="off" spellcheck="false"></textarea>
+        <div class="btn-col">
+          <button class="primary" id="btn-consulta" onclick="buscarProyecto()">Buscar</button>
+          <button class="secondary" onclick="document.getElementById('inp-consulta').value='';document.getElementById('resultados-consulta').innerHTML='<div id=\'empty-consulta\'><div class=\'big-icon\'></div><p>Ingresa un código para consultar el estado completo del proyecto</p></div>';showError('consulta','')">Limpiar</button>
+          <div class="spinner" id="spin-consulta"><div class="spin"></div>Consultando…</div>
+        </div>
+      </div>
+    </div>
+    <div class="error-box" id="err-consulta"></div>
+    <div id="resultados-consulta">
+      <div id="empty-consulta"><div class="big-icon"></div><p>Ingresa un código para consultar el estado completo del proyecto</p></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════ TAB CRUCE -->
+  <div id="tab-cruce" class="tab-pane">
+    <div class="upload-panel">
+      <h2>Cruce con Excel de Programación Zona VII</h2>
+      <p class="hint">Sube el archivo <code>PROGRAMACION ZONA VII...</code>. El sistema extrae automáticamente los trabajos de UBATE y verifica cuáles están cargados en SGS.</p>
+      <input type="file" id="inp-excel" accept=".xlsx,.xls" onchange="archivoSeleccionado(this)">
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('inp-excel').click()"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="event.preventDefault();this.classList.remove('drag-over');document.getElementById('inp-excel').files=event.dataTransfer.files;archivoSeleccionado(document.getElementById('inp-excel'))">
+        <div class="icon"></div>
+        <div class="label">Haz clic o arrastra el archivo Excel aquí</div>
+        <div class="file-name" id="nombre-archivo"></div>
+      </div>
+      <div class="btn-row">
+        <button class="primary" id="btn-cruce" onclick="ejecutarCruce()" disabled>Verificar en SGS</button>
+        <button class="secondary" onclick="limpiarCruce()">Limpiar</button>
+        <div class="spinner" id="spin-cruce"><div class="spin"></div>Consultando SGS… esto puede tardar varios minutos</div>
+      </div>
+    </div>
+    <div class="error-box" id="err-cruce"></div>
+    <div id="resultados-cruce">
+      <div id="empty-cruce" style="text-align:center;padding:40px 20px;color:var(--muted)">
+        <div style="font-size:40px;opacity:.4;margin-bottom:10px"></div>
+        <p>Sube el Excel de programación para cruzarlo con SGS</p>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+/* ── Inicialización ─── */
+const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+(function init() {
+  const hoy = new Date();
+  const mesEl = document.getElementById('sel-mes');
+  const añoEl = document.getElementById('sel-año');
+  mesEl.value = hoy.getMonth() + 1;
+  for (let y = hoy.getFullYear(); y >= 2024; y--) {
+    const o = document.createElement('option');
+    o.value = y; o.textContent = y;
+    añoEl.appendChild(o);
+  }
+})();
+
+let _consultaData = null;
+
+/* Base de SGS para los enlaces "abrir ficha". Llega del servidor (config.py):
+   estaba escrita a mano y quedó apuntando a un host que ya no responde. */
+const SGS_WEB = "{{ sgs_web_url }}";
+const PUEDE_OUTLOOK = {{ 'true' if puede_outlook else 'false' }};   // abrir en el Outlook del PC, solo el dev
+function sgsHref(id) {
+  return (SGS_WEB && id)
+    ? `${SGS_WEB}/web#id=${id}&model=project.dominion&view_type=form`
+    : null;
+}
+
+/* ── Tabs ─── */
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+/* ── Formato ─── */
+const fmtCOP = new Intl.NumberFormat('es-CO', {style:'currency',currency:'COP',minimumFractionDigits:0,maximumFractionDigits:0});
+const fmtNum = n => new Intl.NumberFormat('es-CO',{minimumFractionDigits:0,maximumFractionDigits:2}).format(n);
+function moneda(n) { return n ? fmtCOP.format(n) : '$0'; }
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ════════════════════════════════ MODO MANUAL */
+
+function setLoading(id, on) {
+  document.getElementById('btn-' + id).disabled = on;
+  document.getElementById('spin-' + id).classList.toggle('active', on);
+}
+function showError(id, msg) {
+  const el = document.getElementById('err-' + id);
+  el.textContent = msg; el.style.display = msg ? 'block' : 'none';
+}
+
+async function verificar() {
+  const codigos = document.getElementById('codigos').value.trim();
+  if (!codigos) { showError('manual','Ingresa al menos un código.'); return; }
+  showError('manual',''); setLoading('verificar', true);
+  document.getElementById('resultados-manual').innerHTML = '';
+  try {
+    const r = await fetch('/verificador/api/verificar', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({codigos})});
+    const d = await r.json();
+    if (!d.ok) { showError('manual', d.error || 'Error desconocido.'); return; }
+    renderManual(d);
+  } catch(e) { showError('manual','Error de red: '+e.message); }
+  finally { setLoading('verificar', false); }
+}
+
+function limpiarManual() {
+  document.getElementById('codigos').value = '';
+  document.getElementById('resultados-manual').innerHTML = '<div id="empty-state"><div class="big-icon"></div><p>Ingresa códigos de proyecto para verificar su estado</p></div>';
+  showError('manual','');
+}
+
+function renderManual(data) {
+  const el = document.getElementById('resultados-manual');
+  let html = '';
+  if (!data.familias.length && !data.errores.length) {
+    html = '<div id="empty-state"><div class="big-icon"></div><p>No se encontraron proyectos.</p></div>';
+  }
+  for (const f of data.familias) html += renderFamilia(f);
+  if (data.errores && data.errores.length) html += renderErroresManual(data.errores);
+  el.innerHTML = html;
+}
+
+function renderFamilia(f) {
+  const padre = f.padre, res = f.resumen, hijos = f.hijos||[];
+  const nodosChips = hijos.map(h => `<span class="chip">${esc(h.code)}${h.nodo?' N'+h.nodo:''}</span>`).join('');
+  const moClass  = res.mo_liquidado  ? 'ok' : (res.nodos_sin_mo.length ? 'danger' : 'muted');
+  const matClass = res.mat_liquidado ? (res.nodos_mat_pend.length ? 'warn' : 'ok') : (res.nodos_con_mat.length ? 'danger' : 'muted');
+  const moStr  = res.total_mo_value > 0 ? moneda(res.total_mo_value) : (res.nodos_sin_mo.length ? 'PENDIENTE' : '—');
+  const matStr = res.total_mat_advance > 0 ? fmtNum(res.total_mat_advance)+' un.' : (res.nodos_mat_pend.length ? 'PENDIENTE' : (res.nodos_con_mat.length ? '—' : 'Sin mat.'));
+  const fechasMO = []; for(const m of f.mo) if(m.mo_fecha_ultima) fechasMO.push(m.mo_fecha_ultima);
+  return `<div class="familia-card">
+    <div class="familia-header">
+      <span class="tag-input">Input: ${esc(f.codigo_input)}</span>
+      <div><div class="pro-code">${esc(padre.code)}</div><div class="pro-name">${esc(padre.name)}</div></div>
+      ${hijos.length ? `<div class="nodos-list">${nodosChips}</div>` : ''}
+    </div>
+    <div class="resumen-bar">
+      <div class="resumen-stat"><div class="label">MO liquidada</div><div class="value ${moClass}">${moStr}</div>${fechasMO.length?`<div class="sub">${fechasMO[fechasMO.length-1]}</div>`:''}</div>
+      <div class="resumen-stat"><div class="label">MO pendiente (uds)</div><div class="value ${res.total_mo_balance>0?'warn':'muted'}">${res.total_mo_balance>0?fmtNum(res.total_mo_balance):'—'}</div>${res.nodos_sin_mo.length?`<div class="sub danger">Sin liq: ${res.nodos_sin_mo.join(', ')}</div>`:''}</div>
+      <div class="resumen-stat"><div class="label">Materiales</div><div class="value ${matClass}">${matStr}</div>${res.nodos_mat_pend.length?`<div class="sub warn">Pendiente: ${res.nodos_mat_pend.length} nodo(s)</div>`:''}</div>
+      <div class="resumen-stat"><div class="label">Nodos</div><div class="value muted">${f.n_hijos+1}</div><div class="sub">${f.n_hijos} hijo(s)</div></div>
+    </div>
+    <div class="nodos-grid">
+      <div class="col-section"><div class="col-title"><span class="dot dot-mo"></span>Mano de Obra</div>${f.mo.map(renderMONodo).join('')}</div>
+      <div class="col-section"><div class="col-title"><span class="dot dot-mat"></span>Materiales</div>${f.materiales.map(renderMATNodo).join('')}</div>
+    </div>
+  </div>`;
+}
+
+function renderMONodo(mo) {
+  let ic, ic2, det;
+  if (!mo.mo_tiene_acts) {
+    ic='icon-none';ic2='—'; det=`<div class="nodo-detail muted">Sin actividades</div>`;
+  } else if (mo.mo_liquidado && mo.mo_completo) {
+    ic='icon-ok';ic2='✓'; det=`<div class="nodo-detail"><span class="liquidado-val">${moneda(mo.mo_value)}</span>${mo.mo_fecha_ultima?`<span class="fecha"> · ${mo.mo_fecha_ultima}</span>`:''}</div>`;
+  } else if (mo.mo_liquidado) {
+    ic='icon-warn';ic2='⚑'; det=`<div class="nodo-detail"><span class="liquidado-val">${moneda(mo.mo_value)}</span>${mo.mo_fecha_ultima?`<span class="fecha"> · ${mo.mo_fecha_ultima}</span>`:''}<br><span class="pendiente">Pend: ${fmtNum(mo.mo_act_balance)} uds</span></div>`;
+  } else {
+    ic='icon-pend';ic2='✗'; det=`<div class="nodo-detail"><span class="pendiente">Sin liquidar</span></div>`;
+  }
+  const nb = mo.nodo?`<span class="nodo-badge">N${mo.nodo}</span>`:'';
+  return `<div class="nodo-row"><div class="status-icon ${ic}">${ic2}</div><div class="nodo-info"><div class="nodo-code">${esc(mo.pro_code)}${nb}</div>${det}</div></div>`;
+}
+
+function renderMATNodo(mat) {
+  let ic, ic2, det;
+  const matsBreakdown = (mat.mat_pendientes||[]).length
+    ? `<div class="pend-mats" style="margin-top:4px">${(mat.mat_pendientes||[]).map(p=>`<span class="pend-mat">${esc(p.codigo)} <b>${p.pendiente}</b></span>`).join('')}</div>`
+    : '';
+  if (!mat.tiene_materiales) {
+    ic='icon-none';ic2='—'; det=`<div class="nodo-detail muted">Sin materiales</div>`;
+  } else if (mat.mat_liquidado && mat.mat_completo) {
+    ic='icon-ok';ic2='✓'; det=`<div class="nodo-detail"><span class="liquidado-val">${fmtNum(mat.mat_advance)} uds liq.</span>${mat.mat_fecha_liq?`<span class="fecha"> · ${mat.mat_fecha_liq}</span>`:''}</div>`;
+  } else if (mat.mat_pendiente && mat.mat_liquidado) {
+    ic='icon-warn';ic2='⚑'; det=`<div class="nodo-detail"><span class="liquidado-val">${fmtNum(mat.mat_advance)} liq.</span><br><span class="pendiente">Pend: ${fmtNum(mat.mat_balance)} uds</span>${matsBreakdown}</div>`;
+  } else if (mat.mat_pendiente) {
+    ic='icon-pend';ic2='✗'; det=`<div class="nodo-detail"><span class="pendiente">PENDIENTE · ${fmtNum(mat.mat_balance)} uds</span><br><span class="muted">Neto despachado: ${fmtNum(mat.mat_despachado)}</span>${matsBreakdown}</div>`;
+  } else {
+    ic='icon-none';ic2='?'; det=`<div class="nodo-detail muted">${mat.n_mat} mat · bal: ${fmtNum(mat.mat_balance)}</div>`;
+  }
+  const nb = mat.nodo?`<span class="nodo-badge">N${mat.nodo}</span>`:'';
+  return `<div class="nodo-row"><div class="status-icon ${ic}">${ic2}</div><div class="nodo-info"><div class="nodo-code">${esc(mat.pro_code)}${nb}</div>${det}</div></div>`;
+}
+
+function renderErroresManual(errores) {
+  const items = errores.map(e=>`<div class="error-item"><code style="color:var(--danger)">${esc(e.codigo)}</code> — ${esc(e.error)}</div>`).join('');
+  return `<div class="familia-card"><div class="errores-section"><h4>No encontrados</h4>${items}</div></div>`;
+}
+
+document.getElementById('codigos').addEventListener('keydown', e => { if (e.ctrlKey && e.key==='Enter') verificar(); });
+
+/* ════════════════════════════════ MODO AUTOMÁTICO */
+
+async function analizarMes() {
+  const mes = parseInt(document.getElementById('sel-mes').value);
+  const año = parseInt(document.getElementById('sel-año').value);
+  showError('auto',''); setLoading('auto', true);
+  document.getElementById('resultados-auto').innerHTML = '';
+  try {
+    const r = await fetch('/verificador/api/auto', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({año, mes})});
+    const d = await r.json();
+    if (!d.ok) { showError('auto', d.error || 'Error.'); return; }
+    renderAuto(d);
+  } catch(e) { showError('auto','Error de red: '+e.message); }
+  finally { setLoading('auto', false); }
+}
+
+function renderAuto(data) {
+  const el = document.getElementById('resultados-auto');
+  if (!data.n_total) {
+    el.innerHTML = `<div id="empty-auto"><div class="big-icon"></div><p>Sin proyectos del equipo en ${esc(data.mes_str)}.</p></div>`;
+    return;
+  }
+
+  const pctOk   = data.n_total ? Math.round(data.n_completo  / data.n_total * 100) : 0;
+  const pctPend = data.n_total ? Math.round(data.n_pendiente / data.n_total * 100) : 0;
+
+  const nProg = data.n_programado    || 0;
+  const nMI   = data.n_mayor_impacto || 0;
+  const nOtro = data.n_total - nProg - nMI;
+
+  let html = `
+  <div class="summary-grid">
+    <div class="stat-card"><div class="label">Total proyectos</div><div class="value val-total">${data.n_total}</div><div class="sub">${esc(data.mes_str)}</div></div>
+    <div class="stat-card"><div class="label">Materiales OK</div><div class="value val-ok">${data.n_completo}</div><div class="sub">${pctOk}% del total</div></div>
+    <div class="stat-card"><div class="label">Materiales pendientes</div><div class="value val-warn">${data.n_pendiente}</div><div class="sub">${pctPend}% del total</div></div>
+    <div class="stat-card"><div class="label">Sin materiales</div><div class="value val-muted">${data.n_sin_mat}</div><div class="sub">No aplica</div></div>
+  </div>
+  <div class="tipo-filter">
+    <span>Filtrar:</span>
+    <button class="tipo-btn t-all active" onclick="filtrarTipo('todos',this)">Todos (${data.n_total})</button>
+    <button class="tipo-btn t-prog" onclick="filtrarTipo('programado',this)">Programados 6300 (${nProg})</button>
+    <button class="tipo-btn t-mi"   onclick="filtrarTipo('mayor_impacto',this)">Mayor Impacto DF (${nMI})</button>
+    ${nOtro > 0 ? `<button class="tipo-btn" onclick="filtrarTipo('otro',this)">Otros (${nOtro})</button>` : ''}
+  </div>
+  <div class="auto-table-wrap">
+  <table class="auto-table" id="tbl-auto">
+    <thead><tr>
+      <th class="sel-cell"><input type="checkbox" id="chk-all" onclick="toggleTodos(this)"
+            title="Seleccionar todos los proyectos con material pendiente"></th>
+      <th>Tipo</th>
+      <th>Estado mat.</th>
+      <th>PDL / OT</th>
+      <th>LCL</th>
+      <th>Proyecto padre</th>
+      <th>Supervisor</th>
+      <th>MO liquidada</th>
+      <th>Últ. liq.</th>
+      <th>Antigüedad mat.</th>
+      <th>Líder a liquidar</th>
+      <th>Nodos / Materiales</th>
+    </tr></thead>
+    <tbody>`;
+
+  data.familias.forEach((f, idx) => {
+    const bdg = badgeClasif(f.clasificacion);
+    const tipoTag = tipoLabel(f.tipo);
+    const nodosPills = f.nodos_mat.map(n => {
+      const fuera = (n.n_pend_posterior || 0) > 0;
+      const cls = fuera                             ? 'pill-late'
+                : n.estado_mat === 'completo'       ? 'pill-ok'
+                : n.estado_mat === 'pendiente'      ? 'pill-warn'
+                : 'pill-none';
+      const icon = fuera ? '' : n.estado_mat === 'completo' ? '✓' : n.estado_mat === 'pendiente' ? '⚠' : '—';
+      const label = n.nodo ? `N${n.nodo}` : (n.pro_code ? n.pro_code.replace('PRO-','') : '?');
+      const href = sgsHref(n.pro_id);
+      const pendTxt = (n.pendientes||[]).map(p=>`${p.codigo}:${p.pendiente}`).join(', ');
+      const vent = (n.salida_desde || n.salida_hasta)
+        ? ` · salidas ${esc(n.salida_desde||'?')}→${esc(n.salida_hasta||'?')}` : '';
+      const aviso = fuera ? ` · ${n.n_pend_posterior} material(es) salieron después del mes` : '';
+      const title = `${esc(n.pro_code)} · neto:${(n.despa||0).toFixed(1)} adv:${(n.advance||0).toFixed(1)} pend:${(n.balance||0).toFixed(1)}${vent}${aviso}${pendTxt?' → '+esc(pendTxt):''}`;
+      const inner = `<span class="nodo-pill ${cls}" title="${title}">${icon} ${esc(label)}</span>`;
+      return href ? `<a href="${href}" target="_blank" rel="noopener" style="text-decoration:none">${inner}</a>` : inner;
+    }).join('');
+
+    // Panel desplegable con el detalle exacto de materiales pendientes por nodo
+    const pendNodos = f.nodos_mat.filter(n => n.estado_mat === 'pendiente' && (n.pendientes||[]).length);
+    let pendDetalle = '';
+    if (pendNodos.length) {
+      const filas = pendNodos.map(n => {
+        const label = n.nodo ? `N${n.nodo}` : (n.pro_code ? n.pro_code.replace('PRO-','') : '?');
+        const mats = (n.pendientes||[]).map(p => {
+          const nombre = p.nombre ? ` <span style="color:var(--muted);font-weight:400">${esc(p.nombre)}</span>` : '';
+          const lider = p.lider ? ` <span style="color:var(--accent2)">→ ${esc(p.lider)}</span>` : '';
+          const ad = (p.antiguedad_aprob_dias!=null) ? p.antiguedad_aprob_dias : p.antiguedad_dias;
+          const antig = (ad!=null) ? ` <span style="color:var(--muted)">(${ad}d)</span>` : '';
+          const tip = matTooltip(p);
+          const ban = tip ? ` <span class="pend-ban" title="${esc(tip)}"></span>` : '';
+          // Salió después del mes: se tacha y se rotula con su fecha real de
+          // salida, para que se vea por qué no va a entrar en la plantilla.
+          const late = p.posterior_al_mes ? ' mat-late' : '';
+          const sal  = p.posterior_al_mes && p.fecha_aprob_ultima
+            ? ` <span style="font-size:9px">salió ${esc(p.fecha_aprob_ultima)}</span>` : '';
+          return `<span class="pend-mat${late}" title="${esc(tip)}">${esc(p.codigo)}${nombre} <b>${p.pendiente}</b>${lider}${antig}${sal}${ban}</span>`;
+        }).join('');
+        return `<div class="pend-row"><span class="pend-nodo">${esc(label)}</span><span class="pend-mats">${mats}</span></div>`;
+      }).join('');
+      const nLate = f.n_pend_posterior || 0;
+      const sufijo = nLate ? ` · ${nLate} fuera del mes` : '';
+      pendDetalle = `<details class="pend-details"><summary>${pendNodos.length} nodo(s) con material pendiente${sufijo} — ver detalle</summary><div class="pend-box">${filas}</div></details>`;
+    }
+
+    const liqs = (f.liquidadores||[]).slice(0,2).map(l=>l.nombre.split(' ')[0]).join(', ');
+    const sgsUrl = sgsHref(f.padre_id);
+    const linkA  = sgsUrl ? `href="${sgsUrl}" target="_blank" rel="noopener"` : '';
+    // Solo tiene sentido seleccionar lo que tiene deuda de material: un
+    // proyecto 'completo' o 'sin materiales' generaría bloques vacíos en la
+    // plantilla y Liquidador 2 no tendría nada que liquidar de él.
+    const nLiq = f.clasificacion === 'pendiente' ? matsLiquidables(f) : 0;
+    const selable = nLiq > 0;
+    const soloTarde = f.clasificacion === 'pendiente' && nLiq === 0;
+    const chk = `<input type="checkbox" class="chk-fam" data-idx="${idx}"
+        onchange="onSelFamilia(this)" ${selable ? '' : 'disabled'}
+        title="${selable ? `Incluir en la plantilla (${nLiq} material(es) del mes)`
+                : soloTarde ? 'Todo su material pendiente salió después del mes — no se puede liquidar aquí'
+                : 'Sin material pendiente que liquidar'}">`;
+
+    html += `<tr data-tipo="${esc(f.tipo)}" data-idx="${idx}">
+      <td class="sel-cell">${chk}</td>
+      <td>${tipoTag}</td>
+      <td>${bdg}</td>
+      <td><a ${linkA} class="code-mono sgs-link">${esc(f.pdl_code)}</a></td>
+      <td class="code-mono">${(f.lcl && f.lcl!=='N/A') ? esc(f.lcl) : '<span style="color:var(--muted)">—</span>'}</td>
+      <td><a ${linkA} class="code-mono sgs-link" style="color:var(--accent2)">${esc(f.padre_code)}</a><br><small style="color:var(--muted)">${esc(f.padre_name.length>40?f.padre_name.slice(0,40)+'…':f.padre_name)}</small></td>
+      <td style="color:var(--text)">${esc(f.supervisor_full || f.supervisor)}</td>
+      <td style="color:var(--ok);font-family:monospace">${moneda(f.mo_value)}</td>
+      <td style="color:var(--accent2);font-size:12px">${esc(f.fecha_mo)}</td>
+      <td>${antigCellFam(f)}${ventanaSalida(f)}</td>
+      <td style="font-size:11px;color:var(--text)">${f.lider_liquidar ? esc(f.lider_liquidar) : '<span style="color:var(--muted)">—</span>'}</td>
+      <td><div class="nodo-pills">${nodosPills}</div>${pendDetalle}${liqs?`<div style="font-size:10px;color:var(--muted);margin-top:3px">Por: ${esc(liqs)}</div>`:''}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>
+  ${data.n_con_posterior ? `<p class="sel-hint" style="color:#fca5a5">
+    ${data.n_con_posterior} proyecto(s) traen material que salió de almacén
+    <b>después de ${esc(data.mes_str)}</b>. Ese material queda fuera de la plantilla
+    y se lista aparte en la hoja FUERA_DEL_MES.</p>` : ''}
+  <p class="sel-hint">Marca los proyectos con material pendiente y pulsa
+    <b>Plantilla materiales</b> para generar el Excel masivo que se sube a
+    Liquidador 2 (hoja <b>CRUCE_LIQUIDADOR</b>, un bloque por nodo con su PRO).</p>`;
+  el.innerHTML = html;
+  _autoData = data;
+  actualizarBotonPlantilla();
+}
+
+/* ── Selección de proyectos para la plantilla de materiales ─────────────── */
+
+// Último análisis renderizado. La plantilla se arma con estos mismos datos en
+// vez de re-consultar SGS: el análisis del mes tarda ~30 s y devolvería lo que
+// ya está en pantalla.
+let _autoData = null;
+
+// Materiales pendientes de una familia que sí caben en el mes analizado.
+// Un proyecto cuyo pendiente entero salió después del mes no tiene nada que
+// liquidar aquí, así que no debe poder marcarse.
+function matsLiquidables(f) {
+  return (f.nodos_mat || [])
+    .filter(n => n.estado_mat === 'pendiente')
+    .reduce((a, n) => a + (n.pendientes || [])
+      .filter(p => !p.posterior_al_mes).length, 0);
+}
+
+function familiasSeleccionadas() {
+  if (!_autoData) return [];
+  return [...document.querySelectorAll('.chk-fam:checked')]
+    .map(c => _autoData.familias[parseInt(c.dataset.idx)])
+    .filter(Boolean);
+}
+
+function onSelFamilia(chk) {
+  const tr = chk.closest('tr');
+  if (tr) tr.classList.toggle('row-sel', chk.checked);
+  const todas = [...document.querySelectorAll('.chk-fam:not(:disabled)')];
+  const all   = document.getElementById('chk-all');
+  if (all) {
+    const n = todas.filter(c => c.checked).length;
+    all.checked = n > 0 && n === todas.length;
+    all.indeterminate = n > 0 && n < todas.length;
+  }
+  actualizarBotonPlantilla();
+}
+
+function toggleTodos(master) {
+  // Solo alcanza las filas visibles: si hay un filtro de tipo activo, marcar
+  // todo incluiría proyectos que el usuario dejó fuera de vista.
+  document.querySelectorAll('.chk-fam:not(:disabled)').forEach(c => {
+    const tr = c.closest('tr');
+    if (tr && tr.style.display === 'none') return;
+    c.checked = master.checked;
+    if (tr) tr.classList.toggle('row-sel', c.checked);
+  });
+  master.indeterminate = false;
+  actualizarBotonPlantilla();
+}
+
+function actualizarBotonPlantilla() {
+  const btn = document.getElementById('btn-plantilla');
+  if (!btn) return;
+  const sel = familiasSeleccionadas();
+  const nMat  = sel.reduce((a, f) => a + matsLiquidables(f), 0);
+  const nLate = sel.reduce((a, f) => a + (f.n_pend_posterior || 0), 0);
+  btn.textContent = `Plantilla materiales (${sel.length})`;
+  btn.disabled = sel.length === 0;
+  btn.title = sel.length
+    ? `${sel.length} proyecto(s) · ${nMat} material(es) del mes`
+      + (nLate ? ` · ${nLate} apartado(s) por salir después del mes` : '')
+    : 'Marca proyectos con material pendiente en la tabla';
+}
+
+async function descargarPlantillaMat() {
+  const familias = familiasSeleccionadas();
+  if (!familias.length) return;
+  const btn  = document.getElementById('btn-plantilla');
+  const spin = document.getElementById('spin-xls');
+  showError('auto', '');
+  document.getElementById('spin-xls-txt').textContent = 'Generando plantilla de materiales…';
+  btn.disabled = true;
+  spin.classList.add('active');
+  try {
+    const r = await fetch('/verificador/api/plantilla-mat', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({familias, periodo: _autoData ? _autoData.mes_str : ''}),
+    });
+    if (!r.ok) {
+      let msg = `No se pudo generar la plantilla (HTTP ${r.status}).`;
+      try { const j = await r.json(); if (j.error) msg = j.error; } catch(e) {}
+      showError('auto', msg);
+      return;
+    }
+    const blob = await r.blob();
+    const cd = r.headers.get('Content-Disposition') || '';
+    const m  = cd.match(/filename="?([^"]+)"?/);
+    const dl = URL.createObjectURL(blob);
+    const a  = document.createElement('a');
+    a.href = dl; a.download = m ? m[1] : 'PLANTILLA_MAT_MASIVA.xlsx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(dl), 1500);
+  } catch(e) {
+    showError('auto', 'Error de red al generar la plantilla: ' + e.message);
+  } finally {
+    spin.classList.remove('active');
+    actualizarBotonPlantilla();
+  }
+}
+
+function badgeClasif(c) {
+  if (c === 'completo')       return `<span class="badge badge-ok">✓ Completo</span>`;
+  if (c === 'pendiente')      return `<span class="badge badge-warn">⚠ Pendiente</span>`;
+  return `<span class="badge badge-none">— Sin mat.</span>`;
+}
+
+function justBandejas(p) {
+  const num = q => { q = Number(q||0); return Math.abs(q - Math.round(q)) < 0.005 ? String(Math.round(q)) : String(q); };
+  const desp = (p.bandejas_despacho||[]).map(b => `${b.nombre} (+${num(b.qty)})`);
+  const dev  = (p.bandejas_devolucion||[]).map(b => `${b.nombre} (-${num(b.qty)})`);
+  const partes = [];
+  if (desp.length) partes.push('Despacho: ' + desp.join(', '));
+  if (dev.length)  partes.push('Devolución: ' + dev.join(', '));
+  if (!partes.length) return '';
+  return partes.join('  |  ') + `  → neto ${num(p.neto)}`;
+}
+
+function antigBadge(d) {
+  if (d === null || d === undefined) return '<span style="color:var(--muted)">—</span>';
+  const txt = d + (d === 1 ? ' día' : ' días');
+  const col = d > 30 ? 'var(--danger)' : d > 15 ? 'var(--warn)' : 'var(--muted)';
+  return `<span style="color:${col};font-weight:600;font-size:12px">${txt}</span>`;
+}
+
+// Antigüedad a nivel familia: muestra la de APROBACIÓN (fecha real de almacén)
+// como principal, con la de la bandeja en el tooltip.
+function antigCellFam(f) {
+  const b = f.antiguedad_dias, a = f.antiguedad_aprob_dias;
+  const main = (a !== null && a !== undefined) ? a : b;
+  const tip = [];
+  if (b !== null && b !== undefined) tip.push(`Bandeja: ${b}d`);
+  if (a !== null && a !== undefined) tip.push(`Aprob. almacén: ${a}d`);
+  const sub = (a !== null && a !== undefined) ? '<div style="font-size:9px;color:var(--muted)">aprob.</div>' : '';
+  return `<span title="${esc(tip.join(' · '))}">${antigBadge(main)}${sub}</span>`;
+}
+
+// Tooltip de un material pendiente: fechas (bandeja + aprobación) y bandejas.
+/* Ventana de salidas de almacén de la familia: entre qué fechas salió el
+   material que sigue pendiente. Es lo que dice si un proyecto "de abril" en
+   realidad tiene movimiento reciente. */
+function ventanaSalida(f) {
+  if (!f.salida_desde && !f.salida_hasta) return '';
+  const mismo = f.salida_desde === f.salida_hasta;
+  const txt = mismo ? esc(f.salida_desde)
+                    : `${esc(f.salida_desde||'?')} → <b>${esc(f.salida_hasta||'?')}</b>`;
+  const late = (f.n_pend_posterior || 0) > 0
+    ? `<div class="late-warn">${f.n_pend_posterior} material(es) salieron después del mes</div>` : '';
+  return `<div class="salida-win" title="Salidas de almacén del material pendiente">${txt}</div>${late}`;
+}
+
+function matTooltip(p) {
+  const parts = [];
+  if (p.fecha_despacho)   parts.push(`Fecha bandeja: ${p.fecha_despacho}${p.antiguedad_dias!=null?` (${p.antiguedad_dias}d)`:''}`);
+  if (p.fecha_aprobacion) parts.push(`Aprob. almacén: ${p.fecha_aprobacion}${p.antiguedad_aprob_dias!=null?` (${p.antiguedad_aprob_dias}d)`:''}`);
+  if (p.fecha_aprob_ultima && p.fecha_aprob_ultima !== p.fecha_aprobacion)
+    parts.push(`Última salida: ${p.fecha_aprob_ultima}`);
+  if (p.posterior_al_mes)
+    parts.push('SALIÓ DESPUÉS DEL MES — no entra en la plantilla');
+  const jb = justBandejas(p);
+  if (jb) parts.push(jb);
+  return parts.join('  ·  ');
+}
+
+function tipoLabel(t) {
+  if (t === 'programado')    return `<span class="tipo-tag tipo-tag-prog">6300</span>`;
+  if (t === 'mayor_impacto') return `<span class="tipo-tag tipo-tag-mi">DF</span>`;
+  return `<span class="tipo-tag tipo-tag-otro">—</span>`;
+}
+
+async function exportarAuto(modo) {
+  const mes = parseInt(document.getElementById('sel-mes').value);
+  const año = parseInt(document.getElementById('sel-año').value);
+  const esAño = modo === 'año';
+  if (esAño && !confirm(`Generar el Excel del AÑO ${año} consulta los meses en SGS y puede tardar varios minutos.\nSolo incluye el contrato vigente "Enel zona VII - 2026" (el contrato viejo cerró). ¿Continuar?`)) return;
+
+  const url = esAño ? `/verificador/api/auto/export?año=${año}`
+                    : `/verificador/api/auto/export?año=${año}&mes=${mes}`;
+  showError('auto', '');
+  const btnMes = document.getElementById('btn-xls-mes');
+  const btnAño = document.getElementById('btn-xls-año');
+  const spin   = document.getElementById('spin-xls');
+  document.getElementById('spin-xls-txt').textContent =
+    esAño ? `Generando Excel del año ${año}… (puede tardar varios minutos)` : 'Generando Excel del mes…';
+  btnMes.disabled = btnAño.disabled = true;
+  spin.classList.add('active');
+  try {
+    const r = await fetch(url);
+    if (!r.ok) {
+      let msg = `No se pudo generar el Excel (HTTP ${r.status}).`;
+      if (r.status === 504 || r.status === 502)
+        msg = `El servidor tardó demasiado en generar el Excel (HTTP ${r.status}). ` +
+              'Vuelve a intentarlo; si persiste, genera los meses uno a uno.';
+      try { const j = await r.json(); if (j.error) msg = j.error; } catch(e) {}
+      showError('auto', msg);
+      return;
+    }
+    const blob = await r.blob();
+    const cd = r.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename="?([^"]+)"?/);
+    const fname = m ? m[1] : (esAño ? `Verificador_AUTO_${año}.xlsx` : `Verificador_AUTO_${mes}_${año}.xlsx`);
+    const dl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = dl; a.download = fname;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(dl), 1500);
+  } catch(e) {
+    showError('auto', 'Error de red al generar el Excel: ' + e.message);
+  } finally {
+    btnMes.disabled = btnAño.disabled = false;
+    spin.classList.remove('active');
+  }
+}
+
+/* ════════════════════════════════ CONSULTA INDIVIDUAL */
+
+async function buscarProyecto() {
+  const codigo = document.getElementById('inp-consulta').value.trim();
+  if (!codigo) { showError('consulta', 'Ingresa un código.'); return; }
+  showError('consulta', ''); setLoading('consulta', true);
+  document.getElementById('resultados-consulta').innerHTML = '';
+  try {
+    const r = await fetch('/verificador/api/verificar', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({codigos: codigo})
+    });
+    const d = await r.json();
+    if (!d.ok) { showError('consulta', d.error || 'Error desconocido.'); return; }
+    renderConsulta(d);
+  } catch(e) { showError('consulta', 'Error de red: ' + e.message); }
+  finally { setLoading('consulta', false); }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const inp = document.getElementById('inp-consulta');
+  if (inp) inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); buscarProyecto(); }
+  });
+});
+
+function renderConsulta(data) {
+  _consultaData = data;
+  const el = document.getElementById('resultados-consulta');
+  if (!data.familias.length && !(data.errores && data.errores.length)) {
+    el.innerHTML = '<div id="empty-consulta"><div class="big-icon"></div><p>No se encontró el proyecto en SGS.</p></div>';
+    return;
+  }
+  let html = '';
+  if (data.familias.length) {
+    html += `<div class="xls-bar">
+      <span>Exportar:</span>
+      <button class="xls-btn xls-det" onclick="descargarExcel('detallado')">Excel Detallado (nodo a nodo)</button>
+      <button class="xls-btn xls-res" onclick="descargarExcel('resumen')">Excel Resumen (por proyecto)</button>
+    </div>`;
+  }
+  for (const f of data.familias) html += renderFamiliaConsulta(f);
+  if (data.errores && data.errores.length) html += renderErroresManual(data.errores);
+  el.innerHTML = html;
+}
+
+function renderFamiliaConsulta(f) {
+  const padre = f.padre;
+  const sgsUrl = id => sgsHref(id) || '#';
+
+  // Mapas rápidos por pro_id
+  const moMap  = {};  for (const m of f.mo)         moMap[m.pro_id]  = m;
+  const matMap = {};  for (const m of f.materiales)  matMap[m.pro_id] = m;
+
+  // Todos los nodos: padre primero, luego hijos ordenados por nodo
+  const nodos = [padre, ...f.hijos].sort((a, b) => {
+    if (a.id === padre.id) return -1;
+    if (b.id === padre.id) return  1;
+    return (a.nodo || '').localeCompare(b.nodo || '', undefined, {numeric: true});
+  });
+
+  const rows = nodos.map(n => {
+    const mo  = moMap[n.id]  || {};
+    const mat = matMap[n.id] || {};
+    const esPadre = n.id === padre.id;
+    const pdl = n.pdl || '';
+
+    // MO
+    let moHtml;
+    if (!mo.mo_tiene_acts) {
+      moHtml = `<span class="muted">Sin acts.</span>`;
+    } else if (mo.mo_completo) {
+      moHtml = `<span class="ok">✓</span> <span class="mo-val ok">${moneda(mo.mo_value)}</span>${mo.mo_fecha_ultima ? `<br><small style="color:var(--muted)">${esc(mo.mo_fecha_ultima)}</small>` : ''}`;
+    } else if (mo.mo_liquidado) {
+      moHtml = `<span class="warn">⚑</span> <span class="mo-val warn">${moneda(mo.mo_value)}</span><br><small class="warn">Pend: ${fmtNum(mo.mo_act_balance)} uds</small>`;
+    } else {
+      moHtml = `<span class="danger">✗ Sin liquidar</span>`;
+    }
+
+    // Materiales
+    let matHtml;
+    if (!mat.tiene_materiales) {
+      matHtml = `<span class="muted">Sin materiales</span>`;
+    } else if (mat.mat_completo) {
+      matHtml = `<span class="ok">✓ Completo</span>${mat.mat_fecha_liq ? `<br><small style="color:var(--muted)">${esc(mat.mat_fecha_liq)}</small>` : ''}`;
+    } else if (mat.mat_pendiente) {
+      matHtml = `<span class="warn">⚠ Pendiente</span><br><small class="warn">${fmtNum(mat.mat_balance)} uds</small>`;
+    } else {
+      matHtml = `<span class="muted">${mat.n_mat} mat · bal:${fmtNum(mat.mat_balance)}</span>`;
+    }
+
+    const nodoNum = n.nodo ? `<span class="nodo-num">N${esc(n.nodo)}</span>` : (esPadre ? `<span class="nodo-num" style="color:var(--accent)">PADRE</span>` : `<span class="nodo-num">—</span>`);
+    const nombre  = (n.name || '').length > 48 ? n.name.slice(0, 48) + '…' : (n.name || '');
+    const rowStyle = esPadre ? 'background:rgba(79,126,248,.04)' : '';
+
+    return `<tr style="${rowStyle}">
+      <td>${nodoNum}</td>
+      <td><a href="${sgsUrl(n.id)}" target="_blank" rel="noopener" class="code-mono sgs-link" style="color:var(--accent2)">${esc(n.code)}</a></td>
+      <td class="code-mono" style="color:var(--muted);font-size:11px">${pdl ? esc(pdl) : '<span style="opacity:.35">—</span>'}</td>
+      <td style="color:var(--muted);font-size:12px">${esc(nombre)}</td>
+      <td>${moHtml}</td>
+      <td>${matHtml}</td>
+      <td><a href="${sgsUrl(n.id)}" target="_blank" rel="noopener" class="open-sgs">↗ SGS</a></td>
+    </tr>`;
+  }).join('');
+
+  const res = f.resumen;
+  const moTotal  = res.total_mo_value  > 0 ? moneda(res.total_mo_value)  : '—';
+  const matPend  = res.nodos_mat_pend.length;
+  const matClass = matPend > 0 ? 'warn' : (res.mat_liquidado ? 'ok' : 'muted');
+  const matStr   = matPend > 0 ? `<span class="warn">⚠ ${matPend} nodo(s) pendiente(s)</span>` : (res.mat_liquidado ? `<span class="ok">✓ Materiales OK</span>` : `<span class="muted">Sin materiales</span>`);
+  const padreUrl = sgsUrl(padre.id);
+
+  return `<div class="familia-consulta">
+    <div class="consulta-header">
+      <div>
+        <a href="${padreUrl}" target="_blank" rel="noopener" class="pro-code sgs-link">${esc(padre.code)}</a>
+        <div class="pro-name">${esc(padre.name)}</div>
+      </div>
+      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-left:auto">
+        <div style="text-align:right">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">MO Total</div>
+          <div style="font-family:monospace;color:var(--ok)">${moTotal}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Materiales</div>
+          <div style="font-size:13px">${matStr}</div>
+        </div>
+        <span class="n-nodos">${nodos.length} nodo(s)</span>
+        <a href="${padreUrl}" target="_blank" rel="noopener" class="sgs-btn">↗ Abrir en SGS</a>
+      </div>
+    </div>
+    <table class="nodo-table">
+      <thead><tr>
+        <th>Nodo</th><th>Código</th><th>PDL</th><th>Nombre</th>
+        <th>Mano de Obra</th><th>Materiales</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+/* ════════════════════════════════ CRUCE EXCEL */
+
+let _archivoExcel = null;
+let _cruceData    = null;
+
+function archivoSeleccionado(inp) {
+  const f = inp.files && inp.files[0];
+  if (!f) return;
+  _archivoExcel = f;
+  document.getElementById('nombre-archivo').textContent = f.name;
+  document.getElementById('btn-cruce').disabled = false;
+  showError('cruce', '');
+}
+
+function limpiarCruce() {
+  _archivoExcel = null; _cruceData = null;
+  document.getElementById('inp-excel').value = '';
+  document.getElementById('nombre-archivo').textContent = '';
+  document.getElementById('btn-cruce').disabled = true;
+  document.getElementById('resultados-cruce').innerHTML = `<div id="empty-cruce" style="text-align:center;padding:40px 20px;color:var(--muted)"><div style="font-size:40px;opacity:.4;margin-bottom:10px"></div><p>Sube el Excel de programación para cruzarlo con SGS</p></div>`;
+  showError('cruce', '');
+}
+
+async function ejecutarCruce() {
+  if (!_archivoExcel) { showError('cruce', 'Selecciona un archivo primero.'); return; }
+  showError('cruce', ''); setLoading('cruce', true);
+  document.getElementById('resultados-cruce').innerHTML = '';
+  const fd = new FormData();
+  fd.append('archivo', _archivoExcel);
+  try {
+    const r = await fetch('/verificador/api/cruce', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!d.ok) { showError('cruce', d.error || 'Error desconocido.'); return; }
+    _cruceData = d;
+    renderCruce(d);
+  } catch(e) { showError('cruce', 'Error de red: ' + e.message); }
+  finally { setLoading('cruce', false); }
+}
+
+function renderCruce(d) {
+  if (!d.n_total) {
+    document.getElementById('resultados-cruce').innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted)"><p>${esc(d.msg||'Sin registros de UBATE en el archivo.')}</p></div>`;
+    return;
+  }
+  const pctOk = Math.round(d.n_cargado / d.n_total * 100);
+  let html = `
+  <div class="cruce-summary">
+    <div class="cruce-card"><div class="label">Total trabajos</div><div class="value val-total">${d.n_total}</div></div>
+    <div class="cruce-card"><div class="label">✓ Completo en SGS</div><div class="value val-ok">${d.n_cargado}</div><div style="font-size:11px;color:var(--muted)">${pctOk}%</div></div>
+    <div class="cruce-card"><div class="label">⚠ Mat. pendiente</div><div class="value val-warn">${d.n_pendiente_mat}</div></div>
+    <div class="cruce-card"><div class="label">✗ Sin MO en SGS</div><div class="value" style="color:var(--danger)">${d.n_pendiente_mo}</div></div>
+    <div class="cruce-card"><div class="label">? No encontrado</div><div class="value val-muted">${d.n_no_encontrado}</div></div>
+  </div>
+  <div class="xls-bar">
+    <span>Exportar cruce:</span>
+    <button class="xls-btn xls-det" onclick="exportarCruceExcel()">Descargar Excel cruce</button>
+  </div>
+  <div class="cruce-table-wrap">
+  <table class="cruce-table">
+    <thead><tr>
+      <th>Estado</th><th>Código</th><th>Supervisor (Excel)</th><th>Tipo</th>
+      <th>Municipio</th><th>Fecha Excel</th>
+      <th>Proyecto SGS</th><th>MO ($)</th><th>Fecha MO</th>
+      <th>Materiales</th><th>Fecha Liq. Mat.</th>
+    </tr></thead><tbody>`;
+
+  const filtro = { todos: d.filas, pendientes: d.filas.filter(f=>['no_encontrado','sin_mo','pendiente_mo','pendiente_mat'].includes(f.estado)) };
+  let filasFiltradas = d.filas;
+
+  html += d.filas.map(f => {
+    const pill = estadoPill(f.estado);
+    const moStr = f.mo_value > 0 ? moneda(f.mo_value) : '—';
+    const sgsCode = f.padre_code
+      ? `<a href="${sgsHref(f.padre_id)}" target="_blank" class="code-mono sgs-link" style="color:var(--accent2)">${esc(f.padre_code)}</a>`
+      : `<span class="muted">—</span>`;
+    return `<tr>
+      <td>${pill}</td>
+      <td class="code-mono" style="font-size:11px">${esc(f.codigo)}</td>
+      <td style="font-size:11px">${esc(f.supervisor)}</td>
+      <td style="font-size:11px;color:var(--muted)">${esc(f.tipo)}</td>
+      <td style="font-size:11px;color:var(--muted)">${esc(f.municipio)}</td>
+      <td style="font-size:11px;color:var(--muted)">${esc(f.fecha)}</td>
+      <td>${sgsCode}</td>
+      <td style="font-family:monospace;color:var(--ok)">${moStr}</td>
+      <td style="font-size:11px;color:var(--accent2)">${esc(f.fecha_mo)}</td>
+      <td style="font-size:11px">${esc(f.mat_estado)}</td>
+      <td style="font-size:11px;color:var(--accent2)">${esc(f.fecha_mat)}</td>
+    </tr>`;
+  }).join('');
+
+  html += `</tbody></table></div>`;
+  document.getElementById('resultados-cruce').innerHTML = html;
+}
+
+function estadoPill(e) {
+  const m = {
+    'completo':      ['ep-completo',      '✓ Completo'],
+    'pendiente_mat': ['ep-pend-mat',      '⚠ Mat. pendiente'],
+    'pendiente_mo':  ['ep-pend-mo',       '⚑ MO parcial'],
+    'sin_mo':        ['ep-sin-mo',        '✗ Sin MO'],
+    'no_encontrado': ['ep-no-encontrado', '? No encontrado'],
+    'error':         ['ep-error',         '! Error'],
+  };
+  const [cls, lbl] = m[e] || ['ep-error', e];
+  return `<span class="estado-pill ${cls}">${lbl}</span>`;
+}
+
+function exportarCruceExcel() {
+  if (!_cruceData || !_cruceData.filas.length) return;
+  const ahora   = new Date();
+  const fechaStr = ahora.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const hora    = ahora.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+  const usuario = document.querySelector('.user-chip span')?.textContent?.trim()||'';
+  const numExcel = v => v!=null ? Number(v).toFixed(0) : '0';
+
+  const estadoTexto = {
+    'completo':'Completo','pendiente_mat':'Mat. pendiente',
+    'pendiente_mo':'MO parcial','sin_mo':'Sin MO',
+    'no_encontrado':'No encontrado','error':'Error',
+  };
+
+  let filas = _cruceData.filas.map(f=>`<tr>
+    <td>${estadoTexto[f.estado]||f.estado}</td>
+    <td style="font-family:monospace">${f.codigo}</td>
+    <td>${f.supervisor}</td><td>${f.tipo}</td>
+    <td>${f.municipio}</td><td>${f.fecha}</td>
+    <td style="font-family:monospace">${f.padre_code||''}</td>
+    <td style="mso-number-format:'#,##0'">${numExcel(f.mo_value)}</td>
+    <td>${f.fecha_mo}</td><td>${f.mat_estado}</td><td>${f.fecha_mat}</td>
+  </tr>`).join('');
+
+  const xls = `<html xmlns:o='urn:schemas-microsoft-com:office:office'
+xmlns:x='urn:schemas-microsoft-com:office:excel' xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='UTF-8'>
+<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
+<x:Name>Cruce SGS</x:Name></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+</head><body><table border="1">
+<tr><td colspan="11" style="background:#0d47a1;color:#fff;font-weight:700;font-size:13pt">Cruce Excel vs SGS — Zona UBATE</td></tr>
+<tr><td colspan="11" style="color:#555;font-size:9pt">Generado: ${fechaStr} ${hora} · ${usuario} · ${_cruceData.n_total} trabajos · ${_cruceData.n_cargado} completos · ${_cruceData.n_no_encontrado} no encontrados</td></tr>
+<tr></tr>
+<tr>
+<th>Estado</th><th>Código</th><th>Supervisor (Excel)</th><th>Tipo</th>
+<th>Municipio</th><th>Fecha Excel</th><th>Proyecto SGS</th>
+<th>MO ($)</th><th>Fecha MO</th><th>Materiales</th><th>Fecha Liq. Mat.</th>
+</tr>${filas}
+</table></body></html>`;
+
+  const fechaFile = ahora.toISOString().slice(0,10);
+  const blob = new Blob([xls],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download=`Cruce_SGS_UBATE_${fechaFile}.xls`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+/* ════════════════════════════════ EXCEL EXPORT */
+
+function descargarExcel(tipo) {
+  if (!_consultaData || !_consultaData.familias.length) return;
+  const usuario = document.querySelector('.user-chip span')?.textContent?.trim() || '';
+  const ahora   = new Date();
+  const fechaStr = ahora.toLocaleDateString('es-CO', {day:'2-digit',month:'2-digit',year:'numeric'});
+  const hora    = ahora.toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit'});
+  const fechaFile = ahora.toISOString().slice(0,10);
+
+  // Helper: valor numérico limpio para Excel (sin símbolo $)
+  const numExcel = v => v != null ? Number(v).toFixed(0) : '0';
+
+  let tabla = '';
+
+  if (tipo === 'detallado') {
+    // Una tabla por familia, con fila de título entre ellas
+    for (const f of _consultaData.familias) {
+      const padre = f.padre;
+      const moMap  = {}; for (const m of f.mo)        moMap[m.pro_id]  = m;
+      const matMap = {}; for (const m of f.materiales) matMap[m.pro_id] = m;
+      const nodos  = [padre, ...(f.hijos||[])].sort((a,b)=>{
+        if(a.id===padre.id) return -1; if(b.id===padre.id) return 1;
+        return (a.nodo||'').localeCompare(b.nodo||'',undefined,{numeric:true});
+      });
+
+      // Fila de encabezado de familia
+      tabla += `<tr><td colspan="9" style="background:#1a237e;color:#fff;font-weight:700;font-size:12px">${padre.code} — ${padre.name}</td></tr>`;
+      tabla += `<tr>
+        <th>Nodo</th><th>Código</th><th>PDL</th>
+        <th>MO ($)</th><th>Fecha MO primera</th><th>Fecha MO última</th>
+        <th>Mat. estado</th><th>Mat. balance (uds)</th><th>Fecha liq. mat.</th>
+      </tr>`;
+
+      let sumaTotal = 0;
+      for (const n of nodos) {
+        const mo   = moMap[n.id]  || {};
+        const mat  = matMap[n.id] || {};
+        const esPadre = n.id === padre.id;
+        const nodoLbl = n.nodo ? `N${n.nodo}` : (esPadre ? 'PADRE' : '—');
+        const pdl  = n.pdl || '';
+
+        let moVal  = 0, moStr = 'Sin actividades';
+        if (mo.mo_tiene_acts) {
+          moVal = mo.mo_value || 0; sumaTotal += moVal;
+          moStr = mo.mo_completo ? 'Completo' : (mo.mo_liquidado ? 'Parcial' : 'Sin liquidar');
+        }
+        const fechaMO1 = mo.mo_fecha_primera || '';
+        const fechaMO2 = mo.mo_fecha_ultima  || '';
+
+        let matStr = 'Sin materiales', matBal = 0;
+        if (mat.tiene_materiales) {
+          matBal = mat.mat_balance || 0;
+          matStr = mat.mat_completo ? 'Completo' : (mat.mat_pendiente ? 'Pendiente' : '—');
+        }
+        const fechaMat = mat.mat_fecha_liq || '';
+
+        const bgPadre = esPadre ? 'style="background:#e8f5e9;font-weight:700"' : '';
+        tabla += `<tr ${bgPadre}>
+          <td>${nodoLbl}</td><td>${n.code}</td><td>${pdl}</td>
+          <td style="mso-number-format:'#,##0'">${numExcel(moVal)}</td>
+          <td>${fechaMO1}</td><td>${fechaMO2}</td>
+          <td>${moStr}</td>
+          <td>${matStr}</td>
+          <td style="mso-number-format:'#,##0'">${numExcel(matBal)}</td>
+          <td>${fechaMat}</td>
+        </tr>`;
+      }
+      const matPend = f.resumen.nodos_mat_pend.length;
+      const matRes  = matPend>0 ? `Pendiente (${matPend} nodo(s))` : (f.resumen.mat_liquidado ? 'Completo' : 'Sin materiales');
+      tabla += `<tr style="background:#e3f2fd;font-weight:700">
+        <td colspan="3">TOTAL</td>
+        <td style="mso-number-format:'#,##0'">${numExcel(sumaTotal)}</td>
+        <td colspan="3">${matRes}</td><td></td><td></td>
+      </tr>`;
+      tabla += `<tr><td colspan="9"></td></tr>`; // fila vacía entre familias
+    }
+
+  } else {
+    // Resumen: una fila por familia
+    tabla += `<tr>
+      <th>Código</th><th>Nombre del proyecto</th><th>PDL(s)</th>
+      <th>MO Total ($)</th><th>Fecha MO primera</th><th>Fecha MO última</th>
+      <th>Estado materiales</th><th>Fecha liq. materiales</th><th>Nodos</th>
+    </tr>`;
+    for (const f of _consultaData.familias) {
+      const padre = f.padre;
+      const res   = f.resumen;
+      const pdls  = new Set();
+      if (padre.pdl) pdls.add(padre.pdl);
+      for (const h of (f.hijos||[])) if (h.pdl) pdls.add(h.pdl);
+      const pdlStr = [...pdls].join(', ') || '';
+
+      // Primera y última fecha MO entre todos los nodos
+      const fechasMO = f.mo.filter(m=>m.mo_fecha_ultima||m.mo_fecha_primera);
+      const priMO = fechasMO.filter(m=>m.mo_fecha_primera).map(m=>m.mo_fecha_primera);
+      const ultMO = fechasMO.filter(m=>m.mo_fecha_ultima ).map(m=>m.mo_fecha_ultima);
+      const fechaMO1 = priMO.length ? priMO[0]              : '';
+      const fechaMO2 = ultMO.length ? ultMO[ultMO.length-1] : '';
+
+      const fechasMat = f.materiales.filter(m=>m.mat_fecha_liq).map(m=>m.mat_fecha_liq);
+      const fechaMat  = fechasMat.length ? fechasMat[fechasMat.length-1] : '';
+      const matPend   = res.nodos_mat_pend.length;
+      const matStr    = matPend>0 ? `Pendiente (${matPend} nodo(s))` : (res.mat_liquidado ? 'Completo' : 'Sin materiales');
+
+      tabla += `<tr>
+        <td>${padre.code}</td><td>${padre.name}</td><td>${pdlStr}</td>
+        <td style="mso-number-format:'#,##0'">${numExcel(res.total_mo_value)}</td>
+        <td>${fechaMO1}</td><td>${fechaMO2}</td>
+        <td>${matStr}</td><td>${fechaMat}</td>
+        <td style="text-align:center">${f.n_hijos+1}</td>
+      </tr>`;
+    }
+  }
+
+  const titulo = tipo==='detallado' ? 'Detallado_NodoANodo' : 'Resumen_PorProyecto';
+  const xls = `<html xmlns:o='urn:schemas-microsoft-com:office:office'
+    xmlns:x='urn:schemas-microsoft-com:office:excel'
+    xmlns='http://www.w3.org/TR/REC-html40'>
+<head><meta charset='UTF-8'>
+<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
+<x:Name>SGS</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+<style>
+  th{background:#1a237e;color:#fff;font-weight:700;font-size:11pt;padding:4px 8px}
+  td{font-size:10pt;padding:3px 8px}
+</style>
+</head><body>
+<table border="1">
+<tr><td colspan="9" style="background:#0d47a1;color:#fff;font-weight:700;font-size:13pt">
+  Verificador SGS — ${titulo.replace(/_/g,' ')}
+</td></tr>
+<tr><td colspan="9" style="color:#555;font-size:9pt">
+  Generado: ${fechaStr} ${hora} · Usuario: ${usuario} · ${_consultaData.familias.length} proyecto(s)
+</td></tr>
+<tr><td colspan="9"></td></tr>
+${tabla}
+</table>
+</body></html>`;
+
+  const blob = new Blob([xls], {type:'application/vnd.ms-excel;charset=utf-8'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `SGS_${titulo}_${fechaFile}.xls`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+
+function filtrarTipo(tipo, btn) {
+  document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const filas = document.querySelectorAll('#tbl-auto tbody tr');
+  filas.forEach(tr => {
+    tr.style.display = (tipo === 'todos' || tr.dataset.tipo === tipo) ? '' : 'none';
+  });
+  // La selección sobrevive al filtro (el usuario ya la hizo), pero el checkbox
+  // maestro se recalcula sobre lo visible para que "marcar todos" no alcance
+  // filas ocultas.
+  const all = document.getElementById('chk-all');
+  if (all) {
+    const vis = [...document.querySelectorAll('.chk-fam:not(:disabled)')]
+      .filter(c => c.closest('tr').style.display !== 'none');
+    const n = vis.filter(c => c.checked).length;
+    all.checked = vis.length > 0 && n === vis.length;
+    all.indeterminate = n > 0 && n < vis.length;
+  }
+}
+
+/* ════════════════════════════════ VALIDADO POR CORREOS */
+let _vcData = null;
+const VC_INSTR = {
+  no_mat:            ['badge-bad',  '✗ solo MO'],
+  parcial:           ['badge-warn', '! con excepciones'],
+  pendiente_almacen: ['badge-warn', '… pendiente almacén'],
+  con_mat:           ['badge-ok',   'MO + material'],
+  solo_menciona_mo:  ['badge-none', 'habla de MO'],
+  sin_mencion:       ['badge-none', 'no menciona material'],
+  '':                ['badge-none', 'sin leer'],
+};
+const VC_EST = {
+  LIQUIDAR:     ['badge-warn', 'Mandado y no liquidado'],
+  REVISAR:      ['badge-warn', 'Revisar (excepciones)'],
+  OMITIDO:      ['badge-bad',  'Omitido: solo MO'],
+  SIN_NODO:     ['badge-bad',  'Sin nodo en SGS'],
+  NO_EN_SGS:    ['badge-none', 'No proyectado en SGS'],
+  SIN_DESPACHO: ['badge-none', 'Sin despacho'],
+  SOBRANTE:     ['badge-info', 'Despachado de más'],
+  LIQUIDADO:    ['badge-ok',   'Liquidado'],
+};
+const VC_ORDEN = {LIQUIDAR:0, REVISAR:1, OMITIDO:2, SIN_NODO:3, NO_EN_SGS:4, SIN_DESPACHO:5, SOBRANTE:6, LIQUIDADO:7};
+
+(function vcInit() {
+  const hoy = new Date();
+  document.getElementById('vc-mes').value = String(hoy.getMonth() + 1);
+  const a = document.getElementById('vc-año');
+  for (let y = hoy.getFullYear(); y >= 2026; y--) {
+    const o = document.createElement('option'); o.value = y; o.textContent = y; a.appendChild(o);
+  }
+})();
+
+function vcBadge(map, k, title) {
+  const [cls, txt] = map[k] || ['badge-none', k];
+  return `<span class="badge ${cls}"${title ? ` title="${esc(title)}"` : ''}>${esc(txt)}</span>`;
+}
+
+// Desde «Automático por Mes»: misma fecha, cambia de pestaña y analiza.
+function irValidadoCorreos() {
+  document.getElementById('vc-mes').value = document.getElementById('sel-mes').value;
+  const a = document.getElementById('vc-año'), y = document.getElementById('sel-año').value;
+  if ([...a.options].some(o => o.value === y)) a.value = y;
+  const btn = [...document.querySelectorAll('.tab-btn')].find(b => b.textContent.includes('Validado por correos'));
+  if (btn) switchTab('correos', btn);
+  analizarCorreos();
+}
+
+async function analizarCorreos() {
+  const m = document.getElementById('vc-mes').value;
+  const mes = m === 'todos' ? 'todos' : `${document.getElementById('vc-año').value}-${String(m).padStart(2,'0')}`;
+  showError('correos', ''); setLoading('correos', true);
+  document.getElementById('resultados-correos').innerHTML = '';
+  try {
+    const r = await fetch('/verificador/api/validado-correos', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({mes})});
+    const d = await r.json();
+    if (!d.ok) { showError('correos', d.error || 'Error desconocido.'); return; }
+    renderCorreos(d);
+  } catch(e) { showError('correos', 'Error de red: ' + e.message); }
+  finally { setLoading('correos', false); }
+}
+
+function renderCorreos(d) {
+  _vcData = d;
+  // Nada sale marcado: se marca lo que se va a liquidar (igual que «Plantilla materiales»).
+  d.familias.forEach(f => f.filas.forEach(x => { x.incluir = false; }));
+  const el = document.getElementById('resultados-correos');
+  if (!d.familias.length) {
+    el.innerHTML = `<div class="vc-vacio"><div class="big-icon"></div><p>Sin correos de Centro MO en ${esc(d.mes)}.</p></div>`;
+    actualizarVc(); return;
+  }
+  const t = d.totales || {};
+  let html = `
+  <div class="summary-grid">
+    <div class="stat-card"><div class="label">Códigos / correos</div><div class="value val-total">${d.familias.length}</div><div class="sub">${d.n_correos} correo(s) · ${esc(d.mes)}</div></div>
+    <div class="stat-card"><div class="label">Mandado y no liquidado</div><div class="value val-warn">${fmtNum(t.n_liquidar||0)}</div><div class="sub">${fmtNum(t.cant_liquidar||0)} ud · ${moneda(t.valor_liquidar||0)}</div></div>
+    <div class="stat-card"><div class="label">Revisar / omitidos</div><div class="value val-muted">${fmtNum(t.n_revisar||0)} / ${fmtNum(t.n_omitido||0)}</div><div class="sub">excepciones · solo MO</div></div>
+    <div class="stat-card"><div class="label">Sin nodo en SGS</div><div class="value val-muted">${fmtNum(t.n_sin_nodo||0)}</div><div class="sub">+ ${fmtNum(t.n_no_en_sgs||0)} no proyectados · ${fmtNum(t.n_sin_despacho||0)} sin despacho</div></div>
+  </div>`;
+  d.familias.forEach((f, i) => {
+    const s = f.resumen;
+    const tiene = (s.n_liquidar + s.n_revisar) > 0;
+    const instrs = [...new Set(f.correos.map(c => c.instr))].map(k => {
+      const fr = f.correos.filter(c => c.instr === k).map(c => c.frase).filter(Boolean)[0] || '';
+      return vcBadge(VC_INSTR, k, fr ? `«${fr}»` : '');
+    }).join(' ');
+    const kpi = tiene
+      ? `<span class="vc-kpi">${s.n_liquidar} por liquidar · ${fmtNum(s.cant_liquidar)} ud · ${moneda(s.valor_liquidar)}</span>`
+      : `<span class="vc-kpi cero">nada por liquidar</span>`;
+    const mini = [`revisar ${s.n_revisar}`, `omitidos ${s.n_omitido}`, `sin nodo ${s.n_sin_nodo}`,
+      `no proyectados ${s.n_no_en_sgs}`, `sin despacho ${s.n_sin_despacho}`, `liquidados ${s.n_liquidado}`,
+      `pendiente sin presupuesto ${s.n_sin_presupuesto}`].join(' · ')
+      + (f.sin_presupuesto_leido ? ' · ⚠ ningún correo trae presupuesto de materiales leído' : '')
+      + (f.error ? ` · ⚠ ${esc(f.error)}` : '');
+    html += `<details class="vc-fam" data-tiene="${tiene ? 1 : 0}">
+      <summary>
+        <input type="checkbox" class="vc-chk-fam" data-f="${i}" ${s.n_liquidar ? '' : 'disabled'}
+               onclick="event.stopPropagation()" onchange="vcFam(this)">
+        <b class="vc-cod">${esc(f.codigo)}</b> ${tipoLabel(f.tipo === 'DF' ? 'mayor_impacto' : (f.tipo === '6300' ? 'programado' : 'otro'))}
+        <span class="vc-padres">${esc(f.padres.join(' + ') || 'sin padre en SGS')}</span>
+        ${instrs}
+        ${f.correos.length ? `<button class="vc-btn" onclick="event.stopPropagation(); vcVerCorreo('${esc(vcCorreoClave(f).id)}')"
+          title="${esc(vcCorreoClave(f).titulo)}">Ver correo</button>` : ''}
+        ${kpi}
+        <span class="vc-mini">${mini}</span>
+      </summary>
+      <div class="vc-body">${vcDetalle(f, i)}</div>
+    </details>`;
+  });
+  html += `<p class="sel-hint">Marca lo que quieres liquidar y pulsa <b>Plantilla validada</b>: sale el Excel con la hoja
+    <b>CRUCE_LIQUIDADOR</b> (un bloque por nodo con su PRO) para Liquidador 2, más el detalle con el correo y la frase que lo justifican.</p>`;
+  el.innerHTML = html;
+  vcFiltrar(); actualizarVc();
+}
+
+// el correo que respalda más filas por liquidar (si no hay, el más reciente)
+function vcCorreoClave(f) {
+  const cuenta = {};
+  (f.filas || []).forEach(x => { if (x.estado === 'LIQUIDAR' && x.correo_id) cuenta[x.correo_id] = (cuenta[x.correo_id] || 0) + 1; });
+  const total = Object.values(cuenta).reduce((a, b) => a + b, 0);
+  let c = f.correos[f.correos.length - 1], n = 0;
+  for (const k of Object.keys(cuenta)) if (cuenta[k] > n) { n = cuenta[k]; c = f.correos.find(x => x.id === k) || c; }
+  const quien = `correo del ${String(c.fecha || '').slice(0, 10)} de ${c.remitente || '?'}`;
+  return {id: c.id, titulo: n ? `${quien}: respalda ${n} de ${total} fila(s) por liquidar` + (c.adjunto ? ` (adjunto «${c.adjunto}»)` : '')
+                              : `${quien} (el más reciente)`};
+}
+
+function vcDetalle(f, i) {
+  const correos = f.correos.map(c =>
+    `<div class="vc-correo"><b>${esc(c.fecha)}</b> · ${esc(c.remitente)} · ${esc(c.asunto)} · ${vcBadge(VC_INSTR, c.instr)}
+     ${c.frase ? `<span class="vc-frase">«${esc(c.frase)}»</span>` : ''} · ${c.n_mat} fila(s) de material en el presupuesto${c.adjunto ? ` en «${esc(c.adjunto)}»` : ''} <button class="vc-btn" onclick="vcVerCorreo('${esc(c.id)}')">Ver correo</button></div>`).join('');
+  const visibles = f.filas.map((x, j) => [x, j]).filter(([x]) => x.estado !== 'LIQUIDADO')
+    .sort((a, b) => (VC_ORDEN[a[0].estado] - VC_ORDEN[b[0].estado]) || a[0].clave.localeCompare(b[0].clave));
+  const filas = visibles.map(([x, j]) => {
+    const chk = (x.estado === 'LIQUIDAR' || x.estado === 'REVISAR')
+      ? `<input type="checkbox" class="vc-chk" data-f="${i}" data-j="${j}" ${x.incluir ? 'checked' : ''} onchange="vcFila(this)">` : '';
+    const via = x.via && x.via !== 'nombre' ? ` <span class="badge badge-info" title="cómo se halló el nodo">${esc(x.via)}</span>` : '';
+    const conPorque = x.porque && ['LIQUIDAR', 'REVISAR', 'OMITIDO', 'SOBRANTE'].includes(x.estado);
+    return `<tr class="${x.estado === 'LIQUIDAR' ? 'vc-liq' : ''}${conPorque ? ' vc-porque-con' : ''}">
+      <td>${chk}</td><td>${vcBadge(VC_EST, x.estado, x.porque)}</td>
+      <td>${esc(x.nodo_presu)}</td><td>${esc(x.nodo_sgs || '—')}${via}</td>
+      <td>${x.pro ? `<span title="padre ${esc(x.padre)}">${esc(x.pro)}</span>` : '—'}</td>
+      <td>${esc(x.codigo)}</td><td>${esc(x.nombre)}</td>
+      <td class="n">${fmtNum(x.qty)}</td><td class="n">${fmtNum(x.neto)}</td><td class="n">${fmtNum(x.advance)}</td>
+      <td class="n"><b>${x.a_liquidar ? fmtNum(x.a_liquidar) : ''}</b></td><td class="n">${x.valor ? moneda(x.valor) : ''}</td>
+      <td><button class="vc-btn" title="${esc(x.correo_asunto)}" onclick="vcVerCorreo('${esc(x.correo_id)}')">${esc(String(x.correo_fecha || '').slice(0, 10))}</button></td></tr>
+      ${conPorque ? `<tr class="vc-porque${x.estado === 'LIQUIDAR' ? ' vc-liq' : ''}"><td></td><td colspan="12">↳ ${esc(x.porque)}</td></tr>` : ''}`;
+  }).join('');
+  const nLiq = f.resumen.n_liquidado;
+  return `${correos}
+    <table class="vc-table"><thead><tr><th></th><th>Estado</th><th>Nodo presupuesto</th><th>Nodo SGS</th><th>PRO</th>
+      <th>Código</th><th>Descripción</th><th>Presup.</th><th>Despachado</th><th>Consumido</th><th>A liquidar</th><th>Valor</th><th>Correo</th></tr></thead>
+    <tbody>${filas || '<tr><td colspan="13" style="color:var(--muted)">Nada pendiente en lo presupuestado.</td></tr>'}</tbody></table>
+    ${nLiq ? `<p class="vc-correo">✓ ${nLiq} material(es) del presupuesto ya liquidados (en el Excel, hoja DETALLE).</p>` : ''}
+    ${f.sin_presupuesto.length ? `<p class="vc-correo">ℹ ${f.sin_presupuesto.length} material(es) pendientes en la familia que ningún presupuesto del periodo respalda (hoja PENDIENTE_SIN_PRESUPUESTO).</p>` : ''}`;
+}
+
+function vcFam(chk) {
+  const i = chk.dataset.f;
+  document.querySelectorAll(`.vc-chk[data-f="${i}"]`).forEach(c => {
+    const x = _vcData.familias[i].filas[c.dataset.j];
+    if (x.estado === 'LIQUIDAR') { c.checked = chk.checked; x.incluir = chk.checked; }
+  });
+  actualizarVc();
+}
+
+function vcFila(chk) {
+  _vcData.familias[chk.dataset.f].filas[chk.dataset.j].incluir = chk.checked;
+  actualizarVc();
+}
+
+function vcFiltrar() {
+  const solo = document.getElementById('vc-solo').checked;
+  document.querySelectorAll('.vc-fam').forEach(d => { d.style.display = (solo && d.dataset.tiene === '0') ? 'none' : ''; });
+}
+
+function vcMarcadas() {
+  if (!_vcData) return [];
+  return _vcData.familias.flatMap(f => f.filas.filter(x => x.incluir && (x.estado === 'LIQUIDAR' || x.estado === 'REVISAR')));
+}
+
+function actualizarVc() {
+  const sel = vcMarcadas();
+  const btn = document.getElementById('btn-vc-plantilla');
+  const valor = sel.reduce((a, x) => a + (x.valor || 0), 0);
+  btn.textContent = `Plantilla validada (${sel.length})`;
+  btn.disabled = sel.length === 0;
+  btn.title = sel.length ? `${sel.length} material(es) · ${moneda(valor)}` : 'Marca filas «Mandado y no liquidado»';
+}
+
+// ── «Ver correo»: cuerpo guardado por Gestión General + «Abrir en Outlook (PC)» por Centro MO ──
+function vcModal(cab, cuerpo, rid) {
+  let m = document.getElementById('vc-modal');
+  if (!m) {
+    m = document.createElement('div'); m.id = 'vc-modal'; m.className = 'vc-modal';
+    m.innerHTML = `<div class="vc-modal-box"><div class="vc-modal-cab"></div><div class="vc-modal-cuerpo"></div>
+      <div class="vc-modal-pie"><span class="vc-modal-msg"></span>
+        <button class="xls-btn xls-plan" id="vc-outlook">Abrir en Outlook (PC)</button>
+        <button class="xls-btn xls-det" onclick="vcCerrar()">Cerrar</button></div></div>`;
+    m.addEventListener('click', e => { if (e.target === m) vcCerrar(); });
+    document.body.appendChild(m);
+  }
+  m.querySelector('.vc-modal-cab').innerHTML = cab;
+  m.querySelector('.vc-modal-cuerpo').innerHTML = cuerpo;
+  m.querySelector('.vc-modal-msg').textContent = '';
+  const b = m.querySelector('#vc-outlook');
+  b.style.display = rid ? '' : 'none'; b.disabled = false; b.onclick = () => vcOutlook(rid);
+  m.style.display = 'flex';
+}
+function vcCerrar() { const m = document.getElementById('vc-modal'); if (m) m.style.display = 'none'; }
+
+async function vcVerCorreo(rid) {
+  // «Ver correo» abre en Outlook por el agente del PC de una vez; el cuerpo guardado es apoyo.
+  vcModal('Cargando el correo…', '', PUEDE_OUTLOOK ? rid : null);
+  const abriendo = PUEDE_OUTLOOK ? vcOutlook(rid) : Promise.resolve();   // los demás solo ven el popup
+  try {
+    const r = await fetch('/verificador/api/correo/' + encodeURIComponent(rid));
+    const d = await r.json();
+    if (!d.ok) { vcModal('No se pudo abrir el correo', `<p class="vc-err">${esc(d.error || ('HTTP ' + r.status))}</p>`, null); return; }
+    const quien = esc(d.de || d.remitente) + ((d.de_correo || d.remitente_email) ? ' &lt;' + esc(d.de_correo || d.remitente_email) + '&gt;' : '');
+    const adj = (d.adjuntos && d.adjuntos.length)
+      ? d.adjuntos.map(a => esc(typeof a === 'string' ? a : (a.nombre || a.name || a.filename || ''))).filter(Boolean).join(', ')
+      : (d.adjunto ? esc(d.adjunto) + ' (leído por Centro MO)' : '');
+    const im = d.instruccion_mat || {};
+    const cab = `<b>${esc(d.asunto)}</b><br>De: ${quien} · ${esc(d.fecha)}${d.carpeta ? ' · ' + esc(d.carpeta) : ''}
+      ${d.para ? '<br>Para: ' + esc(d.para) : ''}${adj ? '<br>Adjuntos: ' + adj : ''}
+      ${im.valor ? '<br>Material: ' + vcBadge(VC_INSTR, im.valor) + (im.frase ? ' <span class="vc-frase">«' + esc(im.frase) + '»</span>' : '') : ''}`;
+    let cuerpo;
+    if (d.encontrado && (d.html || d.texto)) {
+      const doc = d.html || ('<pre style="white-space:pre-wrap;font:13px/1.45 Segoe UI,system-ui,sans-serif;margin:0">' + esc(d.texto) + '</pre>');
+      const cabeza = '<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data:; style-src \'unsafe-inline\'; font-src data:">'
+        + '<style>body{font-family:Segoe UI,system-ui,sans-serif;font-size:13px;color:#222;padding:14px}</style>';
+      cuerpo = `<iframe class="vc-iframe" sandbox="" srcdoc="${esc(cabeza + doc)}"></iframe>`;
+    } else {
+      cuerpo = `<p class="vc-aviso">El cuerpo de este correo no está guardado en Gestión General${d.aviso ? ' (' + esc(d.aviso) + ')' : ''}. ${PUEDE_OUTLOOK ? 'Se abre en el Outlook del PC.' : 'Pídeselo al desarrollador.'}</p>`;
+    }
+    vcPintar(cab, cuerpo);
+  } catch (e) { vcPintar('No se pudo abrir el correo', `<p class="vc-err">${esc(e.message)}</p>`); }
+  await abriendo;
+}
+
+function vcPintar(cab, cuerpo) {
+  const m = document.getElementById('vc-modal');
+  if (!m) return;
+  m.querySelector('.vc-modal-cab').innerHTML = cab;
+  m.querySelector('.vc-modal-cuerpo').innerHTML = cuerpo;
+}
+
+async function vcOutlook(rid) {
+  const m = document.getElementById('vc-modal'), msg = m.querySelector('.vc-modal-msg'), b = m.querySelector('#vc-outlook');
+  b.disabled = true; msg.textContent = 'pidiendo al agente del PC…';
+  try {
+    const r = await fetch('/verificador/api/correo/' + encodeURIComponent(rid) + '/outlook', {method: 'POST'});
+    const d = await r.json();
+    if (!r.ok || !d.ok) {
+      msg.textContent = (r.status === 503 ? 'agente del PC apagado: ' : '⚠ ') + (d.error || ('HTTP ' + r.status));
+      b.disabled = false; return;
+    }
+    const t0 = Date.now();
+    while (Date.now() - t0 < 180000) {
+      await new Promise(res => setTimeout(res, 2000));
+      const p = await (await fetch('/verificador/api/pedido-correo/' + encodeURIComponent(d.pedido))).json();
+      if (p.estado === 'hecho') { msg.textContent = '✓ abierto en Outlook (PC)'; b.disabled = false; return; }
+      if (p.estado === 'error') { msg.textContent = '⚠ ' + (p.error || 'el agente devolvió error'); b.disabled = false; return; }
+      msg.textContent = p.estado === 'tomado' ? 'el agente del PC lo está abriendo…' : 'esperando al agente del PC…';
+    }
+    msg.textContent = '⚠ el agente del PC no respondió en 3 min'; b.disabled = false;
+  } catch (e) { msg.textContent = '⚠ ' + e.message; b.disabled = false; }
+}
+
+async function descargarValidado() {
+  if (!_vcData || !vcMarcadas().length) return;
+  const btn = document.getElementById('btn-vc-plantilla');
+  const spin = document.getElementById('spin-vc-xls');
+  showError('correos', ''); btn.disabled = true; spin.classList.add('active');
+  try {
+    const r = await fetch('/verificador/api/validado-correos/excel', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({familias: _vcData.familias, mes: _vcData.mes})});
+    if (!r.ok) {
+      let msg = `No se pudo generar el Excel (HTTP ${r.status}).`;
+      try { const j = await r.json(); if (j.error) msg = j.error; } catch(e) {}
+      showError('correos', msg); return;
+    }
+    const blob = await r.blob();
+    const m = (r.headers.get('Content-Disposition') || '').match(/filename="?([^"]+)"?/);
+    const dl = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = dl; a.download = m ? m[1] : 'VALIDADO_CORREOS.xlsx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(dl), 1500);
+  } catch(e) { showError('correos', 'Error de red al generar el Excel: ' + e.message); }
+  finally { spin.classList.remove('active'); actualizarVc(); }
+}
+</script>
+</body>
+</html>

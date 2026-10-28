@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Inyector de Fechas — SGS UI{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>Inyector de Fechas de cierre</h2>
+  <p style="font-size:0.9rem; color:#555; margin-bottom:14px;">
+    Repara nodos que quedaron <b>liquidados pero sin Fecha Fin</b> (fallo ocasional
+    de la Fase 3 del liquidador 2). Sube el reporte mensual
+    <b>BALANCE_FINAL_SGS_*.xlsx</b> de
+    el módulo Verificador
+    y el sistema:
+  </p>
+  <ol style="font-size:0.87rem; color:#555; margin:0 0 18px 22px; line-height:1.7;">
+    <li>Lee la hoja <b>Prestaciones</b> → fecha de ejecución real de cada nodo (PRO)</li>
+    <li>Consulta SGS (solo lectura) y detecta nodos con <b>Fin real vacío</b>,
+        fechas que difieren, o estado sin pasar a <b>1.4-TERMINADO/EN BALANCE</b></li>
+    <li>Tú revisas y seleccionas — nada se escribe sin tu confirmación</li>
+    <li>Inyecta las 7 fechas + estado con el flujo validado del cierre rápido
+        y <b>verifica cada escritura</b> con lectura fresca de SGS</li>
+  </ol>
+
+  <form method="POST" action="{{ url_for('inyectorfechas.subir') }}"
+        enctype="multipart/form-data"
+        style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+    <input type="file" name="reporte" accept=".xlsx"
+           style="padding:8px; border:1px dashed #aaa; border-radius:6px; background:#fafbfc;">
+    <button type="submit" class="btn btn-primary">Analizar reporte</button>
+  </form>
+
+  <div class="alert alert-info" style="margin-top:18px; font-size:0.82rem;">
+    La fecha inyectada es la <b>fecha de la prestación</b> (Fecha de Avance de las
+    actividades MO) de cada nodo. Si un nodo tiene prestaciones en varias fechas se
+    usa la <b>última</b> y queda marcado <b>multifecha</b> para que lo revises.
+    El PDL del nodo <b>no se toca</b>.
+  </div>
+</div>
+
+{% endblock %}

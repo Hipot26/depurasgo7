@@ -1,0 +1,139 @@
+{% extends "motoverificador/base.html" %}
+{% block title %}Revisar correcciones{% endblock %}
+
+{% block content %}
+
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:22px;flex-wrap:wrap;">
+  <h1 style="font-size:1.25rem;font-weight:700;">Revisar correcciones</h1>
+  <a href="{{ url_for('motoverificador.inicio') }}"
+     style="margin-left:auto;color:#888;font-size:0.82rem;text-decoration:none;">
+    ← Nueva consulta
+  </a>
+</div>
+
+{# ── Estadísticas ─────────────────────────────────────────────────────────── #}
+<div class="stat-row">
+  <div class="stat blue">
+    <div class="num">{{ s.correcciones | length }}</div>
+    <div class="lbl">Actividad(es)</div>
+  </div>
+  <div class="stat blue">
+    <div class="num">{{ total_lineas }}</div>
+    <div class="lbl">Línea(s) a corregir</div>
+  </div>
+  <div class="stat">
+    <div class="num" style="color:#555;font-size:1rem;">{{ s.creado_at }}</div>
+    <div class="lbl">Sesión creada</div>
+  </div>
+</div>
+
+{# ── Plan detallado ───────────────────────────────────────────────────────── #}
+{% for cor in s.correcciones %}
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-header">
+    <span class="mono" style="font-size:1rem;font-weight:700;color:#1a3e6e;">{{ cor.act_code }}</span>
+    <span class="badge badge-gray" style="margin-left:6px;">{{ cor.nombre_nodo }}</span>
+    <span style="color:#888;font-size:0.78rem;margin-left:6px;">
+      pid={{ cor.pid }} | act_id={{ cor.act_id }}
+    </span>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Líder incorrecto</th>
+        <th style="text-align:center;">Cant.</th>
+        <th>Fecha</th>
+        <th>Nuevo líder</th>
+        <th>Cédula</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for l in cor.lineas %}
+      <tr>
+        <td style="color:#aaa;">{{ loop.index }}</td>
+        <td style="color:#c62828;font-weight:600;font-size:0.83rem;">{{ l.partner_incorrecto }}</td>
+        <td style="text-align:center;font-weight:700;">{{ l.cantidad | int }}</td>
+        <td style="color:#666;font-size:0.8rem;">{{ l.fecha_pw }}</td>
+        <td style="color:#27ae60;font-weight:700;font-size:0.83rem;">{{ l.partner_nuevo_nombre }}</td>
+        <td class="mono" style="color:#888;font-size:0.78rem;">{{ l.partner_nuevo_cedula }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div style="margin-top:10px;padding:8px 12px;background:#fff3cd;border-radius:5px;
+              font-size:0.8rem;color:#856404;">
+    Operación: restar {{ cor.lineas | length }} avance(s) de <strong>{{ cor.act_code }}</strong>
+    en <em>{{ cor.nombre_nodo }}</em> y re-liquidar con el nuevo líder en el mismo nodo.
+  </div>
+</div>
+{% endfor %}
+
+{# ── Aviso: regla anti doble escritura ────────────────────────────────────────────────────── #}
+<div class="alert alert-warning" style="margin-bottom:20px;">
+  <strong>Regla anti-doble-escritura:</strong>
+  Si la ejecución falla en el paso de <em>liquidar</em> (post-restar), el sistema detendrá
+  el lote y marcará la línea como error. <strong>No reintentar automáticamente.</strong>
+  Verificar en SGS antes de correr de nuevo.
+</div>
+
+{# ── Botones ──────────────────────────────────────────────────────────────── #}
+<div style="display:flex;gap:12px;justify-content:flex-end;flex-wrap:wrap;margin-top:4px;">
+  <a href="{{ url_for('motoverificador.inicio') }}" class="btn btn-light">
+    ← Volver y editar
+  </a>
+  <button class="btn btn-danger" onclick="ejecutar()" id="btn-ejecutar">
+    Ejecutar correcciones
+  </button>
+</div>
+
+{# Panel flotante de progreso #}
+<div id="status-panel">
+  <div id="status-title">Ejecutando…</div>
+  <div id="status-msg">Iniciando browser…</div>
+  <div class="progress-wrap" style="margin-top:8px;">
+    <div class="progress-bar" id="status-bar" style="width:0%;"></div>
+  </div>
+</div>
+
+<script>
+const SID = {{ sid | tojson }};
+
+async function ejecutar() {
+  if (!confirm('¿Ejecutar todas las correcciones ahora?\n\nEsta operación modifica datos en SGS.')) return;
+
+  const btn = document.getElementById('btn-ejecutar');
+  btn.disabled = true;
+  btn.textContent = 'Ejecutando…';
+
+  const panel = document.getElementById('status-panel');
+  const msg   = document.getElementById('status-msg');
+  const bar   = document.getElementById('status-bar');
+  panel.style.display = 'block';
+  msg.textContent = 'Iniciando…';
+  bar.style.width = '5%';
+
+  try {
+    const r = await fetch('/motoverificador/ejecutar/' + SID, {method:'POST'});
+    const d = await r.json();
+    if (!d.ok) {
+      alert('Error: ' + (d.error || 'desconocido'));
+      btn.disabled = false;
+      btn.textContent = 'Ejecutar correcciones';
+      panel.style.display = 'none';
+      return;
+    }
+    // Redirigir a esperar
+    window.location.href = '/motoverificador/esperar/' + SID;
+  } catch(e) {
+    alert('Error de red: ' + e);
+    btn.disabled = false;
+    btn.textContent = 'Ejecutar correcciones';
+    panel.style.display = 'none';
+  }
+}
+</script>
+
+{% endblock %}

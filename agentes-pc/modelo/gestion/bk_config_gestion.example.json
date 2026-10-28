@@ -1,0 +1,5 @@
+{
+  "api_url": "https://<host>/api/gestion/agente",
+  "token": "<GESTION_AGENTE_TOKEN del servidor>",
+  "buzon": "<cuenta de Outlook que se vigila>"
+}

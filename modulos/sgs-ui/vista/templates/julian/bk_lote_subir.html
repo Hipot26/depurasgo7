@@ -1,0 +1,42 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Liquidación Lote Multi-DF — SGS UI{% endblock %}
+{% block content %}
+<div class="card" style="max-width:560px;margin:60px auto;">
+  <h2>Liquidación Lote — Múltiples DFs</h2>
+  <p style="color:#666;margin-bottom:16px;font-size:0.9rem;">
+    Sube el archivo con todos los DFs a liquidar de corrido.<br>
+    El sistema detecta y verifica cada DF/nodo automáticamente.
+  </p>
+
+  <div style="background:#f1f8f4;border:1px solid #c3e6cb;border-radius:6px;
+              padding:10px 14px;margin-bottom:18px;font-size:0.82rem;color:#155724;">
+    <strong>Formato esperado:</strong> columnas <code>DF | NODO | PRESTACION | CANTIDAD | LIDER</code><br>
+    Puede haber varios DFs en el mismo archivo. Solo contiene MO (códigos QP).
+  </div>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      {% for msg in messages %}
+        <div class="alert alert-danger">{{ msg }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <form method="post" enctype="multipart/form-data">
+    <div style="border:2px dashed #c3e6cb;border-radius:8px;padding:30px;text-align:center;
+                margin-bottom:16px;background:#fafffe;">
+      <input type="file" name="excel" accept=".xlsx,.xlsm,.xls"
+             style="font-size:0.9rem;" required>
+      <p style="margin-top:10px;color:#aaa;font-size:0.8rem;">.xlsx / .xlsm / .xls</p>
+    </div>
+    <button type="submit" class="btn btn-primary" style="width:100%">
+      Cargar y verificar todos los DFs
+    </button>
+  </form>
+
+  <div style="margin-top:20px;padding-top:16px;border-top:1px solid #eee;font-size:0.82rem;color:#888;">
+    ¿Un solo DF? Usa el flujo normal:
+    <a href="{{ url_for('julian.subir') }}" style="color:#1a3e2e;">Presupuesto</a>
+  </div>
+</div>
+{% endblock %}

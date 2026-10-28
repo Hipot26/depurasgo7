@@ -1,0 +1,65 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Paso 1: Subir Presupuesto — SGS UI{% endblock %}
+{% block content %}
+<div class="card" style="max-width:520px;margin:60px auto;">
+  <h2>Paso 1: Subir Presupuesto de Julián</h2>
+  <p style="color:#666;margin-bottom:20px;font-size:0.9rem;">
+    El sistema detectará automáticamente las secciones de
+    <strong>Mano de Obra</strong> y <strong>Materiales</strong>
+    desde la hoja <em>Presupuesto</em>.
+  </p>
+  <div style="background:#f1f8f4;border:1px solid #c3e6cb;border-radius:6px;
+              padding:10px 14px;margin-bottom:18px;font-size:0.82rem;color:#155724;">
+    Formato compatible: <strong>PRESUPUESTO LCL... MEDIDA TEC.FORESTAL...</strong><br>
+    Hoja requerida: <code>Presupuesto</code> — con secciones MO y MAT.
+  </div>
+  <form method="post" enctype="multipart/form-data">
+    <div style="border:2px dashed #c3e6cb;border-radius:8px;padding:30px;text-align:center;
+                margin-bottom:16px;background:#fafffe;">
+      <input type="file" name="excel" accept=".xlsx,.xlsm,.xls"
+             style="font-size:0.9rem;" required>
+      <p style="margin-top:10px;color:#aaa;font-size:0.8rem;">.xlsx / .xlsm / .xls</p>
+    </div>
+    <div style="margin-bottom:18px;">
+      <label style="display:block;font-weight:700;font-size:0.9rem;margin-bottom:6px;">
+        Fecha de planilla <span style="color:#c62828;">*</span>
+        <span style="font-weight:400;color:#888;font-size:0.8rem;margin-left:6px;">
+          — fecha real de las planillas físicas
+        </span>
+      </label>
+      <input type="date" name="fecha_planilla" required
+             style="padding:10px 12px;border:2px solid #1a7a4a;border-radius:6px;
+                    font-size:1rem;width:100%;box-sizing:border-box;">
+      <p style="margin:5px 0 0;font-size:0.78rem;color:#c62828;">
+        Obligatorio — se registra en SGS para todas las actividades de esta planilla.
+      </p>
+    </div>
+    <button type="submit" class="btn btn-primary" style="width:100%">
+      Cargar y verificar contra SGS
+    </button>
+  </form>
+
+  <!-- Acceso rápido a Acción Manual -->
+  <div style="margin-top:16px;padding:14px 18px;background:#f0fbf4;border:1.5px solid #c3e6cb;
+              border-radius:8px;display:flex;align-items:center;gap:14px;">
+    <div style="font-size:1.4rem;">✎</div>
+    <div style="flex:1;">
+      <div style="font-weight:700;font-size:0.9rem;color:#1a3e2e;">Acción Manual</div>
+      <div style="font-size:0.8rem;color:#555;margin-top:2px;">
+        Sin Excel — pega las actividades del supervisor directamente
+      </div>
+    </div>
+    <a href="/julian/manual/" class="btn btn-success" style="font-size:0.85rem;padding:8px 16px;">
+      Usar &rarr;
+    </a>
+  </div>
+
+  <div style="margin-top:14px;padding-top:14px;border-top:1px solid #eee;
+              font-size:0.82rem;color:#888;text-align:center;">
+    ¿Tienes múltiples DFs en un solo archivo?
+    <a href="/julian/lote/subir" style="color:#1a3e2e;font-weight:600;">
+      Usar módulo Lote &rarr;
+    </a>
+  </div>
+</div>
+{% endblock %}

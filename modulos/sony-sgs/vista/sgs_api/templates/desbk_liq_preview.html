@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ERP Liquidador — Vista previa</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Calibri, Candara, sans-serif; background: #f0f3f7; color: #1a1a1a; }
+    .topbar {
+      background: #1F3864; padding: 0 28px; height: 52px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar h1 { color: #fff; font-size: 1rem; font-weight: 700; }
+    .topbar .right { display: flex; align-items: center; gap: 14px; }
+    .topbar a { color: #a8bcd4; text-decoration: none; font-size: .82rem; }
+    .topbar a:hover { color: #fff; }
+    .badge { background: #2e75b6; color: #fff; font-size: .72rem; padding: 3px 10px; border-radius: 10px; }
+
+    .main { max-width: 1000px; margin: 28px auto; padding: 0 20px; }
+
+    .card {
+      background: #fff; border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      padding: 28px 32px; margin-bottom: 20px;
+    }
+    .card h2 { color: #1F3864; font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
+    .card .meta { font-size: .82rem; color: #777; margin-bottom: 18px; }
+
+    /* Badges de resumen */
+    .summary-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .sumbox {
+      flex: 1; min-width: 120px;
+      border-radius: 5px; padding: 12px 16px; text-align: center;
+    }
+    .sumbox .num { font-size: 1.6rem; font-weight: 700; }
+    .sumbox .lbl { font-size: .75rem; margin-top: 2px; }
+    .sumbox.blue  { background: #dce8f5; color: #1F3864; }
+    .sumbox.green { background: #e2f0d9; color: #375623; }
+    .sumbox.red   { background: #fde8e8; color: #7b0000; }
+    .sumbox.yellow { background: #fff3cd; color: #856404; }
+
+    /* Tabla */
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    th {
+      background: #1F3864; color: #fff;
+      padding: 9px 12px; text-align: left; font-weight: 600;
+    }
+    td { padding: 8px 12px; border-bottom: 1px solid #e8edf3; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) td { background: #f6f8fb; }
+    .fila-num { color: #888; font-size: .78rem; }
+    .code { font-family: "Consolas", monospace; font-weight: 600; color: #1F3864; }
+    .qty  { font-weight: 700; color: #375623; text-align: right; }
+
+    /* Errores de parseo */
+    .parse-errs {
+      background: #fff8e1;
+      border-left: 4px solid #ffc107;
+      border-radius: 3px;
+      padding: 12px 16px;
+      margin-bottom: 18px;
+    }
+    .parse-errs h4 { font-size: .88rem; color: #856404; margin-bottom: 6px; }
+    .parse-errs ul { padding-left: 18px; }
+    .parse-errs li { font-size: .82rem; color: #666; margin-bottom: 3px; }
+
+    /* Error ERP */
+    .err-banner {
+      background: #fde8e8; border-left: 4px solid #c00;
+      color: #7b0000; padding: 12px 16px; border-radius: 3px;
+      font-size: .88rem; margin-bottom: 18px;
+    }
+
+    /* No hay datos */
+    .empty {
+      text-align: center; padding: 32px; color: #888; font-size: .9rem;
+    }
+
+    /* Botones */
+    .actions { display: flex; gap: 12px; align-items: center; margin-top: 20px; }
+    .btn-primary {
+      padding: 11px 28px; background: #375623; color: #fff;
+      border: none; border-radius: 4px; font-size: .95rem;
+      font-family: inherit; font-weight: 600; cursor: pointer; transition: background .2s;
+    }
+    .btn-primary:hover { background: #4a7030; }
+    .btn-primary:disabled { background: #aaa; cursor: not-allowed; }
+    .btn-secondary {
+      padding: 10px 20px; background: #fff; color: #1F3864;
+      border: 1.5px solid #1F3864; border-radius: 4px;
+      font-size: .9rem; font-family: inherit; font-weight: 600;
+      cursor: pointer; text-decoration: none; display: inline-block;
+    }
+    .btn-secondary:hover { background: #f0f3f7; }
+
+    .warning-box {
+      background: #fff3cd; border-left: 4px solid #ffc107;
+      color: #856404; padding: 10px 14px; border-radius: 3px;
+      font-size: .85rem; margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>ERP — Sistema Liquidador</h1>
+  <div class="right">
+    <span class="badge">Revisión de plantilla</span>
+    <a href="{{ url_for('liquidacion.dashboard') }}">← Inicio</a>
+    <a href="{{ url_for('liquidacion.logout') }}">Cerrar sesión</a>
+  </div>
+</div>
+
+<div class="main">
+
+  {% if sgs_error %}
+  <div class="err-banner">{{ sgs_error }}</div>
+  {% endif %}
+
+  <div class="card">
+    <h2>Revisión de plantilla</h2>
+    <p class="meta">
+      Archivo: <strong>{{ s.filename }}</strong> &nbsp;|&nbsp;
+      Cargado: {{ s.created_at }}
+    </p>
+
+    <!-- Resumen numérico -->
+    <div class="summary-row">
+      <div class="sumbox blue">
+        <div class="num">{{ s.rows|length }}</div>
+        <div class="lbl">Filas detectadas</div>
+      </div>
+      {% set pros = s.rows|map(attribute='pro')|list|unique|list %}
+      <div class="sumbox blue">
+        <div class="num">{{ pros|length }}</div>
+        <div class="lbl">Proyectos únicos</div>
+      </div>
+      {% if s.parse_errs %}
+      <div class="sumbox yellow">
+        <div class="num">{{ s.parse_errs|length }}</div>
+        <div class="lbl">Advertencias parseo</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Advertencias de parseo -->
+    {% if s.parse_errs %}
+    <div class="parse-errs">
+      <h4>Advertencias al leer el archivo</h4>
+      <ul>
+        {% for e in s.parse_errs %}
+        <li>{{ e }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <!-- Sin datos -->
+    {% if not s.rows %}
+    <div class="empty">
+      No se encontraron filas válidas en la plantilla.<br>
+      Verifica que el archivo tenga columnas <strong>PRO / CODIGO / CANTIDAD</strong>.
+    </div>
+    {% else %}
+
+    <!-- Tabla de datos -->
+    <table>
+      <tr>
+        <th>#</th>
+        <th>PRO</th>
+        <th>Código</th>
+        <th>Cantidad</th>
+        <th>Líder (plantilla)</th>
+      </tr>
+      {% for row in s.rows %}
+      <tr>
+        <td class="fila-num">{{ loop.index }}</td>
+        <td class="code">{{ row.pro }}</td>
+        <td class="code">{{ row.codigo }}</td>
+        <td class="qty">{{ row.cantidad }}</td>
+        <td style="color:#888;font-size:.82rem;">{{ row.lider or '— (del proyecto)' }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+
+    <!-- Botones de acción -->
+    <div class="actions">
+      <form method="post" action="{{ url_for('liquidacion.verificar', sid=sid) }}" id="verifyForm">
+        <button class="btn-primary" type="submit" id="btnVerify">
+          Verificar datos contra ERP
+        </button>
+      </form>
+      <a href="{{ url_for('liquidacion.dashboard') }}" class="btn-secondary">
+        Cancelar y volver
+      </a>
+    </div>
+
+    <p style="font-size:.78rem;color:#888;margin-top:14px;">
+      La verificación solo lee datos de ERP. No realiza ninguna modificación.
+    </p>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  document.getElementById("verifyForm")?.addEventListener("submit", () => {
+    const btn = document.getElementById("btnVerify");
+    btn.disabled = true;
+    btn.textContent = "Verificando contra ERP...";
+  });
+</script>
+
+</body>
+</html>

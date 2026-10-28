@@ -1,0 +1,16 @@
+{
+  "proveedor": "auto",
+  "cf_account_id": "",
+  "cf_ai_token": "",
+  "cf_gateway": "",
+  "cf_model_vision": "@cf/meta/llama-3.2-11b-vision-instruct",
+  "cf_model_texto": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+  "cf_timeout_s": 90,
+  "cf_repeticion_penalty": 1.1,
+  "cf_max_repes": 2,
+  "api_key": "",
+  "endpoint": "https://api.minimax.io/v1/text/chatcompletion_v2",
+  "modelo": "MiniMax-M3",
+  "timeout_s": 120,
+  "lado_max_px": 1600
+}

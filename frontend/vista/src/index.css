@@ -1,0 +1,124 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-blue: #1e3a8a;
+  --brand-dark: #172554;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #f1f5f9;
+  margin: 0;
+}
+
+/* ── AG Grid theme ─────────────────────────────────────────────────────────── */
+.ag-theme-alpine {
+  --ag-header-background-color: #1e3a8a;
+  --ag-header-foreground-color: #ffffff;
+  --ag-header-cell-hover-background-color: #1e40af;
+  --ag-odd-row-background-color: #fafafa;
+  --ag-row-hover-color: #f0f7ff;
+  --ag-selected-row-background-color: #dbeafe;
+  --ag-font-size: 12px;
+  --ag-cell-horizontal-border: solid #e2e8f0;
+  --ag-borders: solid 1px;
+  --ag-border-color: #cbd5e1;
+}
+
+/* ── Cabeceras — colores idénticos a las plantillas Excel ──────────────────── */
+/* Azul   #0070C0 — Datos de planificación / ingeniero                        */
+/* Verde  #92D050 — Datos de programación (estado, PDT, CD, hora)             */
+/* Cían   #00B0F0 — Datos de facturación y liquidación                        */
+/* Morado #7030A0 — Valor dejado de ejecutar (columna calculada)              */
+.ag-theme-alpine .ag-header-cell.hdr-blue   { background-color: #0070C0 !important; color: #fff !important; }
+.ag-theme-alpine .ag-header-cell.hdr-green  { background-color: #92D050 !important; color: #1a1a1a !important; }
+.ag-theme-alpine .ag-header-cell.hdr-lblue  { background-color: #00B0F0 !important; color: #1a1a1a !important; }
+.ag-theme-alpine .ag-header-cell.hdr-purple { background-color: #7030A0 !important; color: #fff !important; }
+/* Plantilla 2026-08: gris azulado (V. dejado, notas, inoperatividad) y ROJO (SE GESTIONA) */
+.ag-theme-alpine .ag-header-cell.hdr-slate  { background-color: #737F8F !important; color: #fff !important; }
+.ag-theme-alpine .ag-header-cell.hdr-red    { background-color: #FF0000 !important; color: #fff !important; }
+/* ANS: gris #E0E4EA (datos STM), ámbar #FFC000 (3.4/3.3). Verde reutiliza hdr-green (3.2) */
+.ag-theme-alpine .ag-header-cell.hdr-gray   { background-color: #E0E4EA !important; color: #1a1a1a !important; }
+.ag-theme-alpine .ag-header-cell.hdr-amber  { background-color: #FFC000 !important; color: #1a1a1a !important; }
+.ag-theme-alpine .ag-header-group-cell.hdr-gray  .ag-header-group-text,
+.ag-theme-alpine .ag-header-group-cell.hdr-green .ag-header-group-text,
+.ag-theme-alpine .ag-header-group-cell.hdr-amber .ag-header-group-text { font-weight: 700; }
+.ag-theme-alpine .ag-header-group-cell.hdr-gray  { background-color: #E0E4EA !important; }
+.ag-theme-alpine .ag-header-group-cell.hdr-green { background-color: #92D050 !important; }
+.ag-theme-alpine .ag-header-group-cell.hdr-amber { background-color: #FFC000 !important; }
+/* tintes de celda ANS */
+.ag-theme-alpine .ag-cell.col-gray  { background-color: rgba(224,228,234,0.45) !important; cursor: text; }
+.ag-theme-alpine .ag-cell.col-gray:hover { background-color: rgba(224,228,234,0.85) !important; box-shadow: inset 0 0 0 1px #94a3b8; }
+.col-amber { background-color: rgba(255,192,0,0.13)   !important; }
+/* manual editable: amarillo claro + cursor de texto + resalte al pasar */
+.ag-theme-alpine .ag-cell.col-ans-edit { background-color: #fef9c3 !important; cursor: text; }
+.ag-theme-alpine .ag-cell.col-ans-edit:hover { background-color: #fde68a !important; box-shadow: inset 0 0 0 1px #f59e0b; }
+/* Observaciones con texto completo (2026-08-24): wrapText+autoHeight en AG Grid deja el
+   line-height de fila (30px) — sin esto cada renglón envuelto sale a 30px de alto. */
+.ag-theme-alpine .ag-cell.celda-texto {
+  line-height: 1.35; padding-top: 5px; padding-bottom: 5px; word-break: break-word;
+}
+
+/* ── Nodos ajustados SOLOS por el sistema (reglas 3.2B/3.2C) — solo en el sistema, no exporta ── */
+/* Amarillo fuerte (distinto del amarillo suave de "celda manual"): la regla se aplicó.          */
+.ag-theme-alpine .ag-cell.nodo-auto-ok {
+  background-color: #fde047 !important; box-shadow: inset 0 0 0 2px #ca8a04; font-weight: 700;
+}
+/* Rojo: la condición que justificaba el ajuste ya no se cumple → revisar (la máquina no revierte). */
+.ag-theme-alpine .ag-cell.nodo-auto-rojo {
+  background-color: #fecaca !important; box-shadow: inset 0 0 0 2px #dc2626;
+  color: #b91c1c !important; font-weight: 700;
+}
+
+/* ── Celdas de datos — tinte suave según sección editable para el rol ──────── */
+.col-ing    { background-color: rgba(0,112,192,0.08)  !important; }  /* azul   */
+.col-prog   { background-color: rgba(146,208,80,0.15) !important; }  /* verde  */
+.col-fact   { background-color: rgba(0,176,240,0.12)  !important; }  /* cían   */
+.col-purple { background-color: rgba(112,48,160,0.08) !important; }  /* morado */
+.col-red    { background-color: rgba(255,0,0,0.07)    !important; }  /* rojo: SE GESTIONA, todos los roles */
+
+/* Columna de otro rol: fondo gris tenue + texto más claro                    */
+.col-lock { background-color: #f1f5f9 !important; color: #94a3b8 !important; }
+
+/* ── FECHA en domingo o festivo — ROJO para TODOS los roles (plantilla 2026-08) ── */
+.ag-theme-alpine .ag-cell.cell-no-laborable {
+  background-color: #FF0000 !important; color: #fff !important; font-weight: 700;
+}
+
+/* ── ANS: celdas PENDIENTES por rol — parpadean hasta que se llenan ─────────── */
+/* Cada rol tiene su color; cada quien ve parpadear solo lo suyo (el dev ve todo). */
+@keyframes ansParpadeo {
+  0%, 100% { background-color: var(--pend-suave); box-shadow: inset 0 0 0 1px var(--pend-fuerte); }
+  50%      { background-color: var(--pend-fuerte); box-shadow: inset 0 0 0 2px var(--pend-borde); }
+}
+.ag-theme-alpine .ag-cell.pend-blink {
+  animation: ansParpadeo 1.5s ease-in-out infinite;
+  cursor: text;
+}
+/* «elaborador» = programación + cumplimentación unificadas (ago-2026): un solo color. */
+.pend-elaborador     { --pend-suave: #fef3c7; --pend-fuerte: #fcd34d; --pend-borde: #d97706; }  /* ámbar  */
+.pend-ingeniero_zona { --pend-suave: #ede9fe; --pend-fuerte: #c4b5fd; --pend-borde: #7c3aed; }  /* violeta */
+.pend-ans            { --pend-suave: #ffe4e6; --pend-fuerte: #fda4af; --pend-borde: #e11d48; }  /* rosa   */
+/* Respeta a quien no quiere animaciones: se queda el color fijo, sin parpadeo.  */
+@media (prefers-reduced-motion: reduce) {
+  .ag-theme-alpine .ag-cell.pend-blink {
+    animation: none;
+    background-color: var(--pend-fuerte) !important;
+    box-shadow: inset 0 0 0 2px var(--pend-borde);
+  }
+}
+
+/* Selección de rango tipo Excel (Shift+Click / Ctrl+Click)                   */
+.ag-theme-alpine .ag-cell.cell-selected {
+  background-color: rgba(21, 101, 192, 0.15) !important;
+  box-shadow: inset 0 0 0 1px rgba(21, 101, 192, 0.55) !important;
+}
+
+/* ── Badges de estado ──────────────────────────────────────────────────────── */
+.badge-ejecutado   { @apply bg-green-100  text-green-800  px-2 py-0.5 rounded-full text-xs font-medium; }
+.badge-parcial     { @apply bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full text-xs font-medium; }
+.badge-cancelado   { @apply bg-red-100    text-red-800    px-2 py-0.5 rounded-full text-xs font-medium; }
+.badge-programado  { @apply bg-blue-100   text-blue-800   px-2 py-0.5 rounded-full text-xs font-medium; }
+.badge-reprogramado{ @apply bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full text-xs font-medium; }

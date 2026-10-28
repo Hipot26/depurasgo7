@@ -1,0 +1,298 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Acción Manual — Vista Previa{% endblock %}
+{% block extra_head %}
+<style>
+  .steps { display:flex; align-items:center; margin-bottom:8px; }
+  .step-circle {
+    width:30px; height:30px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:0.82rem; font-weight:700; flex-shrink:0;
+  }
+  .step-circle.active  { background:#27ae60; color:white; }
+  .step-circle.done    { background:#c8f0da; color:#1a7a40; }
+  .step-circle.pending { background:#e0e0e0; color:#999; }
+  .step-bar  { flex:1; height:3px; }
+  .step-bar.done    { background:#27ae60; }
+  .step-bar.pending { background:#e0e0e0; }
+  .step-labels { display:flex; font-size:0.7rem; color:#aaa; margin-bottom:28px; }
+  .step-labels span { flex:1; text-align:center; }
+  .step-labels span.done   { color:#27ae60; }
+  .step-labels span.active { color:#1a3e2e; font-weight:700; }
+
+  .proj-header {
+    background:linear-gradient(135deg,#1a3e2e,#27ae60);
+    color:white; border-radius:12px; padding:22px 28px;
+    margin-bottom:24px; position:relative; overflow:hidden;
+  }
+  .proj-header::after {
+    content:''; position:absolute; right:-20px; top:-20px;
+    width:100px; height:100px; background:rgba(255,255,255,0.06);
+    border-radius:50%;
+  }
+  .proj-lcl  { font-family:monospace; font-size:1.6rem; font-weight:700; letter-spacing:2px; }
+  .proj-meta { font-size:0.83rem; opacity:0.85; margin-top:6px; display:flex; gap:14px; flex-wrap:wrap; }
+  .proj-badge {
+    display:inline-flex; align-items:center; gap:5px;
+    background:rgba(255,255,255,0.18); padding:3px 10px;
+    border-radius:12px; font-size:0.78rem; font-weight:600;
+  }
+
+  .section-title {
+    font-size:0.95rem; font-weight:700; color:#1a3e2e;
+    border-bottom:2px solid #c3e6cb; padding-bottom:8px;
+    margin-bottom:14px; display:flex; align-items:center; gap:8px;
+  }
+  .section-title .icon { font-size:1.1rem; }
+
+  table { font-size:0.83rem; }
+  .qp-code { font-family:monospace; font-weight:600; color:#1a3e2e; }
+  .sap-code { font-family:monospace; font-weight:600; color:#555; background:#f1f8f4;
+              padding:2px 5px; border-radius:3px; }
+  .price-col { text-align:right; }
+  .subtotal-col { text-align:right; font-weight:600; }
+  .total-row td {
+    font-weight:700; background:#f1f8f4;
+    border-top:2px solid #c3e6cb;
+    font-size:0.9rem;
+  }
+  .qp-miss { color:#cc8800; }
+
+  .total-banner {
+    background:linear-gradient(135deg,#1a3e2e,#1d5c3a);
+    color:white; border-radius:10px; padding:18px 24px;
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:20px; flex-wrap:wrap; gap:12px;
+  }
+  .total-banner .label { font-size:0.82rem; opacity:0.8; margin-bottom:2px; }
+  .total-banner .amount { font-size:1.7rem; font-weight:700; letter-spacing:1px; }
+
+  .stat-mini {
+    background:#f1f8f4; border:1px solid #c3e6cb; border-radius:8px;
+    padding:12px 18px; text-align:center; flex:1; min-width:100px;
+  }
+  .stat-mini .num { font-size:1.4rem; font-weight:700; color:#1a3e2e; }
+  .stat-mini .lbl { font-size:0.72rem; color:#888; margin-top:2px; }
+
+  .warn-codes {
+    background:#fff3cd; border:1px solid #ffc107; border-radius:6px;
+    padding:10px 14px; font-size:0.82rem; color:#856404; margin-top:12px;
+  }
+
+  .btn-confirm {
+    background:linear-gradient(135deg,#27ae60,#1d8a4a);
+    color:white; border:none; width:100%; padding:16px;
+    border-radius:8px; font-size:1.05rem; font-weight:700;
+    cursor:pointer; transition:opacity 0.15s; letter-spacing:0.5px;
+  }
+  .btn-confirm:hover { opacity:0.9; }
+</style>
+{% endblock %}
+{% block content %}
+
+<div style="max-width:920px; margin:36px auto;">
+
+  <!-- Indicador de pasos -->
+  <div class="steps">
+    <div class="step-circle done">✓</div>
+    <div class="step-bar done"></div>
+    <div class="step-circle done">✓</div>
+    <div class="step-bar done"></div>
+    <div class="step-circle done">✓</div>
+    <div class="step-bar done"></div>
+    <div class="step-circle active">4</div>
+  </div>
+  <div class="step-labels">
+    <span class="done">Datos del proyecto</span>
+    <span class="done">Mano de Obra</span>
+    <span class="done">Materiales</span>
+    <span class="active">Vista previa</span>
+  </div>
+
+  <!-- Encabezado del proyecto -->
+  <div class="proj-header">
+    <div class="proj-lcl">{{ sm.lcl }}</div>
+    <div class="proj-meta">
+      <span class="proj-badge">
+        {{ '⚡ Mayor Impacto' if sm.tipo == 'mi' else 'Programado' }}
+      </span>
+      {% if sm.pdl %}
+      <span class="proj-badge">PDL: {{ sm.pdl }}</span>
+      {% endif %}
+      <span class="proj-badge">{{ sm.creado_at }}</span>
+    </div>
+  </div>
+
+  <!-- Stats rápidas -->
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+    <div class="stat-mini">
+      <div class="num">{{ mo_detalle | length }}</div>
+      <div class="lbl">Actividades MO</div>
+    </div>
+    <div class="stat-mini">
+      <div class="num">{{ sm.rows_mat | length }}</div>
+      <div class="lbl">Materiales</div>
+    </div>
+    {% set n_miss = mo_detalle | selectattr('encontrado', 'equalto', false) | list | length %}
+    <div class="stat-mini" style="{{ 'border-color:#ffc107;background:#fff3cd;' if n_miss > 0 else '' }}">
+      <div class="num" style="{{ 'color:#856404;' if n_miss > 0 else '' }}">{{ n_miss }}</div>
+      <div class="lbl">Sin precio baremo</div>
+    </div>
+    <div class="stat-mini" style="flex:2;background:#1a3e2e;border-color:#1a3e2e;">
+      <div class="num" style="color:#4ade80;font-size:1.6rem;">
+        ${{ "{:,.0f}".format(total_mo) }}
+      </div>
+      <div class="lbl" style="color:rgba(255,255,255,0.6);">Total estimado MO</div>
+    </div>
+  </div>
+
+  <!-- Sección MO -->
+  <div class="card" style="margin-bottom:18px;">
+    <div class="section-title">
+      <span class="icon">⚡</span> Mano de Obra
+      <span class="badge badge-ok" style="font-size:0.75rem;margin-left:auto;">
+        {{ mo_detalle | length }} actividad{{ 'es' if mo_detalle|length != 1 else '' }}
+      </span>
+    </div>
+
+    {% if n_miss > 0 %}
+    <div class="warn-codes">
+      ⚠ <strong>{{ n_miss }} código(s) no encontrado(s) en el baremo</strong> —
+      el total excluye esas actividades. Verifica los QP codes antes de continuar.
+    </div>
+    {% endif %}
+
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:70px;">Nodo</th>
+            <th style="width:90px;">Código QP</th>
+            <th>Descripción</th>
+            <th style="width:50px;">UM</th>
+            <th style="width:70px;text-align:right;">Cant.</th>
+            <th style="width:120px;text-align:right;">Precio Unit.</th>
+            <th style="width:130px;text-align:right;">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in mo_detalle %}
+          <tr>
+            <td>{{ r.pro }}</td>
+            <td>
+              <span class="{{ 'qp-code' if r.encontrado else 'qp-miss' }}">
+                {{ r.qp_code }}
+              </span>
+            </td>
+            <td style="max-width:280px;" title="{{ r.desc_baremo }}">
+              {% if r.encontrado %}
+                {{ r.desc_baremo[:80] }}{% if r.desc_baremo|length > 80 %}…{% endif %}
+              {% else %}
+                <em style="color:#cc8800;">Código no encontrado en baremo</em>
+              {% endif %}
+            </td>
+            <td>{{ r.unidad }}</td>
+            <td class="price-col">{{ r.cantidad | int if r.cantidad == r.cantidad|int else r.cantidad }}</td>
+            <td class="price-col">
+              {% if r.encontrado %}
+                ${{ "{:,.0f}".format(r.precio_unit) }}
+              {% else %}
+                <span style="color:#cc8800;">—</span>
+              {% endif %}
+            </td>
+            <td class="subtotal-col">
+              {% if r.encontrado %}
+                ${{ "{:,.0f}".format(r.subtotal) }}
+              {% else %}
+                <span style="color:#cc8800;">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td colspan="6" style="text-align:right;padding-right:14px;">TOTAL ESTIMADO MO</td>
+            <td class="price-col">${{ "{:,.0f}".format(total_mo) }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- Sección MAT -->
+  {% if sm.rows_mat %}
+  <div class="card" style="margin-bottom:18px;">
+    <div class="section-title">
+      <span class="icon"></span> Materiales
+      <span class="badge badge-blue" style="font-size:0.75rem;margin-left:auto;">
+        {{ sm.rows_mat | length }} material{{ 'es' if sm.rows_mat|length != 1 else '' }}
+      </span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:70px;">Nodo</th>
+            <th style="width:110px;">Código SAP</th>
+            <th>Descripción</th>
+            <th style="width:80px;text-align:right;">Cantidad</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in sm.rows_mat %}
+          <tr>
+            <td>{{ r.nodo }}</td>
+            <td><span class="sap-code">{{ r.codigo }}</span></td>
+            <td>{{ r.descripcion or '—' }}</td>
+            <td style="text-align:right;font-weight:600;">
+              {{ r.sgs_neto_excel | int if r.sgs_neto_excel == r.sgs_neto_excel|int else r.sgs_neto_excel }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="card" style="margin-bottom:18px;border:1.5px dashed #ddd;background:#fafafa;">
+    <div style="text-align:center;color:#aaa;padding:10px 0;font-size:0.88rem;">
+      Sin materiales en esta liquidación
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Acción final -->
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;">
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:0.95rem;color:#1a3e2e;margin-bottom:4px;">
+          ¿Todo correcto?
+        </div>
+        <div style="font-size:0.82rem;color:#666;">
+          Al confirmar, el sistema pasará a verificar cada actividad y material
+          contra SGS. Podrás revisar el resultado antes de liquidar.
+        </div>
+      </div>
+    </div>
+
+    <form method="post">
+      <button type="submit" class="btn-confirm">
+        ✓ Confirmar y verificar en SGS →
+      </button>
+    </form>
+
+    <div style="display:flex;gap:12px;margin-top:14px;flex-wrap:wrap;">
+      <a href="/julian/manual/mat/{{ sid }}" class="btn btn-light" style="font-size:0.85rem;">
+        ← Editar materiales
+      </a>
+      <a href="/julian/manual/mo/{{ sid }}" class="btn btn-light" style="font-size:0.85rem;">
+        ← Editar MO
+      </a>
+      <a href="/julian/manual/" class="btn btn-light" style="font-size:0.85rem;">
+        ← Empezar de nuevo
+      </a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+{% block title %}Prueba Playwright — SGS UI{% endblock %}
+{% block content %}
+
+<h1 style="font-size:1.3rem;margin-bottom:6px;">Consola Playwright — {{ s.filename }}</h1>
+<p style="color:#888;font-size:0.85rem;margin-bottom:20px;">
+  Sesión verificada: {{ s.verificado_at }} &nbsp;|&nbsp;
+  MAT con pm_id: <strong>{{ items_mat|length }}</strong> &nbsp;|&nbsp;
+  MO pendientes: <strong>{{ items_mo|length }}</strong>
+</p>
+
+{# ── INSPECT ── #}
+<div class="card">
+  <h2>1. Inspeccionar material (sin escribir)</h2>
+  <p style="font-size:0.85rem;color:#555;">
+    Abre el navegador, navega al formulario del material y vuelca los selectores DOM.
+    Útil para confirmar que los selectores de Playwright son correctos antes de liquidar.
+  </p>
+
+  {% if items_mat %}
+  <form id="form-inspect" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+    <div>
+      <label style="font-size:0.8rem;display:block;margin-bottom:4px;">Material (pm_id)</label>
+      <select name="pm_id" id="sel-inspect" style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;">
+        {% for mc in items_mat %}
+        <option value="{{ mc.pm_id }}"
+                data-partner="{{ mc.mat.descripcion[:30] if mc.mat.descripcion else '' }}"
+                data-pro="{{ mc.pro_code or '' }}">
+          pm#{{ mc.pm_id }} — {{ mc.pro_code or '?' }} — {{ mc.mat.codigo }}
+          ({{ mc.estado }})
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="button" class="btn btn-light" onclick="runInspect()">
+      Inspeccionar →
+    </button>
+  </form>
+  {% else %}
+  <div class="alert alert-warning">
+    No hay materiales con pm_id disponible. Sube y verifica un Excel primero.
+  </div>
+  {% endif %}
+
+  <div id="inspect-result" style="margin-top:16px;display:none;">
+    <h3 style="font-size:0.95rem;">Resultado de inspección</h3>
+    <div id="inspect-body" style="font-size:0.82rem;"></div>
+  </div>
+</div>
+
+{# ── DRY RUN ── #}
+<div class="card">
+  <h2>2. Dry run — liquidación sin guardar</h2>
+  <p style="font-size:0.85rem;color:#555;">
+    Completa el formulario pero NO hace click en GUARDAR. Sirve para verificar que
+    los selectores funcionan end-to-end.
+  </p>
+
+  {% if items_mat %}
+  <form id="form-dry" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+    <div>
+      <label style="font-size:0.8rem;display:block;margin-bottom:4px;">Material</label>
+      <select name="pm_id" id="sel-dry" style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;"
+              onchange="updatePartner(this)">
+        {% for mc in items_mat %}
+        {% set partner = "" %}
+        {% for ck in s.checks_mo %}
+          {% if ck.get and ck.pid == mc.pid %}{% set partner = ck.partner_nombre or "" %}{% endif %}
+        {% endfor %}
+        <option value="{{ mc.pm_id }}"
+                data-cantidad="{{ mc.mat.sgs_neto_excel }}"
+                data-partner="{{ partner }}"
+                data-pro="{{ mc.pro_code or '' }}">
+          pm#{{ mc.pm_id }} — {{ mc.pro_code or '?' }} — {{ mc.mat.codigo }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label style="font-size:0.8rem;display:block;margin-bottom:4px;">Cantidad</label>
+      <input type="number" step="0.01" id="inp-cantidad" name="cantidad"
+             style="width:90px;padding:6px;border:1px solid #ccc;border-radius:4px;" value="1">
+    </div>
+    <div>
+      <label style="font-size:0.8rem;display:block;margin-bottom:4px;">Lider (Equipo)</label>
+      <input type="text" id="inp-partner" name="partner_nombre"
+             style="width:260px;padding:6px;border:1px solid #ccc;border-radius:4px;"
+             placeholder="Nombre del lider en SGS">
+    </div>
+    <input type="hidden" name="dry_run" value="1">
+    <button type="button" class="btn btn-light" onclick="runDry()">
+      Dry run →
+    </button>
+  </form>
+  {% endif %}
+
+  <div id="dry-result" style="margin-top:16px;display:none;">
+    <h3 style="font-size:0.95rem;">Resultado dry run</h3>
+    <div id="dry-body" style="font-size:0.82rem;"></div>
+  </div>
+</div>
+
+{# ── DRY RUN MO ── #}
+<div class="card">
+  <h2>3. Dry run MO — actividad sin guardar</h2>
+  <p style="font-size:0.85rem;color:#555;">
+    Navega al formulario de la actividad MO, agrega línea con cantidad 1 y
+    descarta sin guardar. Verifica que los selectores MO funcionan end-to-end.
+  </p>
+
+  {% if items_mo %}
+  <form id="form-dry-mo" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+    <div>
+      <label style="font-size:0.8rem;display:block;margin-bottom:4px;">Actividad MO</label>
+      <select name="act_id" id="sel-mo"
+              style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;min-width:320px;">
+        {% for ck in items_mo %}
+        <option value="{{ ck.act_id }}"
+                data-pid="{{ ck.pid or '' }}"
+                data-code="{{ ck.act_code or '' }}"
+                data-pro="{{ ck.pro_code or '' }}">
+          act#{{ ck.act_id }} — {{ ck.pro_code or '?' }} — {{ ck.act_code or '' }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label style="font-size:0.8rem;display:block;margin-bottom:4px;">Cantidad</label>
+      <input type="number" step="1" id="inp-mo-cantidad" name="cantidad"
+             style="width:80px;padding:6px;border:1px solid #ccc;border-radius:4px;" value="1">
+    </div>
+    <input type="hidden" name="dry_run" value="1">
+    <button type="button" class="btn btn-light" onclick="runDryMO()">
+      Dry run MO →
+    </button>
+  </form>
+  {% else %}
+  <div class="alert alert-warning">
+    No hay actividades MO pendientes en esta sesión.
+  </div>
+  {% endif %}
+
+  <div id="dry-mo-result" style="margin-top:16px;display:none;">
+    <h3 style="font-size:0.95rem;">Resultado dry run MO</h3>
+    <div id="dry-mo-body" style="font-size:0.82rem;"></div>
+  </div>
+</div>
+
+{# ── Sesión JSON ── #}
+<div class="card" style="background:#f8f9fa;">
+  <h2>Items en sesión</h2>
+  <p style="font-size:0.8rem;color:#888;">
+    MAT con pm_id resuelto — listos para Playwright
+  </p>
+  <table style="font-size:0.78rem;">
+    <thead>
+      <tr>
+        <th>pm_id</th><th>PRO</th><th>Codigo</th><th>Estado</th>
+        <th>SGS Neto</th><th>Avance</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for mc in items_mat %}
+    <tr>
+      <td><code>{{ mc.pm_id }}</code></td>
+      <td style="font-size:0.75rem;">{{ mc.pro_code or '—' }}</td>
+      <td><strong>{{ mc.mat.codigo }}</strong></td>
+      <td>
+        {% if mc.estado == 'ok' %}<span class="badge badge-ok">Pendiente</span>
+        {% elif mc.estado == 'avance_parcial' %}<span class="badge badge-warn">Parcial</span>
+        {% elif mc.estado == 'sin_mov' or mc.estado == 'sin_mov_ok' %}<span class="badge badge-blue">Sin mov.</span>
+        {% else %}<span class="badge badge-gray">{{ mc.estado }}</span>{% endif %}
+      </td>
+      <td style="text-align:right">{{ mc.sgs_neto if mc.sgs_neto is not none else mc.mat.sgs_neto_excel }}</td>
+      <td style="text-align:right">{{ mc.advance_real if mc.advance_real is not none else '—' }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div style="margin-top:8px;">
+  <a href="{{ url_for('verificar', sid=sid) }}" class="btn btn-light">← Volver a verificación</a>
+</div>
+
+<script>
+const SID = "{{ sid }}";
+
+async function runInspect() {
+  const btn = document.querySelector("#form-inspect button");
+  const pmId = document.getElementById("sel-inspect").value;
+  btn.disabled = true;
+  btn.textContent = "Abriendo navegador...";
+
+  const form = new FormData();
+  form.append("pm_id", pmId);
+
+  const res  = await fetch(`/probar/${SID}/inspect`, {method:"POST", body:form});
+  const data = await res.json();
+
+  btn.disabled = false;
+  btn.textContent = "Inspeccionar →";
+
+  document.getElementById("inspect-result").style.display = "block";
+  document.getElementById("inspect-body").innerHTML = renderResult(data);
+}
+
+async function runDry() {
+  const btn = document.querySelector("#form-dry button");
+  btn.disabled = true;
+  btn.textContent = "Ejecutando...";
+
+  const form = new FormData();
+  form.append("pm_id",          document.getElementById("sel-dry").value);
+  form.append("cantidad",       document.getElementById("inp-cantidad").value);
+  form.append("partner_nombre", document.getElementById("inp-partner").value);
+  form.append("dry_run",        "1");
+
+  const res  = await fetch(`/probar/${SID}/run`, {method:"POST", body:form});
+  const data = await res.json();
+
+  btn.disabled = false;
+  btn.textContent = "Dry run →";
+
+  document.getElementById("dry-result").style.display = "block";
+  document.getElementById("dry-body").innerHTML = renderResult(data);
+}
+
+function renderResult(data) {
+  const ok  = data.ok;
+  const col = ok ? "#27ae60" : "#e74c3c";
+  let html  = `<div style="color:${col};font-weight:bold;margin-bottom:8px;">
+    ${ok ? "✓ OK" : "✗ ERROR"} — ${data.msg || data.error || ""}
+  </div>`;
+
+  if (data.errores && data.errores.length) {
+    html += `<div style="color:#e67e22;margin-bottom:6px;">
+      Avisos: ${data.errores.join(" | ")}
+    </div>`;
+  }
+  if (data.add_line_count !== undefined) {
+    html += `<div>Botón "Agregar línea" encontrado: <strong>${data.add_line_count}</strong></div>`;
+  }
+  if (data.fields_edit) {
+    html += `<div style="margin-top:6px;">Campos en modo edición:<br>
+      <code style="font-size:0.75rem;">${data.fields_edit.join(", ")}</code>
+    </div>`;
+  }
+  if (data.html_campo) {
+    html += `<details style="margin-top:8px;"><summary>HTML del campo advance_project_material_ids</summary>
+      <pre style="font-size:0.7rem;overflow:auto;max-height:300px;background:#f4f4f4;padding:8px;">${
+        data.html_campo.replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      }</pre></details>`;
+  }
+  if (data.pasos && data.pasos.length) {
+    html += `<div style="margin-top:8px;font-size:0.78rem;color:#888;">
+      Screenshots: ${data.pasos.map(p => p.split("\\").pop()).join(", ")}
+    </div>`;
+  }
+  return html;
+}
+
+async function runDryMO() {
+  const btn = document.querySelector("#form-dry-mo button");
+  btn.disabled = true;
+  btn.textContent = "Ejecutando...";
+
+  const sel    = document.getElementById("sel-mo");
+  const opt    = sel.options[sel.selectedIndex];
+  const form   = new FormData();
+  form.append("act_id",   sel.value);
+  form.append("pid",      opt.dataset.pid);
+  form.append("cantidad", document.getElementById("inp-mo-cantidad").value);
+  form.append("act_code", opt.dataset.code);
+  form.append("pro_code", opt.dataset.pro);
+  form.append("dry_run",  "1");
+
+  const res  = await fetch(`/probar/${SID}/run_mo`, {method:"POST", body:form});
+  const data = await res.json();
+
+  btn.disabled = false;
+  btn.textContent = "Dry run MO →";
+
+  document.getElementById("dry-mo-result").style.display = "block";
+  document.getElementById("dry-mo-body").innerHTML = renderResultMO(data);
+}
+
+function renderResultMO(data) {
+  const ok  = data.ok;
+  const col = ok ? "#27ae60" : "#e74c3c";
+  let html  = `<div style="color:${col};font-weight:bold;margin-bottom:8px;">
+    ${ok ? "✓ OK" : "✗ ERROR"} — ${data.msg || data.error || ""}
+  </div>`;
+  if (data.pre) {
+    html += `<div style="margin-bottom:6px;">Pre: advance=${data.pre.advance} balance=${data.pre.balance}</div>`;
+  }
+  if (data.post) {
+    html += `<div style="margin-bottom:6px;">Post: advance=${data.post.advance} balance=${data.post.balance}</div>`;
+  }
+  if (data.proyecto_en_pantalla) {
+    html += `<div>Proyecto en pantalla: <strong>${data.proyecto_en_pantalla}</strong></div>`;
+  }
+  if (data.pasos && data.pasos.length) {
+    html += `<div style="margin-top:8px;font-size:0.78rem;color:#888;">
+      Screenshots: ${data.pasos.map(p => p.split("\\").pop()).join(", ")}
+    </div>`;
+  }
+  return html;
+}
+
+function updatePartner(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  const p = opt.dataset.partner;
+  if (p) document.getElementById("inp-partner").value = p;
+  const c = opt.dataset.cantidad;
+  if (c) document.getElementById("inp-cantidad").value = c;
+}
+</script>
+
+{% endblock %}

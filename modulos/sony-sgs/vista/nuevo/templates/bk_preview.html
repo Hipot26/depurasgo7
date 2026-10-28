@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Balance Integrado — Previsualización</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Calibri, 'Segoe UI', Arial, sans-serif; background: #f0f2f5; color: #222; padding: 20px 16px 60px; }
+  .wrap { max-width: 1280px; margin: 0 auto; }
+  .card { background:#fff; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,.10); padding:22px 26px; margin-bottom:18px; }
+  .logo-bar { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+  .logo-icon { width:38px; height:38px; background:#1F3864; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:bold; }
+  .logo-title { font-size:17px; font-weight:700; color:#1F3864; }
+  .sub { color:#666; font-size:13px; margin-top:2px; }
+  .meta { display:flex; flex-wrap:wrap; gap:6px 22px; font-size:13px; margin-top:12px; }
+  .meta b { color:#1F3864; }
+  .step-badge { display:inline-block; background:#D6E4F0; color:#1F3864; font-size:11px; font-weight:700; padding:3px 10px; border-radius:10px; }
+
+  .warning-banner { background:#fff3cd; border:2px solid #ff9900; border-left-width:8px; border-radius:6px; padding:12px 16px; margin-top:14px; color:#7a3e00; font-size:13px; }
+  .warning-title { color:#9c0006; font-weight:800; font-size:14px; margin-bottom:4px; text-transform:uppercase; }
+
+  .tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:0; }
+  .tab-btn { padding:9px 16px; border:none; background:#e7ebf1; color:#445; font-size:13px; font-weight:700; border-radius:8px 8px 0 0; cursor:pointer; }
+  .tab-btn.active { background:#1F3864; color:#fff; }
+  .panel { display:none; background:#fff; border-radius:0 10px 10px 10px; box-shadow:0 4px 20px rgba(0,0,0,.10); padding:16px; }
+  .panel.active { display:block; }
+  .panel-tools { display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+  .search { flex:1; min-width:220px; padding:9px 12px; border:1.5px solid #c8d2e0; border-radius:7px; font-size:13px; }
+  .count { font-size:12px; color:#888; }
+  .table-scroll { max-height:62vh; overflow:auto; border:1px solid #eee; border-radius:6px; }
+  table.grid { border-collapse:collapse; font-size:11.5px; white-space:nowrap; }
+  table.grid td { border:1px solid #eef0f3; padding:3px 7px; }
+  table.grid tr.hide { display:none; }
+
+  .final { background:#fff; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,.10); padding:22px 26px; margin-top:18px; }
+  .final h3 { color:#1F3864; font-size:15px; margin-bottom:4px; }
+  .field { margin:14px 0; }
+  .field label { display:block; font-size:13px; font-weight:700; color:#334; margin-bottom:6px; }
+  .field input[type=date] { padding:9px 12px; border:1.5px solid #c8d2e0; border-radius:7px; font-size:14px; }
+
+  .lid-search-wrap { position:relative; max-width:520px; }
+  .add-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .add-input { padding:9px 11px; border:1.5px solid #c8d2e0; border-radius:7px; font-size:13px; }
+  #lid-q { flex:1; min-width:240px; }
+  #lid-pct { width:110px; }
+  .btn-sm { padding:9px 14px; border:none; border-radius:7px; background:#375623; color:#fff; font-weight:700; font-size:13px; cursor:pointer; }
+  .dropdown { position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #c8d2e0; border-radius:0 0 8px 8px; box-shadow:0 6px 18px rgba(0,0,0,.12); z-index:30; max-height:240px; overflow:auto; }
+  .dropdown div { padding:9px 12px; font-size:13px; cursor:pointer; border-bottom:1px solid #f0f0f0; }
+  .dropdown div:hover { background:#eef4ff; }
+  .sug { font-size:12px; color:#60a5fa; margin:6px 0; }
+  .sug-chip { display:inline-block; background:#eef4ff; color:#1F3864; border:1px solid #cfe0ff; border-radius:14px; padding:3px 10px; margin:3px 4px 0 0; font-size:12px; cursor:pointer; }
+
+  table.lid { width:100%; border-collapse:collapse; font-size:13px; margin-top:12px; }
+  table.lid th { background:#375623; color:#fff; padding:7px 10px; }
+  table.lid td { padding:7px 10px; border-bottom:1px solid #eee; }
+  .lider-pct { font-weight:700; color:#375623; }
+  .del { color:#c0392b; cursor:pointer; font-weight:700; }
+  .err { color:#c0392b; font-size:13px; font-weight:700; margin-top:10px; min-height:18px; }
+  .btn-generar { display:block; width:100%; margin-top:18px; padding:14px; background:#1F3864; color:#fff; border:none; border-radius:8px; font-size:15px; font-weight:800; cursor:pointer; }
+  .btn-generar:hover { background:#2E75B6; }
+  .btn-back { display:inline-block; margin-top:10px; color:#666; font-size:13px; text-decoration:none; }
+  /* equivalencias */
+  .eq-box { margin-top:14px; border:2px solid #7030A0; border-radius:10px; padding:14px 16px; background:#f6f1fb; }
+  .eq-title { font-weight:800; color:#4b1d72; font-size:15px; }
+  .eq-sub { font-size:12.5px; color:#555; margin:4px 0 10px; }
+  table.eq-tab { width:100%; border-collapse:collapse; font-size:13px; background:#fff; }
+  table.eq-tab th { background:#7030A0; color:#fff; padding:7px 9px; text-align:left; }
+  table.eq-tab td { padding:8px 9px; border-bottom:1px solid #e5dcef; vertical-align:top; }
+  table.eq-tab small { color:#666; }
+  tr.eq-aprobada td { background:#eaf7ee; } tr.eq-rechazada td { background:#f3f3f3; color:#777; }
+  .eq-form { display:flex; gap:6px; flex-wrap:wrap; }
+  .eq-form button { border:none; border-radius:7px; padding:7px 11px; font-weight:700; font-size:12.5px; cursor:pointer; }
+  .eq-si { background:#375623; color:#fff; } .eq-no { background:#c0392b; color:#fff; } .eq-undo { background:#e7e7e7; color:#333; }
+  .eq-amb { color:#9c5700; font-weight:700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="card">
+    <div class="logo-bar">
+      <div class="logo-icon">BI</div>
+      <div>
+        <div class="logo-title">Balance Integrado — Previsualización <span class="step-badge">FASE 2 de 2</span></div>
+        <div class="sub">Verifica que el contenido esté correcto, luego ingresa la fecha y los líderes para generar los Excel.</div>
+      </div>
+    </div>
+    <div class="meta">
+      <span>LCL: <b>{{ metadata.get('lcl') or metadata.get('odm') or '—' }}</b></span>
+      <span>OdM: <b>{{ metadata.get('odm','—') }}</b></span>
+      <span>Proyecto SGS: <b>{{ sgs_padre.get('name','—') }}</b></span>
+      <span>PRO: <b>{{ sgs_padre.get('code','—') }}</b></span>
+      <span>Nodos: <b>{{ nodos|length }}</b></span>
+      {% if metadata.get('_planillas') %}<span>Planillas: <b>{{ metadata.get('_planillas')|join(' + ') }}</b></span>{% endif %}
+    </div>
+    {% for adv in advertencias %}
+    <div class="warning-banner">
+      <div class="warning-title">{{ adv.titulo }}</div>
+      <div>{{ adv.mensaje }}</div>
+    </div>
+    {% endfor %}
+    {# Equivalencias: mismo tramo, otro nombre en SIP y en SGS #}
+    {% if equivalencias %}
+    <div class="eq-box">
+      <div class="eq-title">Equivalencias — ¿es el mismo tramo?</div>
+      <div class="eq-sub">Estos nodos de la planilla no cruzan con SGS por nombre, pero un nodo SGS del mismo LCL
+        tiene los mismos materiales y cantidades. Si es el mismo tramo, apruébalo: el cruce se recalcula, el nodo
+        compara su material contra SGS y el Liquidador liquida ese material ahí. La mano de obra no cambia.</div>
+      <table class="eq-tab">
+        <tr><th>Planilla (SIP)</th><th>Nodo SGS</th><th>Materiales (SIP = SGS)</th><th>Estado</th><th></th></tr>
+        {% for e in equivalencias %}
+        <tr class="eq-{{ e.estado }}">
+          <td><b>{{ e.sip }}</b></td>
+          <td><b>{{ e.sgs }}</b><br><small>{{ e.pro }} · {{ e.nombre }}</small></td>
+          <td>{{ e.resumen }}{% if e.consumido_total %}<br><small>En SGS ya está consumido (ya se liquidó ahí).</small>{% endif %}
+            {% if e.ambigua %}<br><small class="eq-amb">También se parece a {{ e.ambigua|join(', ') }}: confirmar con el supervisor.</small>{% endif %}</td>
+          <td>{% if e.estado == 'aprobada' %}✓ Aprobada{% elif e.estado == 'rechazada' %}✗ Rechazada{% else %}… Por decidir{% endif %}
+            {% if e.por %}<br><small>{{ e.por }} · {{ e.en }}</small>{% endif %}</td>
+          <td>
+            <form method="POST" action="/generar-equivalencia/{{ sid }}" class="eq-form">
+              <input type="hidden" name="sip" value="{{ e.sip }}">
+              {% if e.estado == 'pendiente' and not e.ambigua %}
+              <button name="decision" value="aprobada" class="eq-si">Es el mismo tramo</button>
+              <button name="decision" value="rechazada" class="eq-no">No es</button>
+              {% elif e.estado == 'pendiente' %}
+              <button name="decision" value="rechazada" class="eq-no">No es</button>
+              {% else %}
+              <button name="decision" value="pendiente" class="eq-undo">Deshacer</button>
+              {% endif %}
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% endif %}
+    {# SGO7 facturación: el caso de esta consulta #}
+    {% if caso %}
+    <div class="caso-box sem-{{ caso.semaforo }}">
+      <div class="caso-head">
+        <span class="caso-id">Caso #{{ caso.id }}</span>
+        <span class="caso-estado">{{ caso.estado_label }}</span>
+        <span>OK <b>{{ caso.ok }}</b></span>
+        <span>Descuadre <b class="{{ 'rojo' if caso.rojos else '' }}">{{ caso.rojos }}</b></span>
+        <span>Alertas <b>{{ caso.n_alertas }}</b></span>
+        <span>Consultas <b>{{ caso.consultas }}</b>{% if caso.ultima_co %} · última {{ caso.ultima_co }}{% if caso.ultima_consulta_por %} ({{ caso.ultima_consulta_por }}){% endif %}{% endif %}</span>
+      </div>
+      <div class="caso-msg">{{ caso.mensaje }}{% if caso.nota %} · <i>Nota: {{ caso.nota }}</i>{% endif %}</div>
+      {% if caso_error %}<div class="caso-err">{{ caso_error }}</div>{% endif %}
+      <form method="POST" action="/casos/{{ caso.id }}/estado" class="caso-actions">
+        <input type="hidden" name="sid" value="{{ sid }}">
+        {% if caso.estado in ('descuadre', 'consultado', 'cuadra') %}
+        <input type="text" name="nota" placeholder="Observación (ej. reportado a almacén por WhatsApp)" maxlength="300">
+        <button type="submit" name="estado" value="espera_almacen" class="btn-caso">Dejar en espera de almacén</button>
+        {% elif caso.estado == 'espera_almacen' %}
+        <button type="submit" name="estado" value="descuadre" class="btn-caso sec">Quitar de espera</button>
+        {% elif caso.estado == 'archivado' %}
+        <button type="submit" name="estado" value="reabrir" class="btn-caso sec">Reabrir caso</button>
+        {% endif %}
+        <a href="/facturacion" target="_top" class="caso-link">Ver mis casos</a>
+      </form>
+    </div>
+    <style>
+      .caso-box { margin-top:14px; border:2px solid #cfd6e0; border-left-width:8px; border-radius:6px; padding:12px 16px; font-size:13px; background:#f8f9fb; }
+      .caso-box.sem-verde { border-color:#2a7; background:#eefbf0; }
+      .caso-box.sem-rojo { border-color:#c62828; background:#fff3f2; }
+      .caso-box.sem-ambar { border-color:#e69500; background:#fff8e6; }
+      .caso-head { display:flex; flex-wrap:wrap; gap:6px 18px; align-items:center; }
+      .caso-id { font-weight:800; color:#1F3864; }
+      .caso-estado { font-weight:800; text-transform:uppercase; font-size:12px; padding:2px 8px; border-radius:10px; background:#fff; border:1px solid #cfd6e0; }
+      .caso-head b.rojo { color:#c62828; }
+      .caso-msg { margin-top:6px; color:#444; }
+      .caso-err { margin-top:6px; color:#c62828; font-weight:700; }
+      .caso-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px; }
+      .caso-actions input[type=text] { flex:1; min-width:220px; padding:7px 9px; border:1px solid #cfd6e0; border-radius:6px; font-size:12.5px; }
+      .btn-caso { padding:7px 12px; border:none; border-radius:6px; background:#1F3864; color:#fff; font-weight:700; font-size:12.5px; cursor:pointer; }
+      .btn-caso.sec { background:#6b7280; }
+      .caso-link { font-size:12.5px; color:#1F3864; font-weight:700; margin-left:auto; }
+    </style>
+    {% endif %}
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    {% for h in hojas %}
+    <button type="button" class="tab-btn {% if loop.first %}active{% endif %}" onclick="showTab({{ loop.index0 }})">{{ h.titulo }}</button>
+    {% endfor %}
+  </div>
+  {% for h in hojas %}
+  <div class="panel {% if loop.first %}active{% endif %}" id="panel-{{ loop.index0 }}">
+    <div class="panel-tools">
+      <input type="text" class="search" placeholder="Buscar en {{ h.titulo }} (código, nodo, descripción, estado…)"
+             oninput="filterTable({{ loop.index0 }}, this.value)">
+      <span class="count" id="count-{{ loop.index0 }}"></span>
+    </div>
+    <div class="table-scroll">
+      <table class="grid" id="grid-{{ loop.index0 }}">
+        {% for fila in h.filas %}
+        <tr>
+          {% for c in fila %}
+          <td {% if c.s > 1 %}colspan="{{ c.s }}"{% endif %}
+              style="{% if c.bg %}background:{{ c.bg }};{% endif %}{% if c.b %}font-weight:700;{% endif %}">{{ c.v }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+
+  <!-- Datos finales -->
+  <div class="final">
+    <h3>Datos para la liquidación</h3>
+    <div class="sub">Una vez verificado lo anterior, completa estos dos datos. Se generarán 2 Excel: el balance integrado y el RG11 del supervisor.</div>
+
+    <form method="POST" action="/generar-final/{{ sid }}" id="frm-final" onsubmit="return prep(event)">
+      <div class="field">
+        <label>Fecha real de ejecución del trabajo</label>
+        <input type="date" name="fecha_ejecucion" id="fecha" required>
+      </div>
+
+      <div class="field">
+        <label>Líderes a liquidar (con su porcentaje — deben sumar 100%)</label>
+        <div class="sug" id="sug-box" style="display:none">Sugeridos del proyecto SGS:</div>
+        <div id="sug-chips"></div>
+        <div class="lid-search-wrap">
+          <div class="add-row">
+            <input type="text" class="add-input" id="lid-q" autocomplete="off"
+                   placeholder="Buscar por nombre o cédula (ej. C12345)…"
+                   oninput="buscarLider(this.value)">
+            <input type="number" class="add-input" id="lid-pct" placeholder="%" min="0" max="100" step="0.01">
+            <button type="button" class="btn-sm" onclick="addLider()">Agregar</button>
+          </div>
+          <div id="lid-drop" class="dropdown" style="display:none"></div>
+        </div>
+        <table class="lid" id="lid-table" style="display:none">
+          <thead><tr><th>Cédula</th><th>Nombre</th><th>%</th><th></th></tr></thead>
+          <tbody id="lid-body"></tbody>
+        </table>
+        <div class="err" id="err"></div>
+      </div>
+
+      <div id="hidden-lideres"></div>
+      <button type="submit" class="btn-generar">Generar Excel (Balance + RG11)</button>
+    </form>
+    <a class="btn-back" href="/">← Cancelar y empezar de nuevo</a>
+  </div>
+</div>
+
+<script>
+var _sid = "{{ sid }}";
+var _lideres = [];
+var _selLider = null;
+
+function showTab(i) {
+  document.querySelectorAll('.tab-btn').forEach(function(b,j){ b.classList.toggle('active', j===i); });
+  document.querySelectorAll('.panel').forEach(function(p,j){ p.classList.toggle('active', j===i); });
+}
+function filterTable(i, q) {
+  q = (q||'').toLowerCase().trim();
+  var rows = document.querySelectorAll('#grid-'+i+' tr');
+  var shown = 0;
+  rows.forEach(function(tr){
+    var match = !q || tr.textContent.toLowerCase().indexOf(q) !== -1;
+    tr.classList.toggle('hide', !match);
+    if (match) shown++;
+  });
+  document.getElementById('count-'+i).textContent = shown + ' fila(s)';
+}
+
+// ── Líderes ───────────────────────────────────────────────────────────────
+var _t = null;
+function buscarLider(q) {
+  q = (q||'').trim();
+  _selLider = null;
+  var drop = document.getElementById('lid-drop');
+  if (q.length < 2) { drop.style.display='none'; return; }
+  clearTimeout(_t);
+  _t = setTimeout(function(){
+    fetch('/api/buscar-lider?q=' + encodeURIComponent(q))
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d.ok || !d.results || !d.results.length) { drop.style.display='none'; return; }
+        drop.innerHTML = d.results.map(function(r){
+          return '<div onclick="pickLider('+ "'" + (r.cedula||'') + "','" + _esc(r.nombre) + "'" +')">' +
+                 '<b>' + _esc(r.nombre) + '</b> — ' + (r.cedula||'sin cédula') + '</div>';
+        }).join('');
+        drop.style.display='block';
+      });
+  }, 220);
+}
+function pickLider(cedula, nombre) {
+  _selLider = { cedula: cedula, nombre: nombre };
+  document.getElementById('lid-q').value = nombre + (cedula ? ' ('+cedula+')' : '');
+  document.getElementById('lid-drop').style.display='none';
+  document.getElementById('lid-pct').focus();
+}
+function addLider() {
+  var pct = parseFloat(document.getElementById('lid-pct').value) || 0;
+  if (!_selLider) { setErr('Busca y selecciona un líder de la lista primero.'); return; }
+  if (pct <= 0) { setErr('Asigna un porcentaje mayor a 0.'); return; }
+  if (_lideres.some(function(l){ return l.cedula && l.cedula === _selLider.cedula; })) {
+    setErr('Ese líder ya fue agregado.'); return;
+  }
+  _lideres.push({ cedula: _selLider.cedula, nombre: _selLider.nombre, pct: pct });
+  _selLider = null;
+  document.getElementById('lid-q').value = '';
+  document.getElementById('lid-pct').value = '';
+  setErr('');
+  renderLideres();
+}
+function delLider(i) { _lideres.splice(i,1); renderLideres(); }
+function renderLideres() {
+  var tb = document.getElementById('lid-body');
+  var tbl = document.getElementById('lid-table');
+  if (!_lideres.length) { tbl.style.display='none'; checkSum(); return; }
+  tbl.style.display='table';
+  tb.innerHTML = _lideres.map(function(l,i){
+    return '<tr><td>'+ (l.cedula||'—') +'</td><td>'+ _esc(l.nombre) +'</td>' +
+           '<td class="lider-pct">'+ l.pct +'%</td>' +
+           '<td><span class="del" onclick="delLider('+i+')">✕</span></td></tr>';
+  }).join('');
+  checkSum();
+}
+function checkSum() {
+  var t = _lideres.reduce(function(s,l){ return s + (parseFloat(l.pct)||0); }, 0);
+  t = Math.round(t*100)/100;
+  if (!_lideres.length) { setErr(''); return t; }
+  if (Math.abs(t-100) >= 0.01) setErr('Los porcentajes deben sumar 100%. Actualmente: ' + t + '%.');
+  else setErr('');
+  return t;
+}
+function setErr(m) { document.getElementById('err').textContent = m; }
+function _esc(s) { return String(s||'').replace(/[<>&"']/g, function(c){ return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+function prep(ev) {
+  if (!document.getElementById('fecha').value) { ev.preventDefault(); setErr('Ingresa la fecha real de ejecución.'); return false; }
+  if (!_lideres.length) { ev.preventDefault(); setErr('Agrega al menos un líder.'); return false; }
+  if (Math.abs(checkSum()-100) >= 0.01) { ev.preventDefault(); return false; }
+  var box = document.getElementById('hidden-lideres');
+  box.innerHTML = '';
+  _lideres.forEach(function(l){
+    box.innerHTML += '<input type="hidden" name="lider_cedula" value="'+ _esc(l.cedula||'') +'">';
+    box.innerHTML += '<input type="hidden" name="lider_nombre" value="'+ _esc(l.nombre||'') +'">';
+    box.innerHTML += '<input type="hidden" name="lider_pct" value="'+ _esc(String(l.pct||0)) +'">';
+  });
+  return true;
+}
+
+// Sugeridos del proyecto
+fetch('/api/lideres-sugeridos/' + _sid)
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d.ok && d.lideres && d.lideres.length) {
+      document.getElementById('sug-box').style.display='block';
+      var box = document.getElementById('sug-chips');
+      box.innerHTML = d.lideres.map(function(s){
+        return '<span class="sug-chip" onclick="pickLider(\''+(s.cedula||'')+'\',\''+_esc(s.nombre)+'\')">'+ _esc(s.nombre) + (s.cedula? ' ('+s.cedula+')':'') +'</span>';
+      }).join('');
+    }
+  }).catch(function(){});
+
+document.addEventListener('click', function(e){
+  if (!e.target.closest('.lid-search-wrap')) document.getElementById('lid-drop').style.display='none';
+});
+// init counts
+{% for h in hojas %}filterTable({{ loop.index0 }}, '');{% endfor %}
+</script>
+</body>
+</html>

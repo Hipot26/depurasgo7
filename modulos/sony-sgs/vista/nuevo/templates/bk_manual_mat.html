@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Materiales — Balance ERP Manual</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+  background: #f0f2f5; min-height: 100vh;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 32px 16px;
+}
+.card {
+  background: #fff; border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.12);
+  padding: 32px 44px; width: 740px; max-width: 98vw;
+}
+.steps { display: flex; align-items: center; margin-bottom: 28px; }
+.step { display: flex; flex-direction: column; align-items: center; flex: 1; }
+.step-circle {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+}
+.step-circle.done   { background: #375623; color: #fff; }
+.step-circle.active { background: #375623; color: #fff; }
+.step-circle.pending{ background: #e0e0e0; color: #999; }
+.step-label { font-size: 10px; color: #666; margin-top: 4px; text-align: center; }
+.step-label.active { color: #375623; font-weight: 700; }
+.step-line { flex: 1; height: 2px; background: #e0e0e0; }
+.step-line.done { background: #375623; }
+
+.meta-bar {
+  display: flex; gap: 8px; align-items: center;
+  background: #f8f9fb; border-radius: 6px; padding: 8px 14px;
+  margin-bottom: 20px; font-size: 12px;
+}
+.tag { padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+.tag-lcl { background: #1F3864; color: #fff; }
+.tag-pro  { background: #E2EFDA; color: #375623; }
+
+.mo-confirm {
+  background: #f4f7f2; border: 1.5px solid #d4e6cc;
+  border-radius: 6px; padding: 8px 14px;
+  font-size: 12px; margin-bottom: 16px; color: #375623;
+}
+
+.hint-box {
+  background: #f4f7f2; border: 1.5px solid #d4e6cc;
+  border-radius: 6px; padding: 12px 14px;
+  font-size: 12px; color: #375623; margin-bottom: 12px;
+}
+.hint-box ul { margin: 6px 0 0 16px; }
+.hint-box li { margin-bottom: 4px; }
+.col-tag {
+  background: #E2EFDA; color: #375623; font-weight: 700;
+  padding: 1px 7px; border-radius: 4px; font-size: 11px;
+}
+
+textarea {
+  width: 100%; padding: 10px 14px;
+  border: 1.5px solid #d4e6cc; border-radius: 6px;
+  font-size: 13px; font-family: 'Courier New', monospace;
+  resize: vertical; min-height: 130px; transition: border .2s;
+}
+textarea:focus { outline: none; border-color: #375623; }
+
+.preview-box {
+  background: #f8f9fb; border-radius: 6px;
+  padding: 10px 12px; margin: 10px 0;
+  font-size: 12px; color: #666; min-height: 32px;
+}
+
+.error-box {
+  margin: 10px 0; padding: 10px 14px;
+  background: #ffeaea; border-left: 4px solid #e53;
+  border-radius: 4px; font-size: 12px; color: #c00;
+}
+
+.tbl { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+.tbl th { background: #375623; color: #fff; padding: 6px 8px; text-align: center; }
+.tbl td { padding: 6px 8px; border-bottom: 1px solid #eee; }
+.tbl tr:nth-child(even) td { background: #f8f9fb; }
+.tbl td.c { text-align: center; }
+
+.btn-row { display: flex; gap: 10px; margin-top: 18px; }
+.btn {
+  padding: 12px 18px; font-size: 13px; font-weight: 700;
+  border: none; border-radius: 6px; cursor: pointer; transition: background .2s;
+}
+.btn-back  { background: #f0f2f5; color: #555; flex: 0 0 auto; border: 1.5px solid #ccc; }
+.btn-back:hover { background: #e0e4e8; }
+.btn-omit  { background: #f4f7f2; color: #375623; flex: 0 0 auto; border: 1.5px solid #d4e6cc; }
+.btn-omit:hover { background: #e8f1e4; }
+.btn-next  { background: #375623; color: #fff; flex: 1; }
+.btn-next:hover { background: #4a7230; }
+.btn-next:disabled { background: #aaa; cursor: not-allowed; }
+
+.spinner { display: none; text-align: center; margin-top: 10px; color: #555; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-circle done">✓</div>
+      <div class="step-label">Datos del proyecto</div>
+    </div>
+    <div class="step-line done"></div>
+    <div class="step">
+      <div class="step-circle done">✓</div>
+      <div class="step-label">Mano de Obra</div>
+    </div>
+    <div class="step-line done"></div>
+    <div class="step">
+      <div class="step-circle active">3</div>
+      <div class="step-label active">Materiales</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step">
+      <div class="step-circle pending">4</div>
+      <div class="step-label">Vista previa</div>
+    </div>
+  </div>
+
+  <div class="meta-bar">
+    <span class="tag tag-lcl">{{ sesion.lcl_odm }}</span>
+    <span class="tag tag-pro">{{ sesion.padre.get('code', '—') }}</span>
+    <a href="/?tab=sgs" style="margin-left:auto;font-size:11px;color:#888;text-decoration:none">← Cambiar proyecto</a>
+  </div>
+
+  <div class="mo-confirm">
+    ✅ MO confirmada: {{ sesion.rows_mo|length }} actividades —
+    {% for r in sesion.rows_mo[:4] %}{{ r.qp }}{% if not loop.last %}, {% endif %}{% endfor %}
+    {% if sesion.rows_mo|length > 4 %}…{% endif %}
+    &nbsp;|&nbsp;
+    <a href="/manual/mo/{{ sid }}" style="color:#375623;font-size:11px">✏ Editar MO</a>
+  </div>
+
+  <h2 style="font-size:15px;font-weight:700;color:#375623;margin-bottom:14px">Paso 3 — Materiales</h2>
+
+  <div class="hint-box">
+    <strong>Dos modos disponibles:</strong>
+    <ul>
+      <li>
+        <strong>Solo nodos</strong> (ej. <code>74</code>&nbsp;&nbsp;<code>75</code>):
+        el sistema consulta ERP y trae todos los materiales de esos nodos automáticamente.
+      </li>
+      <li>
+        <strong>Con SAP</strong>: pega
+        <span class="col-tag">Nodo</span>
+        <span class="col-tag">SAP</span>
+        <span class="col-tag">Cant</span>
+        — el sistema los usa tal cual y hace el cruce contra ERP.
+      </li>
+    </ul>
+  </div>
+
+  {% if error_sgs %}
+  <div class="error-box">{{ error_sgs }}</div>
+  {% endif %}
+
+  {% if errors %}
+  <div class="error-box">
+    {% for e in errors %}<div>• {{ e }}</div>{% endfor %}
+  </div>
+  {% endif %}
+
+  <form method="POST" id="frm-mat">
+    <textarea id="txt-mat" name="texto_mat"
+      placeholder="Opciones de pegado:&#10;&#10;1) Solo nodos (consulta automática a ERP):&#10;   74&#10;   75&#10;&#10;2) Con SAP (Nodo  Código_SAP  Cantidad):&#10;   74   230966   1&#10;   74   274311   2"
+    >{{ texto or '' }}</textarea>
+
+    <div class="preview-box" id="prev-box">
+      <span style="color:#aaa">Pega nodos o materiales, o salta si no hay materiales</span>
+    </div>
+
+    <div class="btn-row">
+      <a class="btn btn-back" href="/manual/mo/{{ sid }}">← MO</a>
+      <button type="submit" class="btn btn-omit" name="omitir_mat" value="1">Omitir materiales</button>
+      <button type="submit" class="btn btn-next" id="btn-next">Ver vista previa →</button>
+    </div>
+    <div class="spinner" id="sp">Consultando ERP y preparando datos…</div>
+  </form>
+
+</div>
+
+<script>
+var txt = document.getElementById('txt-mat');
+var box = document.getElementById('prev-box');
+
+function detectarModo(texto) {
+  // Modo nodo-solo: cada línea tiene UN solo token (sin TAB ni doble espacio)
+  // Acepta números, nodos cable (N127_N126), etc.
+  var lineas = texto.trim().split('\n').filter(function(l){ return l.trim(); });
+  if (!lineas.length) return null;
+  var soloNodos = lineas.every(function(l) {
+    return !/\t| {2,}/.test(l.trim());
+  });
+  return soloNodos ? 'nodo' : 'sap';
+}
+
+function actualizarPreview() {
+  var val = txt.value.trim();
+  if (!val) {
+    box.innerHTML = '<span style="color:#aaa">Pega nodos o materiales, o salta si no hay materiales</span>';
+    return;
+  }
+  var modo = detectarModo(val);
+  if (modo === 'nodo') {
+    var nodos = val.trim().split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+    box.innerHTML = '<span style="color:#375623;font-weight:700">📡 Modo: Solo nodos — se consultará ERP para '+nodos.length+' nodo(s): '+nodos.join(', ')+'</span>';
+  } else {
+    var rows = [];
+    val.split('\n').forEach(function(linea, i) {
+      var p = linea.trim().split(/\t| {2,}/);
+      p = p.map(function(x){ return x.trim(); }).filter(Boolean);
+      if (p.length >= 2) rows.push({nodo: p[0], sap: p[1], cant: p[2] || '1'});
+    });
+    if (!rows.length) {
+      box.innerHTML = '<span style="color:#aaa">Formato no reconocido</span>';
+      return;
+    }
+    var html = '<span style="color:#375623;font-weight:700">📋 Modo SAP manual — '+rows.length+' materiales</span>';
+    html += '<table class="tbl" style="margin-top:8px"><tr><th>Nodo</th><th>Código SAP</th><th>Cantidad</th></tr>';
+    rows.slice(0,8).forEach(function(r) {
+      html += '<tr><td class="c">'+r.nodo+'</td><td class="c">'+r.sap+'</td><td class="c">'+r.cant+'</td></tr>';
+    });
+    if (rows.length > 8) html += '<tr><td colspan="3" style="text-align:center;color:#888">… '+(rows.length-8)+' más</td></tr>';
+    html += '</table>';
+    box.innerHTML = html;
+  }
+}
+
+txt.addEventListener('input', actualizarPreview);
+actualizarPreview();
+
+document.getElementById('frm-mat').addEventListener('submit', function() {
+  document.getElementById('btn-next').disabled = true;
+  document.getElementById('sp').style.display = 'block';
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Plan de liquidacion — SGS UI{% endblock %}
+{% block content %}
+
+<h1 style="font-size:1.3rem;margin-bottom:20px;">Plan de liquidacion — {{ s.filename }}</h1>
+
+<div class="alert alert-info">
+  Aprobado: <strong>{{ s.indices_mo_aprobados|length if s.indices_mo_aprobados else 0 }} MO</strong>
+  + <strong>{{ s.indices_mat_aprobados|length if s.indices_mat_aprobados else 0 }} MAT</strong>
+  — {{ s.aprobado_at }}
+</div>
+
+{% set checks_mo  = s.checks_mo %}
+{% set checks_mat = s.checks_mat %}
+
+{% if s.indices_mo_aprobados %}
+<div class="card">
+  <h2>MO aprobadas para liquidar</h2>
+  <table>
+    <thead><tr>
+      <th>#</th><th>Codigo</th><th>Cantidad</th><th>PRO SGS</th><th>Lider</th>
+    </tr></thead>
+    <tbody>
+    {% for idx in s.indices_mo_aprobados | sort %}
+    {% set ck = checks_mo[idx] %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td><strong>{{ ck.row.codigo }}</strong><br>
+        <span style="color:#888;font-size:0.75rem;">{{ ck.cat_nom[:50] if ck.cat_nom else '' }}</span>
+      </td>
+      <td style="text-align:right">{{ ck.row.cantidad }}</td>
+      <td style="font-size:0.8rem;">{{ ck.pro_code or '—' }}<br>
+        <span style="color:#888">{{ ck.pnombre[:40] if ck.pnombre else '' }}</span>
+      </td>
+      <td style="font-size:0.8rem;">{{ ck.partner_nombre or '—' }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if s.indices_mat_aprobados %}
+<div class="card">
+  <h2>MAT aprobados para liquidar</h2>
+  <table>
+    <thead><tr>
+      <th>#</th><th>Nodo</th><th>Codigo</th><th>Descripcion</th><th>A liquidar</th>
+    </tr></thead>
+    <tbody>
+    {% for idx in s.indices_mat_aprobados | sort %}
+    {% set mc = checks_mat[idx] %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ mc.mat.nodo }}</td>
+      <td><strong>{{ mc.mat.codigo }}</strong></td>
+      <td style="font-size:0.8rem;">{{ mc.mat.descripcion[:40] if mc.mat.descripcion else '—' }}</td>
+      <td style="text-align:right">
+        {% if mc.estado == 'avance_parcial' %}
+          {{ (mc.sgs_neto or 0) - (mc.advance_real or 0) }}
+        {% else %}
+          {{ mc.sgs_neto or mc.mat.sgs_neto_excel }}
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="card" style="background:#f8f9fa;">
+  <p style="font-size:0.9rem;color:#555;">
+    <strong>Proxima fase:</strong> al hacer clic en "Ejecutar", el sistema abrira
+    el navegador Playwright y liquidara cada item replicando exactamente las
+    acciones que harias manualmente en SGS.
+  </p>
+  <div style="margin-top:16px;display:flex;gap:12px;">
+    <a href="{{ url_for('aprobar', sid=sid) }}" class="btn btn-light">&larr; Modificar seleccion</a>
+    <button class="btn btn-success" disabled title="Proximamente — Playwright">
+      Ejecutar liquidacion (proximamente)
+    </button>
+  </div>
+</div>
+
+{% endblock %}

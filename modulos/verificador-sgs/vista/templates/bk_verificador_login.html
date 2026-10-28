@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verificador ERP — Acceso</title>
+<style>
+  :root {
+    --bg:      #0f1117;
+    --surface: #1a1d27;
+    --border:  #2e3354;
+    --accent:  #4f7ef8;
+    --accent2: #6ee7b7;
+    --danger:  #f87171;
+    --text:    #e2e8f0;
+    --muted:   #64748b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .login-wrap {
+    width: 100%;
+    max-width: 380px;
+    padding: 24px;
+  }
+
+  .brand {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .brand .logo {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -1px;
+  }
+  .brand .sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px 28px;
+  }
+  .card h2 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 24px;
+    color: var(--text);
+  }
+
+  .field {
+    margin-bottom: 16px;
+  }
+  .field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .field input {
+    width: 100%;
+    background: #0f1117;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .field input::placeholder { color: var(--muted); }
+
+  .error-box {
+    background: rgba(248,113,113,.1);
+    border: 1px solid var(--danger);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--danger);
+    margin-bottom: 16px;
+  }
+
+  button[type="submit"] {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: opacity .15s;
+  }
+  button[type="submit"]:hover { opacity: .88; }
+
+  .footer-note {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .footer-note span { color: var(--accent2); }
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="brand">
+    <div class="logo">Verificador ERP</div>
+    <div class="sub">Acceso restringido</div>
+  </div>
+
+  <div class="card">
+    <h2>Iniciar sesión</h2>
+
+    {% if error %}
+    <div class="error-box">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST">
+      <div class="field">
+        <label>Usuario</label>
+        <input type="text" name="usuario" placeholder="usuario" autocomplete="username" required autofocus>
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input type="password" name="password" placeholder="••••••••" autocomplete="current-password" required>
+      </div>
+      <button type="submit">Entrar</button>
+    </form>
+  </div>
+
+  <div class="footer-note">
+    Sistema interno · <span>Solo lectura ERP</span>
+  </div>
+</div>
+</body>
+</html>

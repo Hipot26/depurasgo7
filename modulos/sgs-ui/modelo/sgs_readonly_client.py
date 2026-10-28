@@ -1,0 +1,222 @@
+"""
+SGSReadOnlyClient — Cliente de SOLO LECTURA para SGS (Odoo XML-RPC)
+====================================================================
+CONTRATO: Este módulo JAMÁS escribe, crea, modifica ni elimina datos en SGS.
+Cualquier intento de escritura lanza ReadOnlyViolationError en tiempo de
+ejecución, antes de que la petición salga de esta máquina.
+
+Métodos permitidos (lectura pura):
+  search_read, read, search, fields_get, name_get, name_search
+  buscar_por_codigo, detectar_db
+
+Métodos bloqueados (bloqueo explícito — falla ruidosamente):
+  create, write, unlink, execute_kw(*), copy, action_*, button_*,
+  y cualquier método no incluido en la lista blanca.
+"""
+
+import sys
+import os
+import time
+import logging
+from datetime import datetime
+
+# ── Apuntar al SGSClient original (solo para heredar la conexión) ──────────────
+_SGS_API_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "..", "SGS + SONY", "sgs_api")
+sys.path.insert(0, _SGS_API_DIR)
+from sgs_client import SGSClient  # solo hereda autenticar / _post / _opener
+
+log = logging.getLogger("sgs_readonly")
+
+# ── Métodos permitidos en el ORM de Odoo ──────────────────────────────────────
+_METODOS_LECTURA = frozenset([
+    "search_read",
+    "read",
+    "search",
+    "fields_get",
+    "name_get",
+    "name_search",
+    "read_group",
+    "get_views",
+    "get_view",
+    "onchange",          # solo calcula valores, no persiste
+    "check_access_rights",
+])
+
+# ── Cualquier prefijo de método que huela a escritura ─────────────────────────
+_PREFIJOS_PELIGROSOS = (
+    "create", "write", "unlink", "delete",
+    "action_", "button_", "do_", "post_",
+    "confirm", "validate", "cancel", "approve",
+    "toggle_", "set_", "mark_", "_apply",
+)
+
+
+class ReadOnlyViolationError(RuntimeError):
+    """Se lanza cuando algo intenta escribir datos via este cliente."""
+    pass
+
+
+def _guardar_log_lectura(model: str, method: str, domain):
+    """Registra cada lectura en un archivo local para auditoría."""
+    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    with open(os.path.join(log_dir, "reads.log"), "a", encoding="utf-8") as f:
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        f.write(f"{ts} | {model}.{method} | {str(domain)[:120]}\n")
+
+
+class SGSReadOnlyClient:
+    """
+    Cliente SGS de solo lectura.
+
+    Uso:
+        c = SGSReadOnlyClient(URL, db, LOGIN, PASSWORD)
+        c.autenticar()
+        datos = c.search_read("project.material", [...], [...])
+
+    Cualquier intento de llamar a create/write/unlink/etc.
+    lanza ReadOnlyViolationError ANTES de hacer la petición.
+    """
+
+    def __init__(self, url: str, db: str, login: str, password: str):
+        self._inner = SGSClient(url, db, login, password)
+        self.url      = url
+        self.db       = db
+        self.login    = login
+        self._password = password
+        self.uid      = None
+
+    # ── Conexión ──────────────────────────────────────────────────────────────
+    def autenticar(self):
+        # Reintento incluido: el login es idempotente y un hipo de red aquí
+        # tumba flujos completos de verificación.
+        self._con_reintento(self._inner.autenticar, "autenticar")
+        self.uid = self._inner.uid
+        log.info(f"[READONLY] Autenticado uid={self.uid} db={self.db}")
+        return self.uid
+
+    @staticmethod
+    def detectar_db(url: str) -> str:
+        return SGSClient.detectar_db(url)
+
+    # ── Guardián central ──────────────────────────────────────────────────────
+    def _verificar_metodo(self, method: str):
+        """Lanza si el método no está en la lista blanca o huele a escritura."""
+        method_lower = method.lower()
+
+        # Lista blanca explícita
+        if method_lower in _METODOS_LECTURA:
+            return  # OK
+
+        # Prefijos peligrosos
+        for prefijo in _PREFIJOS_PELIGROSOS:
+            if method_lower.startswith(prefijo) or method_lower == prefijo.rstrip("_"):
+                raise ReadOnlyViolationError(
+                    f"\n{'='*60}\n"
+                    f"  BLOQUEO DE SEGURIDAD — SGSReadOnlyClient\n"
+                    f"  Método bloqueado: '{method}'\n"
+                    f"  Este cliente es estrictamente de SOLO LECTURA.\n"
+                    f"  Para acciones de escritura usa PlaywrightClient.\n"
+                    f"{'='*60}"
+                )
+
+        # Método no reconocido — bloquear por defecto (fail-safe)
+        raise ReadOnlyViolationError(
+            f"\n{'='*60}\n"
+            f"  BLOQUEO DE SEGURIDAD — método desconocido: '{method}'\n"
+            f"  Solo se permiten: {sorted(_METODOS_LECTURA)}\n"
+            f"{'='*60}"
+        )
+
+    # ── Reintento para errores transitorios de red ────────────────────────────
+    # Todos los métodos de este cliente son LECTURAS puras: reintentarlas es
+    # siempre seguro (idempotentes, cero escrituras). Sin esto, un hipo de red
+    # (SSL handshake timeout, connection reset) se propaga como error de fila
+    # en los verificadores aunque los datos estén perfectos.
+    # OSError cubre URLError, ssl.SSLError, socket.timeout y ConnectionError.
+    _REINTENTOS = 3
+    _BACKOFF_S  = 1.5
+
+    def _con_reintento(self, fn, descripcion: str):
+        ultimo = None
+        for intento in range(1, self._REINTENTOS + 1):
+            try:
+                return fn()
+            except ReadOnlyViolationError:
+                raise
+            except OSError as ex:
+                ultimo = ex
+                log.warning(f"[READONLY] Error de red en {descripcion} "
+                            f"(intento {intento}/{self._REINTENTOS}): {ex}")
+                if intento < self._REINTENTOS:
+                    time.sleep(self._BACKOFF_S * intento)
+        raise ultimo
+
+    # ── Métodos de lectura expuestos ───────────────────────────────────────────
+    # Contexto de compañía que SGS requiere para que los campos computados
+    # (despachado, devuelto, balance…) devuelvan valores actualizados.
+    # Equivalente a cids=1 en la URL del navegador.
+    _CTX = {"allowed_company_ids": [1]}
+
+    def search_read(self, model: str, domain: list, fields: list,
+                    limit: int = 100, offset: int = 0, order: str = None):
+        self._verificar_metodo("search_read")
+        _guardar_log_lectura(model, "search_read", domain)
+        return self._con_reintento(
+            lambda: self._inner.search_read(model, domain, fields, limit=limit, context=self._CTX),
+            f"search_read({model})")
+
+    def read(self, model: str, ids: list, fields: list):
+        self._verificar_metodo("read")
+        _guardar_log_lectura(model, "read", ids)
+        return self._con_reintento(
+            lambda: self._inner.read(model, ids, fields, context=self._CTX),
+            f"read({model})")
+
+    def search(self, model: str, domain: list, limit: int = 100):
+        self._verificar_metodo("search")
+        _guardar_log_lectura(model, "search", domain)
+        return self._con_reintento(
+            lambda: self._inner.search(model, domain, limit=limit),
+            f"search({model})")
+
+    def fields_get(self, model: str, attributes: list = None):
+        self._verificar_metodo("fields_get")
+        _guardar_log_lectura(model, "fields_get", [])
+        return self._con_reintento(
+            lambda: self._inner.fields_get(model, attributes=attributes),
+            f"fields_get({model})")
+
+    def buscar_por_codigo(self, codigo: str):
+        self._verificar_metodo("search_read")
+        _guardar_log_lectura("project.project", "buscar_por_codigo", [codigo])
+        return self._con_reintento(
+            lambda: self._inner.buscar_por_codigo(codigo),
+            f"buscar_por_codigo({codigo})")
+
+    # ── Bloqueos explícitos con mensajes claros ────────────────────────────────
+    def create(self, *args, **kwargs):
+        raise ReadOnlyViolationError(
+            "create() está BLOQUEADO. Usa PlaywrightClient para crear registros.")
+
+    def write(self, *args, **kwargs):
+        raise ReadOnlyViolationError(
+            "write() está BLOQUEADO. Usa PlaywrightClient para modificar registros.")
+
+    def unlink(self, *args, **kwargs):
+        raise ReadOnlyViolationError(
+            "unlink() está BLOQUEADO. Eliminar registros no está permitido.")
+
+    def execute_kw(self, *args, **kwargs):
+        raise ReadOnlyViolationError(
+            "execute_kw() directo está BLOQUEADO en el cliente de solo lectura.")
+
+    # ── Cualquier otro atributo no definido → bloquear ─────────────────────────
+    def __getattr__(self, name: str):
+        # Solo llega aquí si el atributo no existe en esta clase
+        raise ReadOnlyViolationError(
+            f"Método/atributo '{name}' no disponible en SGSReadOnlyClient.\n"
+            f"Si necesitas lectura, verifica la lista blanca en sgs_readonly_client.py.\n"
+            f"Si necesitas escritura, usa PlaywrightClient."
+        )

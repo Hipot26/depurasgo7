@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Balance — SIPWEBORA + SGS</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+    background: #f0f2f5;
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .card {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.12);
+    padding: 36px 48px;
+    width: 540px;
+    max-width: 95vw;
+  }
+  .logo-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .logo-icon {
+    width: 40px; height: 40px;
+    background: #1F3864;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 17px; font-weight: bold;
+  }
+  .logo-title { font-size: 17px; font-weight: 700; color: #1F3864; }
+  .subtitle { font-size: 12px; color: #666; margin-bottom: 20px; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 0; border-bottom: 2px solid #e0e4e8; margin-bottom: 24px; }
+  .tab-btn {
+    padding: 9px 20px;
+    font-size: 13px; font-weight: 600;
+    color: #666; background: none; border: none;
+    cursor: pointer; border-bottom: 3px solid transparent;
+    margin-bottom: -2px; transition: color .15s, border-color .15s;
+  }
+  .tab-btn:hover { color: #1F3864; }
+  .tab-btn.active { color: #1F3864; border-bottom-color: #1F3864; }
+  .tab-btn.sgs-tab.active { color: #375623; border-bottom-color: #375623; }
+  .tab-btn.rg03-tab.active { color: #7B3F00; border-bottom-color: #7B3F00; }
+  .tab-btn.mat-tab.active { color: #0F5E75; border-bottom-color: #0F5E75; }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  label { display: block; font-size: 13px; font-weight: 600; color: #333; margin-bottom: 6px; margin-top: 18px; }
+  .hint { font-size: 11px; color: #888; margin-top: 4px; }
+  input[type=text] {
+    width: 100%; padding: 10px 14px;
+    border: 1.5px solid #ccd; border-radius: 6px;
+    font-size: 14px; transition: border .2s;
+  }
+  input[type=text]:focus { outline: none; border-color: #2E75B6; }
+  input[type=text].sgs-input:focus { border-color: #375623; }
+
+  .divider { border: none; border-top: 1px solid #eee; margin: 22px 0 0; }
+
+  .btn {
+    margin-top: 18px; width: 100%; padding: 12px;
+    color: #fff; border: none; border-radius: 6px;
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: background .2s;
+  }
+  .btn-integrado { background: #1F3864; }
+  .btn-integrado:hover { background: #2E75B6; }
+  .btn-sgs { background: #375623; }
+  .btn-sgs:hover { background: #4a7230; }
+  .btn-rg03 { background: #7B3F00; }
+  .btn-rg03:hover { background: #9a5518; }
+  .btn-mat { background: #0F5E75; }
+  .btn-mat:hover { background: #17849e; }
+  input[type=text].mat-input:focus { border-color: #0F5E75; }
+  .btn-sm-mat {
+    padding: 6px 14px; font-size: 12px; font-weight: 600;
+    border: 1.5px solid #b8d4dc; border-radius: 5px;
+    background: #fff; color: #0F5E75; cursor: pointer; white-space: nowrap;
+  }
+  .btn-sm-mat:hover { background: #e8f2f5; }
+  input[type=file] { display: block; margin: 8px 0 2px; font-size: 13px; width: 100%; }
+  .btn:disabled { background: #aaa; cursor: not-allowed; }
+
+  .spinner { display: none; text-align: center; margin-top: 14px; color: #555; font-size: 13px; }
+
+  .error {
+    margin-top: 16px; padding: 10px 14px;
+    background: #ffeaea; border-left: 4px solid #e53;
+    border-radius: 4px; font-size: 13px; color: #c00;
+  }
+
+  .sgs-opcion { border-radius: 7px; overflow: hidden; }
+  .opcion-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 14px; background: #f4f7f2;
+    border: 1.5px solid #d4e6cc; border-radius: 7px;
+    cursor: pointer; transition: background .15s;
+    user-select: none;
+  }
+  .opcion-header:hover { background: #e8f1e4; }
+  .opcion-header.open { border-radius: 7px 7px 0 0; border-bottom-color: transparent; }
+  .opcion-icon { color: #375623; font-size: 12px; transition: transform .2s; }
+  .opcion-icon.open { transform: rotate(90deg); }
+  .opcion-titulo { font-size: 13px; font-weight: 700; color: #375623; }
+  .opcion-sub { font-size: 11px; color: #777; margin-left: auto; }
+  .opcion-body {
+    padding: 14px 14px 4px;
+    border: 1.5px solid #d4e6cc; border-top: none;
+    border-radius: 0 0 7px 7px; background: #fff;
+  }
+  .opcion-body label { margin-top: 0; }
+
+  .badge {
+    display: inline-block; padding: 2px 8px;
+    border-radius: 10px; font-size: 11px; font-weight: 600;
+    margin-left: 6px; vertical-align: middle;
+  }
+  .badge-sip { background: #D6E4F0; color: #1F3864; }
+  .badge-sgs { background: #E2EFDA; color: #375623; }
+
+  .legend { margin-top: 24px; padding: 12px 14px; background: #f8f9fb;
+            border-radius: 6px; font-size: 12px; color: #555; }
+  .legend strong { display: block; margin-bottom: 6px; color: #333; font-size: 12px; }
+  .legend-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+  .dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo-bar">
+    <div class="logo-icon">BI</div>
+    <div class="logo-title">Balance SGS</div>
+  </div>
+  <div class="subtitle">
+    <span class="badge badge-sip">SIPWEBORA</span>
+    <span class="badge badge-sgs">SGS</span>
+    &nbsp;Integración automática
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    {% if session.get('rol') != 'almacen' %}
+    <button class="tab-btn" id="tab-integrado" onclick="switchTab('integrado')">Balance Integrado</button>
+    <button class="tab-btn sgs-tab" id="tab-sgs" onclick="switchTab('sgs')">Balance SGS Puro</button>
+    <button class="tab-btn rg03-tab" id="tab-rg03" onclick="switchTab('rg03')">Formato RG02 · RG03</button>
+    {% endif %}
+    <button class="tab-btn mat-tab" id="tab-materiales" onclick="switchTab('materiales')">Materiales Sony</button>
+  </div>
+
+  <!-- ── Tab 1: Balance Integrado (SIPWEBORA + SGS) ── -->
+  <div class="tab-panel" id="panel-integrado">
+
+    {% if error %}
+    <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="/generar" id="frm-integrado">
+
+      <label for="id_planilla">ID(s) de Planilla SIPWEBORA</label>
+      <input type="text" id="id_planilla" name="id_planilla"
+             placeholder="Ej: 17352  o  18505, 18374"
+             value="{{ id_planilla or '' }}" autofocus>
+      <div class="hint">
+        Si el proyecto está dividido en dos planillas con el mismo LCL/PDL,
+        ingresa <strong>ambos IDs separados por coma</strong>.
+      </div>
+
+      <hr class="divider">
+
+      <label for="proyecto_id">ID o Código Proyecto SGS <span style="font-weight:400;color:#888">(opcional)</span></label>
+      <input type="text" id="proyecto_id" name="proyecto_id"
+             placeholder="Ej: 49879  o  PRO-052651  — se auto-detecta"
+             value="{{ proyecto_id or '' }}">
+      <div class="hint">
+        Si se deja vacío, se intenta resolver desde el OdM o Ticket de la planilla.
+      </div>
+
+      <button type="submit" class="btn btn-integrado" id="btn-integrado">Generar Balance Integrado</button>
+      <div class="spinner" id="sp-integrado">Descargando planilla SIPWEBORA y consultando SGS…</div>
+    </form>
+    {% if session.get('rol') != 'almacen' %}
+    <div class="hint" style="margin-top:10px">Cada consulta queda guardada como <b>caso</b> con su semáforo. <a href="/facturacion" target="_top" style="color:#1F3864;font-weight:700">Ver mis casos</a></div>
+    {% endif %}
+    {% if auto %}<script>window.addEventListener('DOMContentLoaded', function(){ var f=document.getElementById('frm-integrado'); if (f && document.getElementById('id_planilla').value) { if (f.requestSubmit) f.requestSubmit(); else f.submit(); } });</script>{% endif %}
+
+    <div class="legend">
+      <strong>Hojas del Excel generado</strong>
+      <div class="legend-row"><div class="dot" style="background:#2E75B6"></div> SIP_MANO_OBRA — actividades SIPWEBORA</div>
+      <div class="legend-row"><div class="dot" style="background:#2E75B6"></div> SIP_MATERIALES — materiales SIPWEBORA</div>
+      <div class="legend-row"><div class="dot" style="background:#375623"></div> SGS_BALANCE — bandejas vs liquidación (SGS)</div>
+      <div class="legend-row"><div class="dot" style="background:#7B3F00"></div> CRUCE_SIP_SGS — comparativa SIPWEBORA ↔ SGS</div>
+    </div>
+  </div>
+
+  <!-- ── Tab 2: Balance SGS Puro (sin SIPWEBORA) ── -->
+  <div class="tab-panel" id="panel-sgs">
+
+    <!-- Opción A: por PRO padre -->
+    <div class="sgs-opcion" id="opcion-pro">
+      <div class="opcion-header" onclick="toggleOpcion('pro')">
+        <span class="opcion-icon">▸</span>
+        <span class="opcion-titulo">Por código PRO</span>
+        <span class="opcion-sub">Conoces el PRO padre del proyecto</span>
+      </div>
+      <div class="opcion-body" id="body-pro" style="display:none">
+        {% if error_sgs %}
+        <div class="error">{{ error_sgs }}</div>
+        {% endif %}
+
+        <form method="POST" action="/generar-sgs" id="frm-sgs">
+          <label for="proyecto_id_sgs">ID o Código PRO (padre)</label>
+          <input type="text" id="proyecto_id_sgs" name="proyecto_id_sgs"
+                 class="sgs-input"
+                 placeholder="Ej: PRO-048245  o  49879"
+                 value="{{ proyecto_id_sgs or '' }}">
+          <div class="hint">Código PRO del proyecto padre o ID numérico interno de SGS.</div>
+          <label for="pdl_sgs" style="margin-top:14px">PDL <span style="font-weight:400;color:#888">(opcional)</span></label>
+          <input type="text" id="pdl_sgs" name="pdl"
+                 class="sgs-input"
+                 placeholder="Ej: PDL-12345"
+                 value="{{ pdl or '' }}">
+          <div class="hint">Número de PDL o ticket. Se incluirá en el Excel generado.</div>
+          <button type="submit" class="btn btn-sgs" id="btn-sgs">Buscar nodos →</button>
+          <div class="spinner" id="sp-sgs">Consultando SGS…</div>
+        </form>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid #eee;margin:10px 0"></div>
+
+    <!-- Opción B: por LCL / DF / ODM -->
+    <div class="sgs-opcion" id="opcion-lcl">
+      <div class="opcion-header" onclick="toggleOpcion('lcl')">
+        <span class="opcion-icon">▸</span>
+        <span class="opcion-titulo">Por LCL / DF / ODM</span>
+        <span class="opcion-sub">Más fácil — busca por el código del caso</span>
+      </div>
+      <div class="opcion-body" id="body-lcl" style="display:none">
+        {% if error_sgs_libre %}
+        <div class="error">{{ error_sgs_libre }}</div>
+        {% endif %}
+
+        <form method="POST" action="/sgs-libre" id="frm-libre">
+          <label for="lcl_codigo">Código del caso</label>
+          <input type="text" id="lcl_codigo" name="lcl_codigo"
+                 class="sgs-input"
+                 placeholder="Ej: LCL6300985782  o  DF202664420727"
+                 value="{{ lcl_codigo or '' }}">
+          <div class="hint">LCL con o sin prefijo, código DF, ODM u order_number del proyecto en SGS.</div>
+          <label for="pdl_libre" style="margin-top:14px">PDL <span style="font-weight:400;color:#888">(opcional)</span></label>
+          <input type="text" id="pdl_libre" name="pdl"
+                 class="sgs-input"
+                 placeholder="Ej: PDL-12345"
+                 value="{{ pdl or '' }}">
+          <div class="hint">Número de PDL o ticket. Se incluirá en el Excel generado.</div>
+          <button type="submit" class="btn btn-sgs" id="btn-libre">Buscar nodos →</button>
+          <div class="spinner" id="sp-libre">Buscando en SGS…</div>
+        </form>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid #eee;margin:10px 0"></div>
+
+    <!-- Opción C: Importar Excel anterior -->
+    <div class="sgs-opcion" id="opcion-importar">
+      <div class="opcion-header" onclick="toggleOpcion('importar')">
+        <span class="opcion-icon">▸</span>
+        <span class="opcion-titulo">↑ Actualizar desde Excel anterior</span>
+        <span class="opcion-sub">Sube un balance ya generado — reimporta la MO y relanza el SGS fresco</span>
+      </div>
+      <div class="opcion-body" id="body-importar" style="display:none">
+        {% if error_importar %}
+        <div class="error">{{ error_importar }}</div>
+        {% endif %}
+        <div class="hint" style="margin-bottom:12px">
+          Sube el Excel que generó el sistema anteriormente.<br>
+          Se extraen automáticamente: <strong>MO, líderes, supervisor y nodos de materiales</strong>.<br>
+          Los datos de SGS (devoluciones, bandejas) se consultan frescos.
+        </div>
+        <form method="POST" action="/manual/importar-excel" enctype="multipart/form-data" id="frm-importar">
+          <label for="excel_file">Archivo Excel (.xlsx)</label>
+          <input type="file" id="excel_file" name="excel_file" accept=".xlsx"
+                 style="display:block;margin:8px 0 14px;font-size:13px;width:100%">
+          <button type="submit" class="btn btn-sgs" id="btn-importar">Importar y actualizar →</button>
+          <div class="spinner" id="sp-importar">Procesando Excel…</div>
+        </form>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid #eee;margin:10px 0"></div>
+
+    <!-- Retomar balance guardado -->
+    <div class="sgs-opcion" id="opcion-retomar">
+      <div class="opcion-header" onclick="toggleOpcion('retomar'); cargarSesionesGuardadas();">
+        <span class="opcion-icon">▸</span>
+        <span class="opcion-titulo">⟳ Retomar balance guardado</span>
+        <span class="opcion-sub">Continúa donde quedaste — reconsulta SGS sin repetir nada</span>
+      </div>
+      <div class="opcion-body" id="body-retomar" style="display:none">
+        <div class="hint" style="margin-bottom:12px">
+          Cada balance manual se guarda solo mientras avanzas (MO, líderes, supervisor y nodos).
+          Si el almacén aún no había hecho las devoluciones, retómalo cuando ya estén:
+          <strong>se reconsulta SGS fresco</strong> y sigues desde el paso 2 sin volver a digitar.
+        </div>
+        <div id="retomar-lista"><div class="hint">Cargando balances guardados…</div></div>
+      </div>
+    </div>
+
+    <div class="legend" style="margin-top:16px">
+      <strong>Hojas del Excel generado</strong>
+      <div class="legend-row"><div class="dot" style="background:#375623"></div> BALANCE SGS — bandejas vs liquidación por nodo</div>
+      <div class="legend-row"><div class="dot" style="background:#2E75B6"></div> CRUCE BAN-LIQ — errores tipo A (bajo liq) y B (sobre liq)</div>
+    </div>
+  </div>
+
+  <!-- ── Tab 3: Formato RG02 · RG03 (registro fotográfico con IA) ── -->
+  <div class="tab-panel" id="panel-rg03">
+
+    {% if error_rg03 %}
+    <div class="error">{{ error_rg03 }}</div>
+    {% endif %}
+
+    <form method="POST" action="/rg03/analizar" enctype="multipart/form-data" id="frm-rg03">
+
+      <label for="rg03_file">Formato RG03 — registro fotográfico (.xlsm)</label>
+      <input type="file" id="rg03_file" name="rg03" accept=".xlsm,.xlsx" required>
+      <div class="hint">El archivo con las fotos embebidas en la hoja <strong>FOTOS</strong>. Es el que se devuelve diligenciado.</div>
+
+      <label for="rg02_files">Planilla(s) RG02 — trabajo y materiales (PDF)</label>
+      <input type="file" id="rg02_files" name="rg02" accept=".pdf" multiple required>
+      <div class="hint">De aquí salen las <strong>prestaciones QP por nodo</strong>. Si el proyecto está dividido en varias planillas, selecciónalas todas.</div>
+
+      <label for="pdt_file">Plan de trabajo / PDT (PDF) <span style="font-weight:400;color:#888">(opcional)</span></label>
+      <input type="file" id="pdt_file" name="pdt" accept=".pdf">
+      <div class="hint">Contexto adicional de la planeación por rangos de nodos.</div>
+
+      <button type="submit" class="btn btn-rg03" id="btn-rg03">Analizar fotos y nodos →</button>
+      <div class="spinner" id="sp-rg03">Leyendo fotos del RG03 y prestaciones del RG02…</div>
+    </form>
+
+    <div class="legend">
+      <strong>Cómo funciona</strong>
+      <div class="legend-row"><div class="dot" style="background:#7B3F00"></div> 1. Se detectan las fotos, su nodo y las prestaciones QP de la planilla</div>
+      <div class="legend-row"><div class="dot" style="background:#7B3F00"></div> 2. La IA redacta la observación de cada foto según el baremo</div>
+      <div class="legend-row"><div class="dot" style="background:#7B3F00"></div> 3. Revisas/edites los textos y descargas el mismo .xlsm diligenciado</div>
+    </div>
+  </div>
+
+  <!-- ── Tab 4: Materiales Sony (cargue de instalaciones) ── -->
+  <div class="tab-panel" id="panel-materiales">
+
+    {% if error_materiales %}
+    <div class="error">{{ error_materiales }}</div>
+    {% endif %}
+    {% if ok_materiales %}
+    <div style="margin-top:16px;padding:10px 14px;background:#e8f5ec;border-left:4px solid #2e9e5b;
+                border-radius:4px;font-size:13px;color:#1d6f3f">{{ ok_materiales }}</div>
+    {% endif %}
+
+    <!-- ANEXO Nº 14 -->
+    <div style="margin-top:18px;border:1.5px solid {{ '#bfe0d0' if anexo_info and anexo_info.cargado else '#f0d9a8' }};
+                border-radius:7px;padding:13px 14px;background:{{ '#f4faf6' if anexo_info and anexo_info.cargado else '#fdf8ec' }}">
+      <div style="font-size:13px;font-weight:700;color:#0F5E75;margin-bottom:6px">
+        ANEXO Nº 14 — Listado material menor (aportaciones)
+      </div>
+      {% if anexo_info and anexo_info.cargado %}
+        <div style="font-size:12px;color:#333">
+          ✔ Cargado: <strong>{{ anexo_info.filename }}</strong><br>
+          {{ anexo_info.total }} materiales de aportación
+          {% if anexo_info.sin_e4e %} ({{ anexo_info.sin_e4e }} sin código E4E — se cruzan por descripción){% endif %}
+          · subido el {{ anexo_info.subido }}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+          <form method="POST" action="/materiales/anexo" enctype="multipart/form-data"
+                style="display:flex;gap:8px;align-items:center;flex:1">
+            <input type="file" name="anexo_file" accept=".xlsx" style="margin:0;font-size:12px;flex:1" required>
+            <button type="submit" class="btn-sm-mat">Actualizar</button>
+          </form>
+          <form method="POST" action="/materiales/anexo/eliminar"
+                onsubmit="return confirm('¿Eliminar el ANEXO Nº 14 actual?')">
+            <button type="submit" class="btn-sm-mat" style="color:#c00;border-color:#e5b5b5">Eliminar</button>
+          </form>
+        </div>
+      {% else %}
+        <div style="font-size:12px;color:#8a6d1a">
+          ⚠ Sin ANEXO cargado — la columna <strong>Aportación</strong> del cargue saldrá en 0.
+        </div>
+        <form method="POST" action="/materiales/anexo" enctype="multipart/form-data"
+              style="display:flex;gap:8px;align-items:center;margin-top:10px">
+          <input type="file" name="anexo_file" accept=".xlsx" style="margin:0;font-size:12px;flex:1" required>
+          <button type="submit" class="btn-sm-mat">Subir ANEXO</button>
+        </form>
+      {% endif %}
+    </div>
+
+    <!-- Buscar proyecto -->
+    <form method="POST" action="/materiales/buscar" id="frm-materiales">
+      <label for="pro_materiales">Código PRO — hijo o padre</label>
+      <input type="text" id="pro_materiales" name="pro_materiales" class="mat-input"
+             placeholder="Ej: PRO-060341  (puede ser cualquier nodo hijo)"
+             value="{{ pro_materiales or '' }}">
+      <div class="hint">
+        Si ingresas un PRO hijo, el sistema sube automáticamente al proyecto padre
+        y te muestra todos sus nodos con sus bandejas.
+      </div>
+      <button type="submit" class="btn btn-mat" id="btn-materiales">Buscar nodos →</button>
+      <div class="spinner" id="sp-materiales">Consultando SGS (nodos y bandejas)…</div>
+    </form>
+
+    <div class="legend">
+      <strong>Cómo funciona</strong>
+      <div class="legend-row"><div class="dot" style="background:#0F5E75"></div> 1. Eliges los nodos y sus bandejas (igual que se ven en SGS)</div>
+      <div class="legend-row"><div class="dot" style="background:#0F5E75"></div> 2. Las devoluciones SGS se cruzan solas — y puedes agregar devoluciones manuales</div>
+      <div class="legend-row"><div class="dot" style="background:#0F5E75"></div> 3. Descargas el cargue con el formato de la plantilla (Aportación 1 / Enel 0)</div>
+    </div>
+  </div>
+
+</div>
+
+<button id="btn-restart" style="
+  position:fixed; bottom:16px; right:16px;
+  padding:7px 14px; font-size:11px; font-weight:600;
+  background:#e8ecf0; color:#555; border:none; border-radius:6px;
+  cursor:pointer; transition:background .2s; z-index:999;
+" onmouseover="this.style.background='#d0d5da'" onmouseout="this.style.background='#e8ecf0'">
+  ↺ Reiniciar server
+</button>
+
+<script>
+  function switchTab(name) {
+    ['integrado','sgs','rg03','materiales'].forEach(function(t) {
+      document.getElementById('tab-' + t).classList.toggle('active', t === name);
+      document.getElementById('panel-' + t).classList.toggle('active', t === name);
+    });
+    history.replaceState(null, '', name === 'integrado' ? '/' : '/?tab=' + name);
+  }
+
+  // Activar tab correcto al cargar (por URL o por error de servidor)
+  (function() {
+    var tab = '{{ tab or "" }}';
+    var fromUrl = new URLSearchParams(window.location.search).get('tab');
+    var t = tab || fromUrl;
+    switchTab((t === 'sgs' || t === 'rg03' || t === 'materiales') ? t : 'integrado');
+  })();
+
+  document.getElementById('frm-materiales').addEventListener('submit', function() {
+    document.getElementById('btn-materiales').disabled = true;
+    document.getElementById('sp-materiales').style.display = 'block';
+  });
+
+  document.getElementById('frm-rg03').addEventListener('submit', function() {
+    document.getElementById('btn-rg03').disabled = true;
+    document.getElementById('sp-rg03').style.display = 'block';
+  });
+
+  document.getElementById('frm-integrado').addEventListener('submit', function() {
+    document.getElementById('btn-integrado').disabled = true;
+    document.getElementById('sp-integrado').style.display = 'block';
+  });
+
+  function toggleOpcion(id) {
+    var body = document.getElementById('body-' + id);
+    var hdr  = document.querySelector('#opcion-' + id + ' .opcion-header');
+    var icon = document.querySelector('#opcion-' + id + ' .opcion-icon');
+    var open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : 'block';
+    hdr.classList.toggle('open', !open);
+    icon.classList.toggle('open', !open);
+  }
+
+  // ── Retomar balance guardado ──────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  var _sesionesCargadas = false;
+  function cargarSesionesGuardadas(force) {
+    if (_sesionesCargadas && !force) return;
+    _sesionesCargadas = true;
+    var cont = document.getElementById('retomar-lista');
+    fetch('/api/sesiones-guardadas')
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (!d.ok) {
+          cont.innerHTML = '<div class="error">' + escHtml(d.error || 'Error cargando la lista') + '</div>';
+          return;
+        }
+        if (!d.sesiones.length) {
+          cont.innerHTML = '<div class="hint">No hay balances guardados todavía — se guardan solos al avanzar por el flujo manual.</div>';
+          return;
+        }
+        cont.innerHTML = d.sesiones.map(function(s) {
+          var resumen = [];
+          resumen.push(s.n_mo ? s.n_mo + ' filas MO' : 'sin MO');
+          resumen.push(s.n_lideres ? s.n_lideres + ' líder(es)' : 'sin líderes');
+          if (s.con_materiales) resumen.push('materiales ✓');
+          // No repetir el mismo código como PDL o como nombre del proyecto
+          var titulo = escHtml(s.lcl_odm || '(sin código)');
+          if (s.pdl && s.pdl !== s.lcl_odm) titulo += ' · ' + escHtml(s.pdl);
+          var subtitulo = (s.proyecto && s.proyecto !== s.lcl_odm) ? s.proyecto : '';
+          return '<div style="display:flex;align-items:center;gap:10px;border:1px solid #dbe3d5;border-radius:8px;padding:10px 12px;margin-bottom:8px;background:#fafcf8">' +
+            '<div style="flex:1;min-width:0">' +
+              '<div style="font-weight:700;font-size:13px;color:#375623;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+                titulo + '</div>' +
+              (subtitulo ? '<div style="font-size:11.5px;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(subtitulo) + '</div>' : '') +
+              '<div style="font-size:11px;color:#999">' + escHtml(s.paso) + ' — ' + resumen.join(', ') +
+                ' · últ. actividad ' + escHtml(s.actualizado) + '</div>' +
+            '</div>' +
+            '<a class="btn btn-sgs" style="flex:0 0 auto;width:auto;padding:8px 14px;font-size:12.5px;margin:0;text-decoration:none" ' +
+              'href="/manual/retomar/' + s.sid + '" ' +
+              'onclick="this.textContent=\'Reconsultando SGS…\'">Retomar →</a>' +
+            '<button type="button" title="Eliminar este balance guardado" ' +
+              'onclick="eliminarSesionGuardada(\'' + s.sid + '\')" ' +
+              'style="flex:0 0 auto;border:none;background:none;color:#b91c1c;font-size:16px;cursor:pointer;padding:4px">✕</button>' +
+          '</div>';
+        }).join('');
+      })
+      .catch(function() { cont.innerHTML = '<div class="error">No se pudo cargar la lista de balances.</div>'; });
+  }
+
+  function eliminarSesionGuardada(sid) {
+    if (!confirm('¿Eliminar este balance guardado? No se puede deshacer.')) return;
+    fetch('/manual/sesion/' + sid + '/eliminar', { method: 'POST' })
+      .then(function() { cargarSesionesGuardadas(true); })
+      .catch(function() { cargarSesionesGuardadas(true); });
+  }
+
+  // Auto-abrir si hay error en esa opción
+  (function() {
+    {% if error_sgs %}        toggleOpcion('pro'); {% endif %}
+    {% if error_sgs_libre %}  toggleOpcion('lcl'); {% endif %}
+    {% if error_importar %}   toggleOpcion('importar'); {% endif %}
+    // Si ningún error, abrir LCL por defecto (más fácil de usar)
+    {% if not error_sgs and not error_sgs_libre and not error_importar %}
+    toggleOpcion('lcl');
+    {% endif %}
+  })();
+
+  document.getElementById('frm-sgs').addEventListener('submit', function() {
+    document.getElementById('btn-sgs').disabled = true;
+    document.getElementById('sp-sgs').style.display = 'block';
+  });
+  document.getElementById('frm-libre').addEventListener('submit', function() {
+    document.getElementById('btn-libre').disabled = true;
+    document.getElementById('sp-libre').style.display = 'block';
+  });
+  document.getElementById('frm-importar').addEventListener('submit', function() {
+    document.getElementById('btn-importar').disabled = true;
+    document.getElementById('sp-importar').style.display = 'block';
+  });
+
+  document.getElementById('btn-restart').addEventListener('click', function() {
+    this.textContent = 'Reiniciando…';
+    this.disabled = true;
+    fetch('/reiniciar', { method: 'POST' }).finally(function() {
+      setTimeout(function() { location.reload(); }, 2000);
+    });
+  });
+</script>
+</body>
+</html>

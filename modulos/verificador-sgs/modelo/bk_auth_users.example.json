@@ -1,0 +1,3 @@
+{
+  "usuario.ejemplo": "scrypt:32768:8:1$EJEMPLO_SAL$EJEMPLO_HASH_NO_VALIDO"
+}

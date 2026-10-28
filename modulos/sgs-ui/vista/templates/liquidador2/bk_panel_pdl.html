@@ -1,0 +1,189 @@
+{% extends "liquidador2/base.html" %}
+{% block title %}Panel PDL — SGS UI{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+  <div>
+    <h1 style="font-size:1.3rem;margin:0;">Verificador / Parche de PDL</h1>
+    <p style="margin:6px 0 0;color:#888;font-size:0.85rem;">{{ s.filename }}</p>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <a href="{{ url_for('liquidador2.resultado', sid=sid) }}" class="btn">Volver a resultados</a>
+    <a href="{{ url_for('liquidador2.panel_pdl', sid=sid, pdl_global=meta.pdl_global) }}" class="btn btn-success">
+      Reconsultar SGS
+    </a>
+  </div>
+</div>
+
+<!-- Control PDL global -->
+<div class="card" style="margin-bottom:16px;">
+  <form method="GET" action="{{ url_for('liquidador2.panel_pdl', sid=sid) }}"
+        style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;">
+    <div style="min-width:300px;flex:1;">
+      <label style="display:block;font-size:0.78rem;color:#666;margin-bottom:4px;">
+        PDL global — se pre-rellena en todos los nodos sin PDL
+      </label>
+      <input type="text" name="pdl_global" value="{{ meta.pdl_global }}"
+             placeholder="CDOPPI202678612 o CDOPP2026R04843"
+             style="padding:8px 10px;border:1px solid #d9d9d9;border-radius:6px;width:100%;">
+    </div>
+    <button type="submit" class="btn btn-primary">Refrescar / Aplicar global</button>
+  </form>
+  <div style="margin-top:12px;font-size:0.84rem;color:#666;display:flex;gap:22px;flex-wrap:wrap;">
+    <span><strong>Nodos identificados:</strong> {{ meta.total }}</span>
+    <span style="color:{{ '#c62828' if meta.sin_pdl else '#388e3c' }};font-weight:{% if meta.sin_pdl %}600{% else %}400{% endif %};">
+      Sin PDL: {{ meta.sin_pdl }}
+    </span>
+    <span style="color:#388e3c;">Con PDL: {{ meta.con_pdl }}</span>
+  </div>
+  {% if not meta.pdl_global %}
+  <div style="margin-top:8px;padding:8px 12px;background:#fff3e0;border-radius:6px;font-size:0.83rem;color:#e65100;">
+    Escribe el PDL en el campo superior y presiona <strong>Refrescar</strong> — se pre-rellenará en todos los nodos vacíos. Puedes cambiar el PDL de cada nodo individualmente antes de aplicar.
+  </div>
+  {% endif %}
+</div>
+
+{% if not rows %}
+  <div class="card">
+    <p style="margin:0;color:#666;">
+      No se encontraron proyectos en esta sesion. Verifica el Excel primero desde la página de verificación.
+    </p>
+  </div>
+{% else %}
+
+<form method="POST" action="{{ url_for('liquidador2.panel_pdl', sid=sid) }}">
+  <input type="hidden" name="pdl_global" value="{{ meta.pdl_global }}">
+
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+    <button type="submit" class="btn btn-primary" id="btn-aplicar">
+      Aplicar PDL seleccionados
+    </button>
+    <button type="button" id="mark-missing" class="btn">
+      Marcar sin PDL
+    </button>
+    <button type="button" id="clear-sel" class="btn">
+      Limpiar selección
+    </button>
+    <span style="font-size:0.82rem;color:#777;">
+      Abre el navegador y aplica el PDL especificado a cada nodo marcado.
+    </span>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden;">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:44px;"><input type="checkbox" id="toggle-all"></th>
+          <th>Proyecto / Nodo</th>
+          <th>PDL actual en SGS</th>
+          <th style="min-width:280px;">PDL a aplicar</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr style="background:{{ '#fff8e1' if not row.tiene_pdl else '#f3fbf5' }};">
+          <td>
+            <input type="checkbox" name="pid" value="{{ row.pid }}"
+                   data-missing="{{ 0 if row.tiene_pdl else 1 }}"
+                   {% if row.preseleccionado %}checked{% endif %}>
+          </td>
+          <td>
+            <div style="font-weight:700;color:#1f1f1f;">
+              [{{ row.pro_code or ("PID " ~ row.pid) }}] {{ row.nombre }}
+            </div>
+            <div style="font-size:0.81rem;color:#666;margin-top:2px;">
+              Nodo(s): {{ row.nodos_txt }} &nbsp;·&nbsp; PID: {{ row.pid }}
+            </div>
+          </td>
+          <td>
+            {% if row.tiene_pdl %}
+              <span style="color:#2e7d32;font-weight:600;">{{ row.pdl_actual }}</span>
+            {% else %}
+              <span style="color:#b71c1c;font-style:italic;">— sin PDL —</span>
+            {% endif %}
+          </td>
+          <td>
+            <input type="text" name="pdl_{{ row.pid }}"
+                   value="{{ row.pdl_objetivo }}"
+                   placeholder="CDOPPI... o CDOPP2026R..."
+                   style="padding:6px 8px;border:1px solid #d9d9d9;border-radius:5px;
+                          width:100%;font-size:0.88rem;box-sizing:border-box;">
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</form>
+
+{% endif %}
+
+<!-- Historial de parcheos -->
+{% set resultados_pdl = s.get('resultados_pdl', []) %}
+{% if resultados_pdl %}
+<div class="card" style="margin-top:18px;">
+  <h3 style="font-size:0.95rem;margin:0 0 10px;">Historial de parcheos PDL</h3>
+  <table style="font-size:0.84rem;">
+    <thead>
+      <tr>
+        <th>PID</th>
+        <th>Proyecto</th>
+        <th>Estado</th>
+        <th>PDL anterior</th>
+        <th>PDL aplicado</th>
+        <th>Error</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in resultados_pdl | reverse %}
+      {% set pro = rows | selectattr('pid', 'eq', r.pid) | first %}
+      <tr>
+        <td>{{ r.pid }}</td>
+        <td style="font-size:0.8rem;color:#555;">{{ pro.pro_code if pro else '-' }}</td>
+        <td style="color:{{ '#2e7d32' if r.ok else '#c62828' }};font-weight:600;">
+          {{ '✓ OK' if r.ok else '✗ Error' }}
+        </td>
+        <td>{{ r.get('pdl_anterior','') or '-' }}</td>
+        <td style="font-weight:600;">{{ r.get('pdl_aplicado','') or '-' }}</td>
+        <td style="color:#c62828;font-size:0.8rem;">{{ r.get('error','') or '' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+  <a href="{{ url_for('liquidador2.cierre_rapido', sid=sid) }}" class="btn">
+    Verificar cierre rapido
+  </a>
+  <a href="{{ url_for('liquidador2.resultado', sid=sid) }}" class="btn btn-light">
+    ← Volver a resultados
+  </a>
+</div>
+
+<script>
+document.getElementById('toggle-all').addEventListener('change', function() {
+  document.querySelectorAll('input[name="pid"]').forEach(cb => cb.checked = this.checked);
+});
+document.getElementById('mark-missing').addEventListener('click', function() {
+  document.querySelectorAll('input[name="pid"]').forEach(cb => {
+    cb.checked = cb.dataset.missing === '1';
+  });
+});
+document.getElementById('clear-sel').addEventListener('click', function() {
+  document.querySelectorAll('input[name="pid"]').forEach(cb => cb.checked = false);
+});
+
+// Cuando el usuario escribe en el PDL global, propaga a todos los campos vacíos
+const globalInput = document.querySelector('input[name="pdl_global"]');
+if (globalInput) {
+  globalInput.addEventListener('input', function() {
+    const val = this.value.trim();
+    document.querySelectorAll('input[name^="pdl_"]').forEach(inp => {
+      if (!inp.value.trim()) inp.value = val;
+    });
+  });
+}
+</script>
+{% endblock %}

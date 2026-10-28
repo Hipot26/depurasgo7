@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}SGS UI{% endblock %}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a2e; }
+  .navbar { background: #1a1a2e; color: white; padding: 12px 24px;
+            display: flex; align-items: center; gap: 16px; }
+  .navbar .brand { font-size: 1.1rem; font-weight: 700; letter-spacing: 1px; }
+  .navbar .tag { background: #e74c3c; color: white; padding: 2px 8px;
+                 border-radius: 4px; font-size: 0.7rem; font-weight: 700; }
+  .container { max-width: 1100px; margin: 32px auto; padding: 0 16px; }
+  .card { background: white; border-radius: 10px; padding: 28px;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.08); margin-bottom: 20px; }
+  .card h2 { font-size: 1.1rem; margin-bottom: 16px; color: #1a1a2e;
+             border-bottom: 2px solid #f0f2f5; padding-bottom: 10px; }
+  .btn { display: inline-block; padding: 10px 22px; border-radius: 6px;
+         font-size: 0.9rem; font-weight: 600; cursor: pointer;
+         border: none; text-decoration: none; transition: opacity 0.15s; }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: #1a1a2e; color: white; }
+  .btn-success { background: #27ae60; color: white; }
+  .btn-danger  { background: #e74c3c; color: white; }
+  .btn-light   { background: #f0f2f5; color: #1a1a2e; border: 1px solid #ddd; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px;
+           font-size: 0.75rem; font-weight: 700; }
+  .badge-ok      { background: #d4edda; color: #155724; }
+  .badge-error   { background: #f8d7da; color: #721c24; }
+  .badge-warn    { background: #fff3cd; color: #856404; }
+  .badge-gray    { background: #e9ecef; color: #495057; }
+  .badge-blue    { background: #cce5ff; color: #004085; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th { background: #f8f9fa; padding: 10px 12px; text-align: left;
+       border-bottom: 2px solid #dee2e6; font-weight: 600; }
+  td { padding: 9px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+  tr:hover td { background: #fafbfc; }
+  .alert { padding: 12px 16px; border-radius: 6px; margin-bottom: 16px; font-size: 0.9rem; }
+  .alert-danger  { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+  .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+  .alert-warning { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+  .alert-info    { background: #cce5ff; color: #004085; border: 1px solid #b8daff; }
+  .stat-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  .stat { background: white; border-radius: 8px; padding: 14px 20px;
+          box-shadow: 0 1px 6px rgba(0,0,0,0.07); text-align: center; min-width: 100px; }
+  .stat .num { font-size: 1.8rem; font-weight: 700; }
+  .stat .lbl { font-size: 0.75rem; color: #888; margin-top: 2px; }
+  .stat.green .num { color: #27ae60; }
+  .stat.red   .num { color: #e74c3c; }
+  .stat.blue  .num { color: #2980b9; }
+  .stat.gray  .num { color: #888; }
+  ul.errores { margin: 4px 0 0 16px; }
+  ul.errores li { color: #e74c3c; font-size: 0.82rem; }
+  ul.warns  { margin: 4px 0 0 16px; }
+  ul.warns  li { color: #856404; font-size: 0.82rem; }
+</style>
+{% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="navbar">
+  <span class="brand">SGS UI</span>
+  <span class="tag">SOLO LECTURA</span>
+  <span style="flex:1"></span>
+  {# ── Panel sesión SGS ── #}
+  <span id="sesion-indicator"
+        style="display:inline-flex;align-items:center;gap:6px;font-size:0.78rem;
+               padding:3px 10px;border-radius:20px;background:rgba(255,255,255,0.12);
+               color:rgba(255,255,255,0.7);transition:background .3s,color .3s;">
+    <span id="sesion-dot"
+          style="width:7px;height:7px;border-radius:50%;background:#888;flex-shrink:0;"></span>
+    <span id="sesion-label">Navegador inactivo</span>
+  </span>
+  <button id="btn-abrir" onclick="browserCtrl('restart_browser')"
+          style="display:none;background:transparent;border:1px solid #2ecc71;
+                 color:#2ecc71;padding:3px 10px;border-radius:20px;font-size:0.73rem;
+                 font-weight:700;cursor:pointer;">
+    Conectar
+  </button>
+  <button id="btn-cerrar" onclick="browserCtrl('close_browser')"
+          style="display:none;background:transparent;border:1px solid rgba(255,255,255,0.3);
+                 color:white;padding:3px 10px;border-radius:20px;font-size:0.73rem;cursor:pointer;">
+    Desconectar
+  </button>
+  <button id="btn-recheck" onclick="browserCtrl('reverificar')"
+          style="display:none;background:transparent;border:1px solid rgba(255,255,255,0.3);
+                 color:white;padding:3px 10px;border-radius:20px;font-size:0.73rem;cursor:pointer;">
+    ↻
+  </button>
+  {% if sid is defined and sid %}
+  <a href="{{ url_for('liquidador2.cierre_rapido', sid=sid) }}"
+     title="Verifica fecha, PDL y estado de los proyectos identificados antes de corregirlos"
+     style="display:inline-flex;align-items:center;text-decoration:none;background:#1565c0;
+            border:1px solid #64b5f6;color:white;padding:3px 12px;border-radius:20px;
+            font-size:0.73rem;font-weight:700;cursor:pointer;">
+    Verificar cierre
+  </a>
+  {% endif %}
+  <span id="sesion-fb" style="font-size:0.72rem;color:#2ecc71;display:none;margin-left:4px;"></span>
+  <button id="btn-restart-srv" onclick="reiniciarServidor()"
+          title="Reiniciar servidor Flask"
+          style="background:transparent;border:1px solid rgba(255,255,255,0.25);
+                 color:rgba(255,255,255,0.6);padding:3px 10px;border-radius:20px;
+                 font-size:0.73rem;cursor:pointer;margin-left:8px;">
+    ⟳ Servidor
+  </button>
+  <span id="restart-fb" style="font-size:0.72rem;color:#f39c12;display:none;margin-left:4px;"></span>
+</div>
+<script>
+async function browserCtrl(cmd) {
+  const fb = document.getElementById('sesion-fb');
+  fb.style.display = 'inline'; fb.style.color = '#aaa'; fb.textContent = '…';
+  try {
+    const r = await fetch('/liquidador2/browser_ctrl', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({cmd}),
+    });
+    const d = await r.json();
+    fb.style.color = d.ok !== false ? '#2ecc71' : '#e74c3c';
+    fb.textContent = d.ok !== false ? '✓ ' + (d.msg || 'OK') : '✗ ' + (d.error || 'Error');
+  } catch(e) { fb.style.color = '#e74c3c'; fb.textContent = '✗ Error'; }
+  setTimeout(() => { fb.style.display = 'none'; }, 3500);
+  setTimeout(checkSesion, 800);
+}
+
+async function checkSesion() {
+  try {
+    const r = await fetch('/liquidador2/sesion_estado');
+    const d = await r.json();
+    const ind      = document.getElementById('sesion-indicator');
+    const dot      = document.getElementById('sesion-dot');
+    const lbl      = document.getElementById('sesion-label');
+    const bAbrir   = document.getElementById('btn-abrir');
+    const bCerrar  = document.getElementById('btn-cerrar');
+    const bRecheck = document.getElementById('btn-recheck');
+    if (d.activa) {
+      ind.style.background = 'rgba(46,204,113,0.2)'; ind.style.color = '#2ecc71';
+      dot.style.background = '#2ecc71';
+      lbl.textContent = 'Sesión SGS activa' + (d.cuenta ? ' · ' + d.cuenta : '');
+      bAbrir.style.display   = 'none';
+      bCerrar.style.display  = 'inline-block';
+      bRecheck.style.display = 'inline-block';
+    } else if (d.iniciando) {
+      ind.style.background = 'rgba(243,156,18,0.2)'; ind.style.color = '#f39c12';
+      dot.style.background = '#f39c12';
+      lbl.textContent = d.cuenta ? ('Conectando a SGS con ' + d.cuenta + '…') : 'Conectando a SGS…';
+      bAbrir.style.display   = 'inline-block';
+      bCerrar.style.display  = 'inline-block';
+      bRecheck.style.display = 'inline-block';
+    } else {
+      ind.style.background = 'rgba(255,255,255,0.12)'; ind.style.color = 'rgba(255,255,255,0.6)';
+      dot.style.background = '#888';
+      lbl.textContent = (d.registrada === false) ? 'Sin cuenta SGS: regístrala en SGO7 → Liquidador → Mi cuenta SGS' : (d.error ? ('Sin sesión SGS: ' + d.error.slice(0, 80)) : 'Sin sesión SGS');
+      bAbrir.style.display   = 'inline-block';
+      bCerrar.style.display  = 'none';
+      bRecheck.style.display = 'none';
+    }
+  } catch(e) {}
+}
+checkSesion();
+setInterval(checkSesion, 5000);
+
+async function reiniciarServidor() {
+  const btn = document.getElementById('btn-restart-srv');
+  const fb  = document.getElementById('restart-fb');
+  btn.disabled = true;
+  btn.textContent = '⟳ Reiniciando…';
+  btn.style.color = '#f39c12';
+  fb.style.display = 'inline';
+  fb.textContent = 'esperando…';
+
+  try {
+    await fetch('/reiniciar_servidor', { method: 'POST' });
+  } catch(e) { /* el servidor se cayó — es lo esperado */ }
+
+  // Dar tiempo a que el proceso viejo salga; si polleamos inmediato podemos
+  // pegarle al server viejo y mostrar "listo" demasiado pronto.
+  await new Promise(resolve => setTimeout(resolve, 1400));
+
+  // Esperar a que el servidor vuelva (poll cada 800ms por hasta 20s)
+  fb.textContent = 'volviendo…';
+  let intentos = 0;
+  const intervalo = setInterval(async () => {
+    intentos++;
+    try {
+      const r = await fetch('/liquidador2/sesion_estado');
+      if (r.ok) {
+        clearInterval(intervalo);
+        btn.textContent = '⟳ Servidor';
+        btn.style.color = 'rgba(255,255,255,0.6)';
+        btn.disabled = false;
+        fb.style.color = '#2ecc71';
+        fb.textContent = '✓ listo';
+        setTimeout(() => { fb.style.display = 'none'; }, 2500);
+        checkSesion();
+      }
+    } catch(e) { /* todavía bajando */ }
+    if (intentos > 25) {
+      clearInterval(intervalo);
+      fb.style.color = '#e74c3c';
+      fb.textContent = '✗ no respondió';
+      btn.disabled = false;
+      btn.textContent = '⟳ Servidor';
+      btn.style.color = 'rgba(255,255,255,0.6)';
+    }
+  }, 800);
+}
+</script>
+<div class="container">
+  {% with msgs = get_flashed_messages() %}
+    {% if msgs %}{% for m in msgs %}
+      <div class="alert alert-warning">{{ m }}</div>
+    {% endfor %}{% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</div>
+<script>
+// SGO7: los informes técnicos se guardan en el servidor (Registros) además de poder copiarse.
+async function sgo7GuardarInforme(tipo, texto) {
+  try {
+    var sid = (location.pathname.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/) || [''])[0];
+    await fetch('/liquidador2/diagnostico', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({tipo: tipo, sid: sid, texto: texto})});
+  } catch (e) {}
+}
+</script>
+</body>
+</html>

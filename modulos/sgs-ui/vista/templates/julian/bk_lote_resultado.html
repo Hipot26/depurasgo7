@@ -1,0 +1,69 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Resultado Lote — SGS UI{% endblock %}
+{% block content %}
+
+<div class="stat-row">
+  <div class="stat {{ 'green' if ok_n > 0 else 'gray' }}">
+    <div class="num">{{ ok_n }}</div>
+    <div class="lbl">Liquidados</div>
+  </div>
+  <div class="stat {{ 'red' if err_n > 0 else 'gray' }}">
+    <div class="num">{{ err_n }}</div>
+    <div class="lbl">Errores</div>
+  </div>
+  <div class="stat blue">
+    <div class="num">{{ resultados|length }}</div>
+    <div class="lbl">Total</div>
+  </div>
+</div>
+
+{% if err_n == 0 %}
+  <div class="alert alert-success">Todos los ítems liquidados correctamente.</div>
+{% elif ok_n == 0 %}
+  <div class="alert alert-danger">No se pudo liquidar ningún ítem. Revisa los errores.</div>
+{% else %}
+  <div class="alert alert-warning">{{ ok_n }} OK / {{ err_n }} con error. Revisa los errores abajo.</div>
+{% endif %}
+
+<div class="card">
+  <h2>Detalle de resultados</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Estado</th>
+        <th>Proyecto</th>
+        <th>Prestación</th>
+        <th>Cantidad</th>
+        <th>Mensaje</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for res in resultados %}
+    <tr>
+      <td>
+        {% if res.get('ok') %}
+          <span class="badge badge-ok">OK</span>
+        {% else %}
+          <span class="badge badge-error">Error</span>
+        {% endif %}
+      </td>
+      <td style="font-size:0.82rem;">{{ res.get('pro_code','—') }}</td>
+      <td style="font-family:monospace;">{{ res.get('codigo', res.get('act_code','—')) }}</td>
+      <td>{{ res.get('cantidad','—') }}</td>
+      <td style="font-size:0.82rem;color:{{ '#e74c3c' if not res.get('ok') else '#555' }};">
+        {{ res.get('error', res.get('msg','')) or '—' }}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" style="color:#aaa;text-align:center;">Sin resultados</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div style="display:flex;gap:10px;margin-top:8px;">
+  <a href="{{ url_for('julian_lote.ver', sid=sid) }}" class="btn btn-light">Volver a verificación</a>
+  <a href="{{ url_for('julian_lote.subir') }}" class="btn btn-primary">Nuevo lote</a>
+</div>
+
+{% endblock %}

@@ -1,0 +1,18 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sabogal-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: sabogal_db
+      POSTGRES_USER: sabogal
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
+
+volumes:
+  postgres_data:

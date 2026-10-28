@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Balance ERP</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Calibri, Arial, sans-serif; background: #f0f2f5; min-height: 100vh;
+         display: flex; align-items: center; justify-content: center; }
+  .card { background: #fff; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,.12);
+          padding: 40px 48px; width: 480px; max-width: 95vw; }
+  .logo { font-size: 22px; font-weight: 700; color: #1F3864; margin-bottom: 4px; }
+  .sub  { font-size: 13px; color: #666; margin-bottom: 32px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: #333; margin-bottom: 6px; }
+  input[type=text] {
+    width: 100%; padding: 10px 14px; border: 1.5px solid #ccd;
+    border-radius: 6px; font-size: 14px; transition: border .2s;
+  }
+  input[type=text]:focus { outline: none; border-color: #2E75B6; }
+  .hint { font-size: 11px; color: #888; margin-top: 5px; }
+  button {
+    margin-top: 22px; width: 100%; padding: 12px;
+    background: #1F3864; color: #fff; border: none; border-radius: 6px;
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: background .2s;
+  }
+  button:hover { background: #2E75B6; }
+  button:disabled { background: #aaa; cursor: not-allowed; }
+  .spinner { display: none; text-align: center; margin-top: 18px; color: #555; font-size: 13px; }
+  .error { margin-top: 16px; padding: 10px 14px; background: #ffeaea;
+           border-left: 4px solid #e53; border-radius: 4px; font-size: 13px; color: #c00; }
+  .ok    { margin-top: 16px; padding: 10px 14px; background: #eaffea;
+           border-left: 4px solid #2a7; border-radius: 4px; font-size: 13px; color: #180; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">Balance ERP</div>
+  <div class="sub">Extrae bandejas y materiales por proyecto padre desde ERP (Odoo)</div>
+
+  {% if error %}
+  <div class="error">{{ error }}</div>
+  {% endif %}
+
+  <form method="POST" action="/generar" id="frm">
+    <label for="proyecto_id">ID o Codigo del proyecto padre</label>
+    <input type="text" id="proyecto_id" name="proyecto_id"
+           placeholder="Ej: 49879  o  PRO-052651"
+           value="{{ proyecto_id or '' }}" required autofocus>
+    <div class="hint">
+      Puedes ingresar el ID numerico del proyecto padre en ERP,
+      o su codigo PRO-XXXXXX.
+    </div>
+
+    <button type="submit" id="btn">Generar Balance Excel</button>
+    <button type="submit" formaction="/reversion" id="btn2"
+            style="margin-top:10px; background:#7B3F00;">
+      Ticket Reversion — Sobre-liquidados
+    </button>
+    <div class="spinner" id="sp">Consultando ERP y generando Excel...</div>
+  </form>
+</div>
+
+<script>
+  document.getElementById('frm').addEventListener('submit', function() {
+    document.getElementById('btn').disabled = true;
+    document.getElementById('sp').style.display = 'block';
+  });
+</script>
+</body>
+</html>

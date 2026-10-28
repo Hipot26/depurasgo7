@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ERP Liquidador — Progreso</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Calibri, Candara, sans-serif; background: #f0f3f7; color: #1a1a1a; }
+
+    .topbar {
+      background: #1F3864; padding: 0 28px; height: 52px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar h1 { color: #fff; font-size: 1rem; font-weight: 700; }
+    .topbar .right { display: flex; align-items: center; gap: 14px; }
+    .topbar a { color: #a8bcd4; text-decoration: none; font-size: .82rem; }
+    .topbar a:hover { color: #fff; }
+
+    .main { max-width: 900px; margin: 28px auto; padding: 0 20px; }
+
+    .card {
+      background: #fff; border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      padding: 28px 32px; margin-bottom: 20px;
+    }
+    .card h2 { color: #1F3864; font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
+    .card .meta { font-size: .82rem; color: #777; margin-bottom: 20px; }
+
+    /* Status banner */
+    .status-banner {
+      border-radius: 5px; padding: 14px 20px; margin-bottom: 20px;
+      display: flex; align-items: center; gap: 12px; font-size: .95rem; font-weight: 600;
+    }
+    .status-banner.running  { background: #dce8f5; border-left: 5px solid #1F3864; color: #1F3864; }
+    .status-banner.done     { background: #e2f0d9; border-left: 5px solid #375623; color: #375623; }
+    .status-banner.error    { background: #fde8e8; border-left: 5px solid #c00;    color: #7b0000; }
+    .status-banner.starting { background: #fff8e1; border-left: 5px solid #856404; color: #856404; }
+    .status-banner .icon { font-size: 1.4rem; }
+
+    /* Progress bar */
+    .progress-wrap { margin-bottom: 20px; }
+    .progress-label {
+      display: flex; justify-content: space-between;
+      font-size: .83rem; color: #555; margin-bottom: 6px;
+    }
+    .progress-bar-bg {
+      background: #e0e6ef; border-radius: 8px; height: 14px; overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%; background: #375623;
+      border-radius: 8px; transition: width .4s ease;
+      min-width: 4px;
+    }
+    .progress-bar-fill.error { background: #c00; }
+    .progress-bar-fill.running { background: #1F3864; }
+
+    /* Contadores */
+    .counters { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .counter-box { flex: 1; min-width: 100px; border-radius: 5px; padding: 10px 14px; text-align: center; }
+    .counter-box .n  { font-size: 1.5rem; font-weight: 700; }
+    .counter-box .lb { font-size: .72rem; margin-top: 2px; }
+    .counter-box.blue   { background: #dce8f5; color: #1F3864; }
+    .counter-box.green  { background: #e2f0d9; color: #375623; }
+    .counter-box.red    { background: #fde8e8; color: #7b0000; }
+
+    /* Log table */
+    .log-table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+    .log-table th {
+      background: #1F3864; color: #fff;
+      padding: 8px 12px; text-align: left; font-weight: 600;
+    }
+    .log-table td { padding: 8px 12px; border-bottom: 1px solid #e8edf3; vertical-align: middle; }
+    .log-table tr:last-child td { border-bottom: none; }
+
+    .badge {
+      display: inline-block; border-radius: 3px;
+      padding: 2px 8px; font-size: .75rem; font-weight: 700; white-space: nowrap;
+    }
+    .badge.ok      { background: #e2f0d9; color: #375623; }
+    .badge.error   { background: #fde8e8; color: #7b0000; }
+    .badge.info    { background: #dce8f5; color: #1F3864; }
+    .badge.skip    { background: #f0f0f0; color: #888; }
+    .badge.running { background: #fff3cd; color: #856404; }
+
+    .ts { font-family: Consolas, monospace; font-size: .75rem; color: #888; white-space: nowrap; }
+    .cod { font-family: Consolas, monospace; font-weight: 700; color: #375623; }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block; width: 16px; height: 16px; border: 2px solid #a8bcd4;
+      border-top-color: #1F3864; border-radius: 50%; animation: spin .8s linear infinite;
+      vertical-align: middle; margin-right: 6px;
+    }
+
+    /* Botones */
+    .actions { display: flex; gap: 12px; align-items: center; margin-top: 24px; }
+    .btn {
+      padding: 11px 24px; border-radius: 4px; font-size: .9rem;
+      font-family: inherit; font-weight: 600; cursor: pointer;
+      text-decoration: none; display: inline-block; border: none;
+    }
+    .btn-primary   { background: #375623; color: #fff; }
+    .btn-primary:hover { background: #4a7030; }
+    .btn-secondary { background: #fff; color: #1F3864; border: 1.5px solid #1F3864; }
+    .btn-secondary:hover { background: #f0f3f7; }
+
+    .error-detail {
+      background: #fde8e8; border: 1px solid #f44336; border-radius: 4px;
+      padding: 12px 16px; margin-top: 12px; font-size: .85rem; color: #7b0000;
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>ERP — Motor de Liquidación</h1>
+  <div class="right">
+    <span id="topbar-badge" style="font-size:.75rem;padding:3px 10px;border-radius:10px;
+          background:#856404;color:#fff;">Iniciando...</span>
+    <a href="{{ url_for('liquidacion.logout') }}">Cerrar sesión</a>
+  </div>
+</div>
+
+<div class="main">
+  <div class="card">
+    <h2>Ejecución en tiempo real</h2>
+    <p class="meta">
+      Archivo: <strong>{{ s.filename }}</strong> &nbsp;|&nbsp;
+      Enviado: {{ s.confirmado_at }} &nbsp;|&nbsp;
+      {{ s.rows|length }} prestaciones
+    </p>
+
+    <!-- Status banner -->
+    <div class="status-banner starting" id="status-banner">
+      <span class="icon" id="status-icon">⏳</span>
+      <span id="status-text">Conectando con ERP...</span>
+    </div>
+
+    <!-- Barra de progreso -->
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span id="prog-label">0 / {{ s.rows|length }}</span>
+        <span id="prog-pct">0%</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill running" id="prog-bar" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- Contadores -->
+    <div class="counters">
+      <div class="counter-box blue">
+        <div class="n" id="c-total">{{ s.rows|length }}</div>
+        <div class="lb">Total</div>
+      </div>
+      <div class="counter-box green">
+        <div class="n" id="c-ok">0</div>
+        <div class="lb">Liquidadas</div>
+      </div>
+      <div class="counter-box red">
+        <div class="n" id="c-err">0</div>
+        <div class="lb">Errores</div>
+      </div>
+    </div>
+
+    <!-- Log de actividades -->
+    <table class="log-table" id="log-table">
+      <thead>
+        <tr>
+          <th style="width:60px">Hora</th>
+          <th style="width:36px">Fila</th>
+          <th style="width:90px">Código</th>
+          <th style="width:70px">Estado</th>
+          <th>Detalle</th>
+        </tr>
+      </thead>
+      <tbody id="log-body">
+        <tr id="waiting-row">
+          <td colspan="5" style="text-align:center;padding:20px;color:#888;">
+            <span class="spinner"></span> Esperando inicio del motor...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Error global -->
+    <div class="error-detail" id="error-global" style="display:none;"></div>
+
+    <!-- Verificación final de totales (aparece al completar) -->
+    <div id="verif-section" style="display:none; margin-top:24px;">
+      <h3 style="color:#1F3864;font-size:.95rem;font-weight:700;margin-bottom:12px;">
+        Verificación final de totales monetarios
+      </h3>
+      <table style="width:100%;border-collapse:collapse;font-size:.86rem;">
+        <thead>
+          <tr>
+            <th style="background:#1F3864;color:#fff;padding:8px 14px;text-align:left;font-weight:600;width:40%">Concepto</th>
+            <th style="background:#1F3864;color:#fff;padding:8px 14px;text-align:right;font-weight:600;width:30%">Valor</th>
+            <th style="background:#1F3864;color:#fff;padding:8px 14px;text-align:center;font-weight:600;width:30%">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:9px 14px;border-bottom:1px solid #e8edf3;">
+              Total esperado (Excel — Mano de Obra)
+            </td>
+            <td style="padding:9px 14px;border-bottom:1px solid #e8edf3;text-align:right;
+                       font-family:Consolas,monospace;font-weight:600;">
+              <span id="v-excel">—</span>
+            </td>
+            <td style="padding:9px 14px;border-bottom:1px solid #e8edf3;text-align:center;">
+              &nbsp;
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:9px 14px;border-bottom:1px solid #e8edf3;">
+              Total liquidado (ERP — suma advanced_price)
+            </td>
+            <td style="padding:9px 14px;border-bottom:1px solid #e8edf3;text-align:right;
+                       font-family:Consolas,monospace;font-weight:600;">
+              <span id="v-sgs">—</span>
+            </td>
+            <td style="padding:9px 14px;border-bottom:1px solid #e8edf3;text-align:center;">
+              &nbsp;
+            </td>
+          </tr>
+          <tr id="v-diff-row">
+            <td style="padding:9px 14px;font-weight:700;">Diferencia</td>
+            <td style="padding:9px 14px;text-align:right;
+                       font-family:Consolas,monospace;font-weight:700;">
+              <span id="v-diff">—</span>
+            </td>
+            <td style="padding:9px 14px;text-align:center;">
+              <span id="v-badge">—</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Acciones (se muestran al terminar) -->
+    <div class="actions" id="actions" style="display:none;">
+      <a href="{{ url_for('liquidacion.dashboard') }}" class="btn btn-primary">
+        Volver al inicio
+      </a>
+      <a href="{{ url_for('liquidacion.dashboard') }}" class="btn btn-secondary">
+        Nueva liquidación
+      </a>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const SID   = "{{ sid }}";
+  const API   = "{{ url_for('liquidacion.progreso_api', sid=sid) }}";
+  const TOTAL = {{ s.rows|length }};
+
+  let lastLogLen = 0;
+  let polling    = null;
+
+  const ESTADOS = {
+    iniciando:   { cls: "starting", icon: "⏳", txt: "Conectando con ERP..." },
+    ejecutando:  { cls: "running",  icon: "⚙️", txt: "Liquidando prestaciones..." },
+    verificando: { cls: "running",  icon: "🔍", txt: "Verificando totales monetarios..." },
+    completado:  { cls: "done",     icon: "✅", txt: "Liquidación completada con éxito." },
+    error:       { cls: "error",    icon: "🚫", txt: "Se produjo un error. Motor detenido." },
+    desconocido: { cls: "starting", icon: "⏳", txt: "Iniciando..." },
+  };
+
+  const BADGE_COLORS = {
+    iniciando:  "background:#856404;color:#fff",
+    ejecutando: "background:#1F3864;color:#fff",
+    completado: "background:#375623;color:#fff",
+    error:      "background:#c00;color:#fff",
+  };
+
+  const BADGE_LABELS = {
+    iniciando:  "Iniciando",
+    ejecutando: "Ejecutando",
+    completado: "Completado",
+    error:      "Error",
+  };
+
+  function updateBanner(estado) {
+    const e = ESTADOS[estado] || ESTADOS["desconocido"];
+    const banner = document.getElementById("status-banner");
+    banner.className = "status-banner " + e.cls;
+    document.getElementById("status-icon").textContent = e.icon;
+    document.getElementById("status-text").textContent = e.txt;
+
+    const badge = document.getElementById("topbar-badge");
+    badge.style.cssText = BADGE_COLORS[estado] || BADGE_COLORS["iniciando"];
+    badge.textContent   = BADGE_LABELS[estado] || "...";
+  }
+
+  function updateProgress(ok, err, total) {
+    const done = ok + err;
+    const pct  = total > 0 ? Math.round((done / total) * 100) : 0;
+    document.getElementById("prog-label").textContent = done + " / " + total;
+    document.getElementById("prog-pct").textContent   = pct + "%";
+    document.getElementById("prog-bar").style.width   = pct + "%";
+    document.getElementById("c-ok").textContent  = ok;
+    document.getElementById("c-err").textContent = err;
+  }
+
+  function appendLog(entries) {
+    const tbody = document.getElementById("log-body");
+    // Eliminar fila de espera si existe
+    const waiting = document.getElementById("waiting-row");
+    if (waiting) waiting.remove();
+
+    entries.forEach(function(e) {
+      const tr = document.createElement("tr");
+
+      const badgeMap = {
+        ok:    '<span class="badge ok">OK</span>',
+        error: '<span class="badge error">ERROR</span>',
+        info:  '<span class="badge info">INFO</span>',
+        skip:  '<span class="badge skip">SKIP</span>',
+      };
+      const badge = badgeMap[e.estado] || '<span class="badge info">—</span>';
+
+      tr.innerHTML =
+        '<td class="ts">' + e.ts + '</td>' +
+        '<td style="text-align:center;color:#888;font-size:.75rem">' + e.fila + '</td>' +
+        '<td><span class="cod">' + e.cod + '</span></td>' +
+        '<td>' + badge + '</td>' +
+        '<td style="font-size:.82rem;color:#333">' + e.msg + '</td>';
+
+      tbody.appendChild(tr);
+    });
+
+    // Auto-scroll al último registro
+    tbody.lastElementChild && tbody.lastElementChild.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  async function poll() {
+    try {
+      const res  = await fetch(API);
+      const data = await res.json();
+
+      updateBanner(data.estado);
+      updateProgress(data.ok, data.err, data.total || TOTAL);
+
+      // Cambiar color barra según estado
+      const bar = document.getElementById("prog-bar");
+      if (data.estado === "error") bar.className = "progress-bar-fill error";
+      else if (data.estado === "completado") bar.className = "progress-bar-fill";
+
+      // Agregar solo entradas nuevas del log
+      if (data.log && data.log.length > lastLogLen) {
+        appendLog(data.log.slice(lastLogLen));
+        lastLogLen = data.log.length;
+      }
+
+      // Mostrar error global si existe
+      if (data.error_global) {
+        const eg = document.getElementById("error-global");
+        eg.textContent = "Error: " + data.error_global;
+        eg.style.display = "block";
+      }
+
+      // Mostrar verificación de totales cuando esté disponible
+      if (data.verificacion) {
+        const v = data.verificacion;
+        const sec = document.getElementById("verif-section");
+        sec.style.display = "block";
+
+        const fmt = n => n != null
+          ? "$\u00a0" + parseFloat(n).toLocaleString("es-CO", {minimumFractionDigits:2, maximumFractionDigits:2})
+          : "—";
+
+        document.getElementById("v-excel").textContent = fmt(v.excel_total);
+        document.getElementById("v-sgs").textContent   = fmt(v.sgs_total);
+        document.getElementById("v-diff").textContent  = fmt(v.diferencia);
+
+        const badge = document.getElementById("v-badge");
+        const diffRow = document.getElementById("v-diff-row");
+        if (v.ok === true) {
+          badge.innerHTML = '<span style="background:#e2f0d9;color:#375623;padding:3px 10px;border-radius:3px;font-weight:700;font-size:.8rem;">CORRECTO</span>';
+          diffRow.style.background = "#f4faf0";
+        } else if (v.ok === false) {
+          badge.innerHTML = '<span style="background:#fde8e8;color:#7b0000;padding:3px 10px;border-radius:3px;font-weight:700;font-size:.8rem;">ALERTA</span>';
+          diffRow.style.background = "#fde8e8";
+        } else if (v.excel_total == null) {
+          badge.innerHTML = '<span style="background:#dce8f5;color:#1F3864;padding:3px 10px;border-radius:3px;font-size:.8rem;">Sin total Excel</span>';
+        }
+      }
+
+      // Detener polling cuando termine
+      if (data.estado === "completado" || data.estado === "error") {
+        clearInterval(polling);
+        document.getElementById("actions").style.display = "flex";
+        if (data.liquidado_at) {
+          document.getElementById("status-text").textContent +=
+            " · " + data.liquidado_at;
+        }
+      }
+
+    } catch (err) {
+      console.warn("Poll error:", err);
+    }
+  }
+
+  // Primer poll inmediato, luego cada 2 segundos
+  poll();
+  polling = setInterval(poll, 2000);
+</script>
+
+</body>
+</html>

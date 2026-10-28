@@ -1,0 +1,144 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Informe técnico — {{ sid[:8] }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .reporte-bloque {
+    background: #1e1e2e; color: #cdd6f4;
+    border-radius: 10px; padding: 18px 20px;
+    font-family: monospace; font-size: 0.78rem;
+    white-space: pre-wrap; overflow-x: auto;
+    line-height: 1.65; margin-bottom: 18px;
+    max-height: 480px; overflow-y: auto;
+  }
+  .btn-copy {
+    background: #6c5ce7; color: white; border: none;
+    border-radius: 6px; padding: 6px 14px;
+    cursor: pointer; font-size: 0.8rem; font-weight: 700;
+  }
+  .btn-copy:hover { background: #5a4ed1; }
+  .captura-grid {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;
+  }
+  .captura-item {
+    background: #f8f9fa; border: 1px solid #dee2e6;
+    border-radius: 8px; padding: 8px 12px;
+    font-size: 0.78rem; font-family: monospace;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+  <h1 style="font-size:1.25rem;margin:0;">Informe técnico</h1>
+  <span style="font-size:0.8rem;color:#888;font-family:monospace;">sid={{ sid[:8] }}</span>
+</div>
+<p style="color:#888;font-size:0.85rem;margin-bottom:20px;">
+  {% if s %}{{ s.filename }}{% else %}sesión no disponible{% endif %}
+</p>
+
+{# ── Bloque 1: Resumen del job ── #}
+{% if job %}
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;">
+    <h2 style="margin:0;">Estado del Job</h2>
+    <button class="btn-copy" onclick="copiar('bloque-job')">Copiar</button>
+  </div>
+  <pre class="reporte-bloque" id="bloque-job">Estado: {{ job.estado }}
+{% if job.error %}Error global: {{ job.error }}{% endif %}
+
+MO ({{ job.items_mo | length }}):
+{% for it in job.items_mo %}  [{{ it.estado | upper }}] {{ it.codigo }}{% if it.error %} — {{ it.error }}{% endif %}
+{% endfor %}
+MAT ({{ job.items_mat | length }}):
+{% for it in job.items_mat %}  [{{ it.estado | upper }}] {{ it.codigo_sgs or it.codigo }}  W={{ it.worker_id }}{% if it.error %} — {{ it.error }}{% endif %}
+{% endfor %}</pre>
+</div>
+{% endif %}
+
+{# ── Bloque 2: Debug JSON ── #}
+{% if debug %}
+<div class="card">
+  <div style="display:flex;align-items:center;justify-content:space-between;">
+    <h2 style="margin:0;">Debug Report</h2>
+    <button class="btn-copy" onclick="copiar('bloque-debug')">Copiar</button>
+  </div>
+  <pre class="reporte-bloque" id="bloque-debug">
+=== LIQUIDACION DEBUG REPORT {{ debug.timestamp }} ===
+
+RESUMEN
+  sid           : {{ sid[:8] }}
+  Total items   : {{ debug.total }}
+  OK            : {{ debug.ok }}
+  Fallidos      : {{ debug.fallidos }}
+  Tasa exito    : {{ ((debug.ok / debug.total) * 100) | round(1) if debug.total else 0 }}%
+
+CLASIFICACION DE ERRORES
+{% for clase, n in debug.clases_error.items() %}  {{ "%-28s" | format(clase) }} x{{ n }}
+{% else %}  (sin errores)
+{% endfor %}
+DETALLE DE FALLIDOS ({{ debug.errores_detalle | length }})
+{% for e in debug.errores_detalle %}  [{{ e.tipo }}] {{ e.codigo }} | W={{ e.worker }} | intento={{ e.intento }} | clase={{ e.clase }}
+    {{ e.error[:180] }}
+{% else %}  (todos OK — no hay errores)
+{% endfor %}
+  </pre>
+</div>
+{% else %}
+<div class="card">
+  <p style="color:#888;">No hay archivo errores JSON para esta sesión.
+    La liquidación puede no haber completado aún.</p>
+</div>
+{% endif %}
+
+{# ── Bloque 3: Capturas ── #}
+<div class="card">
+  <h2>Capturas disponibles en logs/</h2>
+  {% if capturas %}
+  <div class="captura-grid">
+    {% for cap in capturas %}
+    <div class="captura-item">{{ cap }}</div>
+    {% endfor %}
+  </div>
+  <p style="font-size:0.78rem;color:#888;margin-top:10px;">
+    Muéstrame las capturas relevantes usando el botón "Ver capturas" o directamente desde
+    <code>logs/</code> en tu explorador de archivos.
+  </p>
+  {% else %}
+  <p style="color:#aaa;font-size:0.85rem;">No hay capturas en la carpeta logs/.</p>
+  {% endif %}
+</div>
+
+{# ── Instrucciones ── #}
+<div class="card" style="background:#f0f8ff;border:1px solid #bee3f8;">
+  <h2>Cómo usar este reporte</h2>
+  <ol style="font-size:0.88rem;color:#444;line-height:1.8;">
+    <li>Copia el bloque <strong>Debug Report</strong> y envíalo a soporte.</li>
+    <li>Si hay capturas relevantes, adjúntalas directamente en el chat.</li>
+    <li>Describe brevemente qué pasó para que soporte analice los errores.</li>
+  </ol>
+</div>
+
+<div style="margin-top:12px;display:flex;gap:12px;">
+  {% if s %}
+  <a href="{{ url_for('julian.resultado', sid=sid) }}" class="btn btn-light">&larr; Volver al resultado</a>
+  <a href="{{ url_for('julian.errores_json', sid=sid) }}" class="btn btn-light" target="_blank">
+    Ver JSON crudo
+  </a>
+  {% endif %}
+</div>
+
+<script>
+function copiar(id) {
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    const btn = el.previousElementSibling.querySelector('.btn-copy');
+    const orig = btn.textContent;
+    btn.textContent = '✓ Copiado';
+    setTimeout(() => btn.textContent = orig, 1800);
+  });
+}
+</script>
+
+{% endblock %}

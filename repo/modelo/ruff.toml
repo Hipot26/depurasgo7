@@ -1,0 +1,38 @@
+# Configuración de ruff para todo el repositorio.
+# Objetivo: errores reales (F) y estilo básico (E, W) sin alterar el comportamiento del código que corre en producción.
+line-length = 120
+target-version = "py312"
+
+extend-exclude = [
+    "sabogal-platform/frontend",
+    "whatsapp-bot",
+    "**/templates",
+    "**/almacen_templates",
+    "**/plantillas",
+    "**/assets",
+]
+
+[lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    # Longitud de línea del código heredado. Se corrige módulo por módulo con pruebas (docs/LIMITACIONES.md #16).
+    "E501",
+    # Importaciones después de código: varios módulos ajustan sys.path antes de importar sus vecinos
+    # (apps Flask independientes sin paquete). Reordenarlas cambiaría el comportamiento.
+    "E402",
+    # Orden de importación: misma razón que E402; ruff --fix lo cambiaría en masa.
+    "I001",
+    # `except:` sin tipo en código heredado. Cambiarlo a `except Exception:` no es neutro
+    # (dejaría pasar KeyboardInterrupt/SystemExit): se revisa caso por caso.
+    "E722",
+    # Comparaciones `== None` / `== True` en filtros de SQLAlchemy son intencionales (se traducen a SQL).
+    "E711", "E712",
+    # Asignación de lambdas y nombres ambiguos (`l`, `O`) en código heredado; sin impacto funcional.
+    "E731", "E741",
+    # Varias sentencias en una línea (`if x: return`, `a = 1; b = 2`) en código heredado: solo formato.
+    "E701", "E702",
+]
+
+[lint.per-file-ignores]
+# Pruebas: varias sentencias por línea en fixtures compactos.
+"tests/*" = ["E701", "E702"]

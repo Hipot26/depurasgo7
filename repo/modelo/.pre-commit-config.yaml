@@ -1,0 +1,25 @@
+# Ganchos previos al commit. Instalación: `pip install pre-commit && pre-commit install`.
+# gitleaks impide que un secreto llegue al repositorio; ruff aplica la configuración de ruff.toml.
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.(md|xlsx|png)$
+      - id: end-of-file-fixer
+        exclude: \.(xlsx|png)$
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=2048]
+      - id: detect-private-key

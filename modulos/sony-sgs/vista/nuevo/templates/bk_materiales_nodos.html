@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Materiales Sony — Nodos</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+    background: #f0f2f5; min-height: 100vh;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 40px 16px;
+  }
+  .card {
+    background: #fff; border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,.12);
+    padding: 36px 44px; width: 760px; max-width: 98vw;
+  }
+  .logo-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .logo-icon {
+    width: 40px; height: 40px; background: #0F5E75; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 15px; font-weight: bold;
+  }
+  .logo-title { font-size: 17px; font-weight: 700; color: #0F5E75; }
+  .subtitle { font-size: 12px; color: #888; margin-bottom: 24px; }
+  .step-bar { display:flex; gap:6px; font-size:11px; color:#999; margin-bottom:18px; }
+  .step { padding:3px 10px; border-radius:10px; background:#f0f2f5; }
+  .step.on { background:#0F5E75; color:#fff; font-weight:600; }
+
+  .meta-grid {
+    display: grid; grid-template-columns: 140px 1fr;
+    gap: 3px 12px; font-size: 13px;
+    background: #f8f9fb; border-radius: 6px;
+    padding: 12px 14px; margin-bottom: 22px;
+  }
+  .meta-label { color: #555; font-weight: 600; text-align: right; }
+  .meta-value { color: #222; }
+  .meta-value.hl { color: #0F5E75; font-weight: 700; }
+
+  h2 { font-size: 13px; font-weight: 700; color: #0F5E75; margin-bottom: 10px; }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
+  .btn-sm {
+    padding: 5px 12px; font-size: 12px; font-weight: 600;
+    border: 1.5px solid #ccc; border-radius: 5px;
+    background: #f8f9fb; color: #555; cursor: pointer;
+  }
+  .btn-sm:hover { background: #e8ecf0; }
+  .counter { font-size: 12px; color: #555; margin-bottom: 10px; }
+  .counter span { font-weight: 700; color: #0F5E75; }
+
+  .buscador {
+    width: 100%; padding: 9px 12px 9px 34px; margin-bottom: 10px;
+    border: 1.5px solid #b8d4dc; border-radius: 6px; font-size: 13px;
+    background: #fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="%230F5E75" stroke-width="2.5"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>') 10px center no-repeat;
+  }
+  .buscador:focus { outline: none; border-color: #0F5E75; }
+  .sin-result { display: none; padding: 14px; text-align: center; color: #999;
+                font-size: 12px; font-style: italic; }
+
+  .nodos-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
+  .nodos-table th { background: #0F5E75; color: #fff; padding: 7px 10px; text-align: center; }
+  .nodos-table td { padding: 7px 10px; border-bottom: 1px solid #eee; vertical-align: middle; }
+  .nodo-cell {
+    max-width: 170px; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; cursor: help;
+  }
+  .nodos-table tr:nth-child(even) td { background: #f8f9fb; }
+  .nodos-table tr.origen td { background: #e6f3f7; }
+  .nodos-table td.center { text-align: center; }
+  input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #0F5E75; }
+  .badge-status {
+    display: inline-block; padding: 2px 7px; border-radius: 9px;
+    font-size: 10px; font-weight: 600; background: #D8EAF0; color: #0F5E75;
+  }
+  .badge-origen {
+    display:inline-block; padding:1px 6px; border-radius:8px; font-size:9px;
+    font-weight:700; background:#0F5E75; color:#fff; margin-left:5px; vertical-align:middle;
+  }
+  .pill-dev { color:#9C0006; font-weight:600; }
+  .pill-desp { color:#375623; font-weight:600; }
+
+  .error {
+    margin-bottom: 14px; padding: 10px 14px;
+    background: #ffeaea; border-left: 4px solid #e53;
+    border-radius: 4px; font-size: 13px; color: #c00;
+  }
+  .btn-generar {
+    width: 100%; padding: 13px; background: #0F5E75; color: #fff;
+    border: none; border-radius: 6px; font-size: 14px; font-weight: 700;
+    cursor: pointer; margin-top: 4px;
+  }
+  .btn-generar:hover { background: #17849e; }
+  .btn-generar:disabled { background: #aaa; cursor: not-allowed; }
+  .btn-back {
+    display: block; margin-top: 10px; padding: 10px;
+    background: #f0f2f5; color: #555; text-align: center;
+    border-radius: 6px; font-size: 13px; text-decoration: none;
+  }
+  .btn-back:hover { background: #e0e4e8; }
+  .spinner { display: none; text-align: center; margin-top: 12px; color: #555; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div class="logo-bar">
+    <div class="logo-icon">MAT</div>
+    <div class="logo-title">Materiales Sony</div>
+  </div>
+  <div class="subtitle">Cargue de instalaciones — selecciona los nodos que te interesan</div>
+
+  <div class="step-bar">
+    <div class="step on">1 · Nodos</div>
+    <div class="step">2 · Bandejas</div>
+    <div class="step">3 · Cuadre</div>
+    <div class="step">4 · Cargue</div>
+  </div>
+
+  <div class="meta-grid">
+    <div class="meta-label">Proyecto padre:</div>
+    <div class="meta-value hl">{{ padre.get('name', '—') }}</div>
+    <div class="meta-label">Código padre:</div>
+    <div class="meta-value">{{ padre.get('code', '—') }}</div>
+    <div class="meta-label">OdM / DF:</div>
+    <div class="meta-value">{{ padre.get('order_number') or padre.get('odm') or '—' }}</div>
+    {% if pro_origen %}
+    <div class="meta-label">PRO ingresado:</div>
+    <div class="meta-value">{{ pro_origen }} <span style="color:#888">(hijo — se resolvió el padre automáticamente)</span></div>
+    {% endif %}
+    <div class="meta-label">Total nodos:</div>
+    <div class="meta-value">{{ nodos | length }}</div>
+  </div>
+
+  {% if error %}
+  <div class="error">{{ error }}</div>
+  {% endif %}
+
+  <form method="POST" id="frm-sel">
+    <h2>Nodos del proyecto</h2>
+
+    <input type="text" class="buscador" id="buscar-nodo" autocomplete="off"
+           placeholder="Buscar nodo… (por número de nodo, PRO o nombre completo del proyecto)"
+           oninput="filtrar()">
+
+    <div class="toolbar">
+      <button type="button" class="btn-sm" onclick="toggleAll(true)">Seleccionar visibles</button>
+      <button type="button" class="btn-sm" onclick="toggleAll(false)">Ninguno</button>
+    </div>
+
+    <div class="counter">Seleccionados: <span id="cnt">0</span> de {{ nodos | length }}
+      <span id="cnt-filtro" style="color:#888"></span></div>
+
+    <table class="nodos-table">
+      <thead>
+        <tr>
+          <th style="width:40px"></th>
+          <th>Código PRO</th>
+          <th>Nodo</th>
+          <th>Estado</th>
+          <th>Despachos</th>
+          <th>Devoluciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for n in nodos %}
+        <tr class="{{ 'origen' if n.es_origen else '' }}"
+            data-buscar="{{ (n.pro ~ ' ' ~ n.nodo ~ ' ' ~ n.name) | lower }}">
+          <td class="center">
+            <input type="checkbox" name="nodo_codes" value="{{ n.pro }}"
+                   {{ 'checked' if n.es_origen else '' }} onchange="actualizarContador()">
+          </td>
+          <td class="center" title="{{ n.name }}">{{ n.pro }}{% if n.es_origen %}<span class="badge-origen">TU PRO</span>{% endif %}</td>
+          <td class="center nodo-cell" title="{{ n.name }}">{{ n.nodo }}</td>
+          <td class="center"><span class="badge-status">{{ n.status }}</span></td>
+          <td class="center"><span class="pill-desp">{{ n.despachos }}</span></td>
+          <td class="center"><span class="pill-dev">{{ n.devoluciones }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="sin-result" id="sin-result">Ningún nodo coincide con la búsqueda.</div>
+
+    <button type="submit" class="btn-generar" id="btn-gen">Ver bandejas de los nodos →</button>
+    <div class="spinner" id="sp">Preparando bandejas…</div>
+  </form>
+
+  <a class="btn-back" href="/?tab=materiales">← Cambiar proyecto</a>
+</div>
+
+<script>
+  function actualizarContador() {
+    var sel = document.querySelectorAll('input[name="nodo_codes"]:checked').length;
+    document.getElementById('cnt').textContent = sel;
+  }
+  function toggleAll(state) {
+    // Solo afecta las filas visibles (respeta el filtro del buscador)
+    document.querySelectorAll('tr[data-buscar]').forEach(function(tr) {
+      if (tr.style.display === 'none') return;
+      tr.querySelector('input[name="nodo_codes"]').checked = state;
+    });
+    actualizarContador();
+  }
+  function filtrar() {
+    var q = document.getElementById('buscar-nodo').value.trim().toLowerCase();
+    var visibles = 0, total = 0;
+    document.querySelectorAll('tr[data-buscar]').forEach(function(tr) {
+      total++;
+      var ok = !q || tr.dataset.buscar.indexOf(q) !== -1;
+      tr.style.display = ok ? '' : 'none';
+      if (ok) visibles++;
+    });
+    document.getElementById('sin-result').style.display = visibles ? 'none' : 'block';
+    document.getElementById('cnt-filtro').textContent =
+      q ? ' · mostrando ' + visibles + ' de ' + total : '';
+  }
+  actualizarContador();
+
+  document.getElementById('frm-sel').addEventListener('submit', function(e) {
+    var sel = document.querySelectorAll('input[name="nodo_codes"]:checked').length;
+    if (sel === 0) { alert('Selecciona al menos un nodo.'); e.preventDefault(); return false; }
+    document.getElementById('btn-gen').disabled = true;
+    document.getElementById('sp').style.display = 'block';
+  });
+</script>
+</body>
+</html>

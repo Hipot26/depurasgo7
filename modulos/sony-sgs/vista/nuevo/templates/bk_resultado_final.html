@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Balance Integrado — Archivos generados</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Calibri, 'Segoe UI', Arial, sans-serif; background:#f0f2f5; display:flex; justify-content:center; padding:40px 16px; }
+  .card { background:#fff; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,.12); padding:34px 42px; width:720px; max-width:98vw; }
+  .logo-bar { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+  .logo-icon { width:40px; height:40px; background:#1F3864; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:bold; }
+  .logo-title { font-size:17px; font-weight:700; color:#1F3864; }
+  .ok-banner { background:#eaffea; border-left:4px solid #2a7; border-radius:4px; padding:12px 16px; font-size:14px; color:#180; margin-bottom:20px; }
+  h2 { font-size:14px; color:#1F3864; margin:22px 0 10px; }
+  .meta-grid { display:grid; grid-template-columns:170px 1fr; gap:3px 12px; font-size:13px; background:#f8f9fb; border-radius:6px; padding:12px 14px; }
+  .meta-label { color:#555; font-weight:600; text-align:right; }
+  .meta-value.hl { color:#1F3864; font-weight:700; }
+
+  .warning-banner { background:#fff3cd; border:2px solid #ff9900; border-left-width:8px; border-radius:6px; padding:14px 16px; margin-bottom:16px; color:#7a3e00; font-size:13.5px; }
+  .warning-title { color:#9c0006; font-weight:800; font-size:14px; margin-bottom:6px; text-transform:uppercase; }
+  .rg11-warn { background:#fff7e6; border:2px solid #e69500; border-radius:8px; padding:14px 16px; margin:14px 0; }
+  .rg11-warn h3 { color:#9c5700; font-size:14px; margin-bottom:8px; }
+  table.inc { width:100%; border-collapse:collapse; font-size:12.5px; }
+  table.inc th { background:#e69500; color:#fff; padding:6px 9px; text-align:left; }
+  table.inc td { padding:5px 9px; border-bottom:1px solid #f0e2c5; }
+
+  .dl-row { display:flex; gap:14px; margin-top:22px; flex-wrap:wrap; }
+  .dl { flex:1; min-width:260px; text-decoration:none; border-radius:10px; padding:18px 20px; color:#fff; display:block; }
+  .dl small { display:block; font-size:12px; opacity:.85; font-weight:400; margin-top:4px; }
+  .dl b { font-size:15px; }
+  .dl-bal { background:#1F3864; }
+  .dl-bal:hover { background:#2E75B6; }
+  .dl-rg11 { background:#375623; }
+  .dl-rg11:hover { background:#4a7030; }
+  .lid-line { font-size:13px; color:#333; }
+  .btn-back { display:block; margin-top:22px; padding:10px; background:#f0f2f5; color:#555; text-align:center; border-radius:6px; font-size:13px; text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo-bar">
+    <div class="logo-icon">BI</div>
+    <div class="logo-title">Balance Integrado — Archivos generados</div>
+  </div>
+
+  <div class="ok-banner">Se generaron los 2 archivos: el <b>balance integrado</b> y el <b>RG11 del supervisor</b>.</div>
+
+  {% for adv in advertencias %}
+  <div class="warning-banner">
+    <div class="warning-title">{{ adv.titulo }}</div>
+    <div>{{ adv.mensaje }}</div>
+  </div>
+  {% endfor %}
+
+  {% if rg11_adv %}
+  <div class="rg11-warn">
+    <h3>⚠️ Revisar antes de entregar el RG11: {{ rg11_adv|length }} material(es) de SIP no respaldados por SGS</h3>
+    <table class="inc">
+      <tr><th>Código</th><th>Descripción</th><th>SIP (total)</th><th>SGS (total)</th><th>Faltan</th><th>Incidencia</th></tr>
+      {% for a in rg11_adv %}
+      <tr>
+        <td>{{ a.codigo }}</td><td>{{ a.desc }}</td>
+        <td>{{ a.sip }}</td><td>{{ a.sgs }}</td><td><b>{{ a.falta }}</b></td><td><b>{{ a.tipo }}</b></td>
+      </tr>
+      {% endfor %}
+    </table>
+    <div style="font-size:12px;color:#7a5c00;margin-top:8px">
+      Comparación por <b>total de proyecto</b> (no por nodo). Solo se listan materiales donde SIP instaló más de lo que SGS respalda.
+    </div>
+  </div>
+  {% endif %}
+
+  <h2>Datos de liquidación</h2>
+  <div class="meta-grid">
+    <div class="meta-label">Proyecto SGS:</div><div class="meta-value hl">{{ sgs_padre.get('name','—') }}</div>
+    <div class="meta-label">LCL/ODM:</div><div>{{ metadata.get('lcl') or metadata.get('odm','—') }}</div>
+    <div class="meta-label">Fecha de ejecución:</div><div class="meta-value hl">{{ fecha or '—' }}</div>
+    <div class="meta-label">Líderes:</div>
+    <div>
+      {% for l in lideres %}<div class="lid-line">{{ l.nombre }}{% if l.cedula %} ({{ l.cedula }}){% endif %} — <b>{{ l.pct }}%</b></div>{% endfor %}
+    </div>
+  </div>
+
+  <div class="dl-row">
+    <a class="dl dl-bal" href="/descargar/{{ tok_bal }}">
+      <b>⬇ Balance integrado</b>
+      <small>{{ bal_name }}</small>
+    </a>
+    <a class="dl dl-rg11" href="/descargar/{{ tok_rg11 }}">
+      <b>⬇ RG11 supervisor</b>
+      <small>{{ rg11_name }}</small>
+    </a>
+  </div>
+
+  {# SGO7 facturación: «Mandar a liquidar» #}
+  {% if caso %}
+  <div class="orden-box sem-{{ caso.semaforo }}">
+    <h2 style="margin-top:0">Caso #{{ caso.id }} · {{ caso.estado_label }}</h2>
+    <div class="orden-sem">OK <b>{{ caso.ok }}</b> · Descuadre <b class="{{ 'rojo' if caso.rojos else '' }}">{{ caso.rojos }}</b> · Alertas <b>{{ caso.n_alertas }}</b> · Consultas <b>{{ caso.consultas }}</b></div>
+    {% if orden == 'ok' %}
+    <div class="orden-ok">✅ Orden enviada al Liquidador Automático. Ya aparece en su panel; el resultado de la liquidación volverá a este caso.</div>
+    {% elif caso_error %}
+    <div class="orden-err">No se pudo enviar: {{ caso_error }}</div>
+    {% endif %}
+    {% if caso.orden_estado and caso.orden_estado != 'cancelada' %}
+    <div class="orden-info">Orden <b>{{ caso.orden_estado_label }}</b>{% if caso.orden_enviada_co %} · enviada {{ caso.orden_enviada_co }}{% endif %}{% if caso.orden_enviada_por %} por {{ caso.orden_enviada_por }}{% endif %}{% if caso.orden_nota %} · <i>{{ caso.orden_nota }}</i>{% endif %}</div>
+    {% elif caso.estado in ('cuadra', 'descuadre', 'consultado', 'espera_almacen', 'archivado') %}
+    <form method="POST" action="/casos/{{ caso.id }}/mandar-a-liquidar" class="orden-form"
+          onsubmit="return confirm('¿Mandar este balance al Liquidador Automático? Quien liquida recibirá el Excel generado.')">
+      <input type="hidden" name="sid" value="{{ sid }}">
+      <textarea name="nota" rows="2" maxlength="600" placeholder="Observación para quien liquida{% if caso.semaforo != 'verde' %} — obligatoria: el balance no cuadra o tiene alertas{% endif %}" {% if caso.semaforo != 'verde' %}required{% endif %}></textarea>
+      <button type="submit" class="btn-orden">🚀 Mandar a liquidar</button>
+      {% if caso.semaforo == 'rojo' %}<div class="orden-aviso">Este balance tiene {{ caso.rojos }} fila(s) en rojo. Lo normal es dejarlo en espera de almacén hasta que cuadre; envíalo solo si la diferencia está justificada.</div>{% endif %}
+    </form>
+    {% endif %}
+    <a href="/facturacion" target="_top" class="orden-link">Ver mis casos</a>
+  </div>
+  <style>
+    .orden-box { margin-top:22px; border:2px solid #cfd6e0; border-left-width:8px; border-radius:8px; padding:14px 18px; font-size:13px; background:#f8f9fb; }
+    .orden-box.sem-verde { border-color:#2a7; background:#eefbf0; }
+    .orden-box.sem-rojo { border-color:#c62828; background:#fff3f2; }
+    .orden-box.sem-ambar { border-color:#e69500; background:#fff8e6; }
+    .orden-sem b.rojo { color:#c62828; }
+    .orden-ok { margin-top:10px; background:#eaffea; border-left:4px solid #2a7; padding:10px 12px; color:#180; font-weight:700; }
+    .orden-err { margin-top:10px; color:#c62828; font-weight:700; }
+    .orden-info { margin-top:10px; color:#333; }
+    .orden-form { margin-top:12px; display:flex; flex-direction:column; gap:8px; }
+    .orden-form textarea { width:100%; padding:8px 10px; border:1px solid #cfd6e0; border-radius:6px; font-family:inherit; font-size:13px; }
+    .btn-orden { align-self:flex-start; padding:11px 18px; border:none; border-radius:8px; background:#375623; color:#fff; font-weight:800; font-size:14px; cursor:pointer; }
+    .btn-orden:hover { background:#4a7030; }
+    .orden-aviso { font-size:12px; color:#7a3e00; }
+    .orden-link { display:inline-block; margin-top:10px; font-size:12.5px; color:#1F3864; font-weight:700; }
+  </style>
+  {% endif %}
+
+  <a class="btn-back" href="/">← Generar otro balance</a>
+</div>
+</body>
+</html>

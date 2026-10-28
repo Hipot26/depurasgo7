@@ -1,0 +1,134 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Paso 5: Aprobar liquidacion — Presupuesto{% endblock %}
+{% block content %}
+
+<h1 style="font-size:1.3rem;margin-bottom:20px;">Paso 5: Seleccionar items a liquidar</h1>
+
+<form method="post">
+  {# ── MO ── #}
+  {% set mo_pendientes = checks_mo | selectattr('ok') | rejectattr('ya_liquidada') | list %}
+  {% if mo_pendientes %}
+  <div class="card">
+    <h2>Mano de Obra — {{ mo_pendientes|length }} pendientes</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:40px">
+            <input type="checkbox" id="chk_all_mo" onclick="toggleAll('mo')">
+          </th>
+          <th>Nodo</th><th>QP Code</th><th>Actividad</th>
+          <th>Cantidad</th><th>PRO SGS</th><th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for idx in range(checks_mo|length) %}
+      {% set ck = checks_mo[idx] %}
+      {% if ck.ok and not ck.ya_liquidada %}
+      <tr>
+        <td>
+          <input type="checkbox" name="idx_mo" value="{{ idx }}"
+                 class="chk_mo" checked>
+        </td>
+        <td><strong>{{ ck.row.pro or '—' }}</strong></td>
+        <td style="font-size:0.8rem;color:#2980b9;">{{ ck.row.qp_code or '—' }}</td>
+        <td><strong>{{ ck.row.codigo }}</strong></td>
+        <td style="text-align:right">{{ ck.row.cantidad }}</td>
+        <td style="font-size:0.8rem;">{{ ck.pro_code or '—' }}</td>
+        <td>
+          {% if ck.act_existente and ck.act_existente.advance > 0 %}
+            <span class="badge badge-warn">Avance parcial</span>
+          {% else %}
+            <span class="badge badge-ok">Pendiente</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {# ── MAT ── #}
+  {% set mat_pendientes = checks_mat | selectattr('ok') | selectattr('estado', 'in', ['ok','avance_parcial']) | list %}
+  {% if mat_pendientes %}
+  <div class="card">
+    <h2>Materiales — {{ mat_pendientes|length }} pendientes</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:40px">
+            <input type="checkbox" id="chk_all_mat" onclick="toggleAll('mat')">
+          </th>
+          <th>Nodo</th><th>Código SAP</th><th>Descripcion</th>
+          <th>A liquidar</th><th>Tipo</th><th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for idx in range(checks_mat|length) %}
+      {% set mc = checks_mat[idx] %}
+      {% if mc.ok and mc.estado in ['ok','avance_parcial'] %}
+      <tr>
+        <td>
+          <input type="checkbox" name="idx_mat" value="{{ idx }}"
+                 class="chk_mat" checked>
+        </td>
+        <td>{{ mc.mat.nodo }}</td>
+        <td><strong>{{ mc.mat.codigo }}</strong></td>
+        <td style="font-size:0.8rem;">{{ mc.mat.descripcion[:35] if mc.mat.descripcion else '—' }}</td>
+        <td style="text-align:right">
+          {% if mc.estado == 'avance_parcial' %}
+            {{ (mc.sgs_neto or 0) - (mc.advance_real or 0) }}
+            <span style="color:#888;font-size:0.75rem;">(delta)</span>
+          {% else %}
+            {{ mc.sgs_neto or mc.mat.sgs_neto_excel }}
+          {% endif %}
+        </td>
+        <td>
+          {% if mc.mat.tipo_material %}
+            <span class="badge {{ 'badge-blue' if mc.mat.tipo_material == 'PROPIO' else 'badge-gray' }}">
+              {{ mc.mat.tipo_material }}
+            </span>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if mc.estado == 'avance_parcial' %}
+            <span class="badge badge-warn">Parcial</span>
+          {% else %}
+            <span class="badge badge-ok">Pendiente</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if not mo_pendientes and not mat_pendientes %}
+  <div class="alert alert-success">
+    Todo está liquidado o tiene errores que requieren revisión manual.
+  </div>
+  {% else %}
+  <div class="card" style="background:#f1f8f4;border:1px solid #27ae60;">
+    <div style="margin-top:4px;display:flex;gap:12px;">
+      <a href="{{ url_for('julian.verificar', sid=sid) }}" class="btn btn-light">
+        &larr; Volver a verificacion
+      </a>
+      <button type="submit" class="btn btn-primary">
+        Ver plan de liquidacion
+      </button>
+    </div>
+  </div>
+  {% endif %}
+</form>
+
+<script>
+function toggleAll(tipo) {
+  var checks = document.querySelectorAll('.chk_' + tipo);
+  var master = document.getElementById('chk_all_' + tipo);
+  checks.forEach(function(c) { c.checked = master.checked; });
+}
+</script>
+{% endblock %}

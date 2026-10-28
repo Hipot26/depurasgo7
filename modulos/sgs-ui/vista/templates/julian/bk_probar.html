@@ -1,0 +1,120 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Probar liquidacion — Presupuesto{% endblock %}
+{% block content %}
+
+<h1 style="font-size:1.3rem;margin-bottom:20px;">Probar liquidación (dry-run) — {{ s.filename }}</h1>
+
+{% if not items_mo and not items_mat %}
+<div class="alert alert-warning">No hay items con act_id/pm_id resueltos para probar.</div>
+{% endif %}
+
+{# ── MO ── #}
+{% if items_mo %}
+<div class="card">
+  <h2>Mano de Obra — probar</h2>
+  <table>
+    <thead>
+      <tr><th>Nodo</th><th>QP</th><th>Actividad</th><th>Cantidad</th><th>act_id</th><th>Acción</th></tr>
+    </thead>
+    <tbody>
+    {% for ck in items_mo %}
+    <tr>
+      <td>{{ ck.row.pro or '—' }}</td>
+      <td style="font-size:0.8rem;color:#2980b9;">{{ ck.row.qp_code or '—' }}</td>
+      <td><strong>{{ ck.row.codigo }}</strong></td>
+      <td style="text-align:right">{{ ck.row.cantidad }}</td>
+      <td style="font-size:0.8rem;color:#888;">{{ ck.act_id }}</td>
+      <td>
+        <button class="btn btn-light" style="font-size:0.8rem;padding:6px 12px;"
+                onclick="probarMO({{ ck.act_id }}, {{ ck.pid }}, {{ ck.row.cantidad }}, '{{ ck.row.codigo }}', '{{ ck.pro_code }}')">
+          Dry-run MO
+        </button>
+        <span id="res-mo-{{ ck.act_id }}" style="font-size:0.8rem;margin-left:8px;"></span>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{# ── MAT ── #}
+{% if items_mat %}
+<div class="card">
+  <h2>Materiales — probar</h2>
+  <table>
+    <thead>
+      <tr><th>Nodo</th><th>Código SAP</th><th>Descripcion</th><th>pm_id</th><th>Acción</th></tr>
+    </thead>
+    <tbody>
+    {% for mc in items_mat %}
+    <tr>
+      <td>{{ mc.mat.nodo }}</td>
+      <td><strong>{{ mc.mat.codigo }}</strong></td>
+      <td style="font-size:0.8rem;">{{ mc.mat.descripcion[:40] if mc.mat.descripcion else '—' }}</td>
+      <td style="font-size:0.8rem;color:#888;">{{ mc.pm_id }}</td>
+      <td>
+        <button class="btn btn-light" style="font-size:0.8rem;padding:6px 12px;"
+                onclick="probarMAT({{ mc.pm_id }}, {{ mc.sgs_neto or mc.mat.sgs_neto_excel }}, '{{ mc.pro_code }}')">
+          Dry-run MAT
+        </button>
+        <span id="res-mat-{{ mc.pm_id }}" style="font-size:0.8rem;margin-left:8px;"></span>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div style="display:flex;gap:12px;margin-top:8px;">
+  <a href="{{ url_for('julian.verificar', sid=sid) }}" class="btn btn-light">
+    &larr; Volver a verificacion
+  </a>
+</div>
+
+<script>
+const SID = "{{ sid }}";
+
+async function probarMO(act_id, pid, cantidad, act_code, pro_code) {
+  const span = document.getElementById('res-mo-' + act_id);
+  span.textContent = 'Ejecutando...';
+  const fd = new FormData();
+  fd.append('act_id', act_id);
+  fd.append('pid', pid);
+  fd.append('cantidad', cantidad);
+  fd.append('act_code', act_code);
+  fd.append('pro_code', pro_code);
+  fd.append('dry_run', '1');
+  try {
+    const r = await fetch(`/julian/probar/${SID}/run_mo`, {method:'POST', body:fd});
+    const d = await r.json();
+    span.textContent = d.ok ? '✓ OK (dry)' : '✗ ' + (d.error || 'error');
+    span.style.color = d.ok ? '#27ae60' : '#e74c3c';
+  } catch(e) {
+    span.textContent = '✗ Error de red';
+    span.style.color = '#e74c3c';
+  }
+}
+
+async function probarMAT(pm_id, cantidad, pro_code) {
+  const span = document.getElementById('res-mat-' + pm_id);
+  span.textContent = 'Ejecutando...';
+  const fd = new FormData();
+  fd.append('pm_id', pm_id);
+  fd.append('cantidad', cantidad);
+  fd.append('partner_nombre', 'DRY_RUN');
+  fd.append('pro_code', pro_code);
+  fd.append('dry_run', '1');
+  try {
+    const r = await fetch(`/julian/probar/${SID}/run`, {method:'POST', body:fd});
+    const d = await r.json();
+    span.textContent = d.ok ? '✓ OK (dry)' : '✗ ' + (d.error || 'error');
+    span.style.color = d.ok ? '#27ae60' : '#e74c3c';
+  } catch(e) {
+    span.textContent = '✗ Error de red';
+    span.style.color = '#e74c3c';
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,310 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Acción Manual — Paso 2: Mano de Obra{% endblock %}
+{% block extra_head %}
+<style>
+  .steps { display:flex; align-items:center; margin-bottom:8px; }
+  .step-circle {
+    width:30px; height:30px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:0.82rem; font-weight:700; flex-shrink:0;
+  }
+  .step-circle.active  { background:#27ae60; color:white; }
+  .step-circle.done    { background:#c8f0da; color:#1a7a40; }
+  .step-circle.pending { background:#e0e0e0; color:#999; }
+  .step-bar  { flex:1; height:3px; }
+  .step-bar.done    { background:#27ae60; }
+  .step-bar.pending { background:#e0e0e0; }
+  .step-labels { display:flex; font-size:0.7rem; color:#aaa; margin-bottom:28px; }
+  .step-labels span { flex:1; text-align:center; }
+  .step-labels span.done   { color:#27ae60; }
+  .step-labels span.active { color:#1a3e2e; font-weight:700; }
+
+  .paste-area {
+    width:100%; min-height:180px; padding:14px;
+    font-family:'Consolas','Courier New',monospace; font-size:0.87rem;
+    border:2px solid #c3e6cb; border-radius:8px;
+    resize:vertical; outline:none; line-height:1.55;
+    background:#fafffe; transition:border-color 0.15s;
+  }
+  .paste-area:focus { border-color:#27ae60; }
+  .paste-area::placeholder { color:#bbb; font-family:'Segoe UI',sans-serif; font-size:0.85rem; }
+
+  #tbl-preview { display:none; }
+  #tbl-preview table { font-size:0.82rem; }
+  .qp-ok   { color:#155724; font-weight:600; }
+  .qp-miss { color:#856404; font-weight:600; }
+  .total-row td { font-weight:700; background:#f1f8f4; border-top:2px solid #c3e6cb; }
+
+  .hint-box {
+    background:#f1f8f4; border:1px solid #c3e6cb; border-radius:8px;
+    padding:12px 16px; font-size:0.83rem; color:#155724; margin-bottom:18px;
+  }
+  .hint-box code {
+    background:#e8f5e9; padding:2px 6px; border-radius:4px;
+    font-family:monospace; font-size:0.85rem;
+  }
+  .estado-bar {
+    display:flex; align-items:center; gap:10px;
+    padding:8px 12px; border-radius:6px; font-size:0.83rem;
+    margin-bottom:12px; min-height:36px;
+    background:#f8f9fa; color:#888;
+    transition:all 0.2s;
+  }
+  .estado-bar.ok    { background:#d4edda; color:#155724; }
+  .estado-bar.error { background:#fff3cd; color:#856404; }
+  .spinner { display:inline-block; width:14px; height:14px; border:2px solid #ccc;
+             border-top-color:#27ae60; border-radius:50%; animation:spin 0.6s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+{% endblock %}
+{% block content %}
+
+<div style="max-width:860px; margin:36px auto;">
+
+  <!-- Indicador de pasos -->
+  <div class="steps">
+    <div class="step-circle done">✓</div>
+    <div class="step-bar done"></div>
+    <div class="step-circle active">2</div>
+    <div class="step-bar pending"></div>
+    <div class="step-circle pending">3</div>
+    <div class="step-bar pending"></div>
+    <div class="step-circle pending">4</div>
+  </div>
+  <div class="step-labels">
+    <span class="done">Datos del proyecto</span>
+    <span class="active">Mano de Obra</span>
+    <span>Materiales</span>
+    <span>Vista previa</span>
+  </div>
+
+  <!-- Header con datos del proyecto -->
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+    <div style="background:#1a3e2e;color:white;padding:6px 14px;border-radius:6px;
+                font-family:monospace;font-size:0.95rem;font-weight:700;letter-spacing:1px;">
+      {{ sm.lcl }}
+    </div>
+    <div class="badge {{ 'badge-ok' if sm.tipo == 'mi' else 'badge-warn' }}"
+         style="font-size:0.8rem;padding:4px 10px;">
+      {{ 'Mayor Impacto' if sm.tipo == 'mi' else 'Programado' }}
+    </div>
+    {% if sm.pdl %}
+    <div class="badge badge-blue" style="font-size:0.8rem;padding:4px 10px;">
+      PDL: {{ sm.pdl }}
+    </div>
+    {% endif %}
+    <a href="/julian/manual/" style="margin-left:auto;font-size:0.8rem;color:#888;">
+      ← Cambiar datos
+    </a>
+  </div>
+
+  <div class="card">
+    <h2>Paso 2 — Mano de Obra</h2>
+
+    <!-- Instrucciones -->
+    <div class="hint-box">
+      <strong>Copia desde el Excel del supervisor</strong> las columnas
+      <code>Nodo</code> <code>Prestación</code> <code>Cantidad</code>
+      (en ese orden) y pégalas aquí.<br>
+      <span style="margin-top:6px;display:inline-block;">
+        Ejemplo: <code>67&nbsp;&nbsp;&nbsp;QP0007&nbsp;&nbsp;&nbsp;2</code>
+        &nbsp;&nbsp;(separado por <strong>Tab</strong>)
+      </span>
+    </div>
+
+    <!-- Barra de estado del parsing -->
+    <div class="estado-bar" id="estado-bar">
+      <span id="estado-icono">·</span>
+      <span id="estado-txt">Pega las filas de MO para ver la vista previa</span>
+    </div>
+
+    <form method="post" id="frm-mo">
+      <textarea
+        name="texto_mo"
+        id="txt-mo"
+        class="paste-area"
+        placeholder="Pega aquí desde Excel (Tab-separado):
+
+Nodo   Prestación   Cantidad
+67     QP0007       2
+69     QP0008       3
+71     QP0011       1
+
+(Puedes pegar directamente desde Excel con Ctrl+C / Ctrl+V)"
+        autocomplete="off"
+        spellcheck="false"
+      >{{ texto_prev or '' }}</textarea>
+
+      <!-- Vista previa dinámica -->
+      <div id="tbl-preview" style="margin-top:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;
+                    margin-bottom:8px;">
+          <strong style="font-size:0.9rem;color:#1a3e2e;">
+            Vista previa — <span id="n-filas">0</span> actividades
+          </strong>
+          <span id="total-mo-badge"
+                style="background:#1a3e2e;color:white;padding:4px 14px;
+                       border-radius:20px;font-size:0.88rem;font-weight:700;">
+            Total: $0
+          </span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table id="tbl-mo">
+            <thead>
+              <tr>
+                <th style="width:70px;">Nodo</th>
+                <th style="width:90px;">QP Code</th>
+                <th>Descripción (baremo)</th>
+                <th style="width:50px;">UM</th>
+                <th style="width:70px;text-align:right;">Cant.</th>
+                <th style="width:110px;text-align:right;">Precio Unit.</th>
+                <th style="width:120px;text-align:right;">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-mo"></tbody>
+            <tfoot>
+              <tr class="total-row">
+                <td colspan="6" style="text-align:right;">TOTAL MO</td>
+                <td style="text-align:right;" id="tfoot-total">$0</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div id="errs-mo" style="margin-top:10px;"></div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:22px;">
+        <a href="/julian/manual/" class="btn btn-light">← Volver</a>
+        <button type="submit" class="btn btn-success"
+                id="btn-continuar"
+                style="flex:1;padding:13px;font-size:1rem;"
+                disabled>
+          Siguiente: Materiales →
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  const txt    = document.getElementById('txt-mo');
+  const tbody  = document.getElementById('tbody-mo');
+  const tPreview = document.getElementById('tbl-preview');
+  const estadoBar = document.getElementById('estado-bar');
+  const estadoIco = document.getElementById('estado-icono');
+  const estadoTxt = document.getElementById('estado-txt');
+  const nFilas   = document.getElementById('n-filas');
+  const totalBadge = document.getElementById('total-mo-badge');
+  const tFootTotal = document.getElementById('tfoot-total');
+  const errDiv   = document.getElementById('errs-mo');
+  const btnCont  = document.getElementById('btn-continuar');
+  const LCL      = "{{ sm.lcl }}";
+
+  let timer = null;
+
+  function fmt(n) {
+    return new Intl.NumberFormat('es-CO', {
+      style:'currency', currency:'COP', minimumFractionDigits:0, maximumFractionDigits:0
+    }).format(n);
+  }
+
+  function setEstado(state, msg) {
+    estadoBar.className = 'estado-bar ' + (state || '');
+    const icons = { ok:'✓', error:'⚠', loading:'', '':'·' };
+    estadoIco.innerHTML = state === 'loading'
+      ? '<span class="spinner"></span>'
+      : (icons[state] || '·');
+    estadoTxt.textContent = msg;
+  }
+
+  async function parsear() {
+    const texto = txt.value.trim();
+    if (!texto) {
+      tPreview.style.display = 'none';
+      btnCont.disabled = true;
+      setEstado('', 'Pega las filas de MO para ver la vista previa');
+      return;
+    }
+    setEstado('loading', 'Procesando…');
+
+    const fd = new FormData();
+    fd.append('texto', texto);
+    fd.append('lcl',   LCL);
+
+    try {
+      const res  = await fetch('/julian/manual/api/parse_mo', { method:'POST', body:fd });
+      const data = await res.json();
+
+      if (!data.rows || data.rows.length === 0) {
+        setEstado('error', 'No se detectaron filas válidas — revisa el formato');
+        tPreview.style.display = 'none';
+        btnCont.disabled = true;
+        return;
+      }
+
+      // Renderizar tabla
+      tbody.innerHTML = '';
+      let total = 0;
+      data.rows.forEach(r => {
+        const tr = document.createElement('tr');
+        const qpClass = r.encontrado ? 'qp-ok' : 'qp-miss';
+        const precio  = r.encontrado ? fmt(r.precio_unit) : '<span style="color:#cc8800;">No en baremo</span>';
+        const sub     = r.encontrado ? fmt(r.subtotal) : '—';
+        total += r.subtotal || 0;
+        tr.innerHTML = `
+          <td>${r.nodo}</td>
+          <td><span class="${qpClass}">${r.qp}</span></td>
+          <td style="max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"
+              title="${r.descripcion}">${r.descripcion || '<em style="color:#bbb">Código no encontrado en baremo</em>'}</td>
+          <td>${r.unidad}</td>
+          <td style="text-align:right;">${r.cantidad}</td>
+          <td style="text-align:right;">${precio}</td>
+          <td style="text-align:right;font-weight:${r.encontrado?'600':'400'};">${sub}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      tFootTotal.textContent = fmt(total);
+      totalBadge.textContent = 'Total: ' + fmt(total);
+      nFilas.textContent     = data.rows.length;
+      tPreview.style.display = 'block';
+      btnCont.disabled = false;
+
+      // Errores de parseo
+      errDiv.innerHTML = '';
+      const warns = (data.errs || []).filter(e => !e.startsWith('[INFO]'));
+      if (warns.length) {
+        errDiv.innerHTML = '<div class="alert alert-warning" style="font-size:0.8rem;padding:8px 12px;">'
+          + warns.map(e => `<div>⚠ ${e}</div>`).join('') + '</div>';
+      }
+
+      // Resaltar si hay códigos desconocidos
+      const nMiss = data.rows.filter(r => !r.encontrado).length;
+      if (nMiss > 0) {
+        setEstado('error', `${data.rows.length} actividades detectadas — ${nMiss} código(s) sin precio en baremo`);
+      } else {
+        setEstado('ok', `${data.rows.length} actividades detectadas — todos los códigos encontrados en baremo`);
+      }
+
+    } catch(e) {
+      setEstado('error', 'Error de comunicación con el servidor');
+    }
+  }
+
+  txt.addEventListener('paste', () => {
+    clearTimeout(timer);
+    timer = setTimeout(parsear, 120);
+  });
+  txt.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(parsear, 400);
+  });
+
+  // Si hay texto previo (por error de validación), parsear inmediatamente
+  if (txt.value.trim()) {
+    setTimeout(parsear, 100);
+  }
+})();
+</script>
+{% endblock %}

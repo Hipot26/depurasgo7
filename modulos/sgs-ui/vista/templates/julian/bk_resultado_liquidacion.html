@@ -1,0 +1,366 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Paso 8: Resultado de Liquidación — Presupuesto{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+  <h1 style="font-size:1.3rem;margin:0;">Paso 8: Resultado de Liquidación</h1>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <a href="{{ url_for('julian.reporte', sid=sid) }}" class="btn"
+       style="background:#6c5ce7;color:white;font-size:0.82rem;"
+       title="Informe consolidado: errores JSON + capturas">
+      Informe técnico
+    </a>
+    <a href="{{ url_for('julian.errores_json', sid=sid) }}" class="btn"
+       style="background:#0984e3;color:white;font-size:0.82rem;" target="_blank"
+       title="Ver errores en JSON crudo">
+      Ver errores JSON
+    </a>
+    <a href="{{ url_for('julian.auditoria', sid=sid) }}" class="btn btn-success">
+      ↻ Verificar en SGS
+    </a>
+  </div>
+</div>
+<p style="color:#888;font-size:0.85rem;margin-bottom:{% if cancelado %}8{% else %}20{% endif %}px;">{{ s.filename }}</p>
+{% if cancelado %}
+<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;
+            padding:10px 16px;margin-bottom:16px;font-size:0.87rem;color:#856404;">
+  Liquidación <strong>cancelada manualmente</strong> — resultados parciales.
+  Los items con estado OK ya fueron grabados en SGS.
+</div>
+{% endif %}
+
+{% set ok_count    = resultados | selectattr('ok')                          | list | length %}
+{% set err_count   = resultados | rejectattr('ok')                          | list | length %}
+{% set new_count   = resultados | selectattr('creada')                      | list | length %}
+{% set audit_ok    = resultados | selectattr('auditoria') | selectattr('auditoria.coincide') | list | length %}
+{% set audit_desc  = resultados | selectattr('ok') | selectattr('auditoria') | rejectattr('auditoria.coincide') | list | length %}
+{# Lider: contar MAT con lider_ok=true / lider_ok=false #}
+{% set lider_ok_n  = resultados | selectattr('auditoria') | selectattr('auditoria.lider_ok') | list | length %}
+{% set lider_mal_n = namespace(v=0) %}
+{% for r in resultados %}
+  {% if r.auditoria and r.auditoria.lider_ok == false %}{# strict false, not None #}
+    {% set lider_mal_n.v = lider_mal_n.v + 1 %}
+  {% endif %}
+{% endfor %}
+{# Custodia: materiales liquidados bajo variante C #}
+{% set custodia_n = resultados | selectattr('es_custodia') | list | length %}
+
+<div class="stat-row" style="margin-bottom:20px;">
+  <div class="stat {{ 'green' if ok_count == resultados|length else 'blue' }}">
+    <div class="num">{{ ok_count }}</div><div class="lbl">Liquidadas OK</div>
+  </div>
+  <div class="stat {{ 'red' if err_count else 'gray' }}">
+    <div class="num">{{ err_count }}</div><div class="lbl">Con error</div>
+  </div>
+  <div class="stat gray">
+    <div class="num">{{ new_count }}</div><div class="lbl">Creadas nuevas</div>
+  </div>
+  <div style="width:1px;background:#eee;margin:0 8px;"></div>
+  <div class="stat {{ 'green' if audit_ok == ok_count else 'red' }}">
+    <div class="num">{{ audit_ok }}</div><div class="lbl">Auditoria ✓</div>
+  </div>
+  <div class="stat {{ 'red' if audit_desc else 'gray' }}">
+    <div class="num">{{ audit_desc }}</div><div class="lbl">Descuadres</div>
+  </div>
+  <div style="width:1px;background:#eee;margin:0 8px;"></div>
+  <div class="stat {{ 'green' if lider_ok_n > 0 and lider_mal_n.v == 0 else ('red' if lider_mal_n.v > 0 else 'gray') }}">
+    <div class="num">{{ lider_ok_n }}</div><div class="lbl">Lider ✓</div>
+  </div>
+  <div class="stat {{ 'red' if lider_mal_n.v else 'gray' }}">
+    <div class="num">{{ lider_mal_n.v }}</div><div class="lbl">Lider MAL</div>
+  </div>
+  <div style="width:1px;background:#eee;margin:0 8px;"></div>
+  <div class="stat {{ 'blue' if custodia_n else 'gray' }}"
+       title="Materiales liquidados bajo variante custodia (código SGS termina en C)">
+    <div class="num">{{ custodia_n }}</div><div class="lbl">Custodia (C)</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Detalle</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Tipo</th><th>Código</th><th>PRO</th><th>Cant. liquidada</th>
+        <th>Nueva</th><th>Modo</th><th>Estado liq.</th>
+        <th style="border-left:2px solid #c3e6cb;">SGS Advance</th>
+        <th>SGS Balance</th><th>Auditoria</th>
+        <th style="border-left:2px solid #fde68a;">Lider esperado</th>
+        <th>Lider grabado</th><th>Lider ok</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in resultados %}
+    {% set aud = r.auditoria or {} %}
+    <tr>
+      <td>
+        <span class="badge {{ 'badge-blue' if r.tipo == 'MAT' else 'badge-ok' }}">{{ r.tipo }}</span>
+      </td>
+      <td>
+        {% if r.es_custodia %}
+          <strong>{{ r.codigo_sgs or r.codigo }}</strong>
+          <span style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;
+                       border-radius:4px;font-size:0.63rem;font-weight:800;
+                       padding:1px 5px;margin-left:2px;"
+                title="Variante custodia — Excel usa '{{ r.codigo }}'">C</span>
+          <div style="font-size:0.68rem;color:#92400e;">{{ r.codigo }}</div>
+        {% else %}
+          <strong>{{ r.codigo }}</strong>
+        {% endif %}
+      </td>
+      <td style="font-size:0.8rem;">{{ r.pro_code }}</td>
+      <td style="text-align:right;">{{ r.cantidad }}</td>
+      <td style="text-align:center;">
+        {% if r.creada %}<span class="badge badge-blue">Nueva</span>
+        {% else %}<span style="color:#aaa;">—</span>{% endif %}
+      </td>
+      <td style="text-align:center;font-size:0.78rem;">
+        {% if r.worker_id is defined %}
+          <span title="Worker paralelo headless #{{ r.worker_id }}"
+                style="background:#e3f2fd;color:#1565c0;border-radius:10px;
+                       padding:2px 7px;font-weight:700;">
+            W{{ r.worker_id }}
+          </span>
+        {% else %}
+          <span title="Browser visible principal"
+                style="background:#f0faf4;color:#2e7d32;border-radius:10px;
+                       padding:2px 7px;font-weight:700;">
+            vis.
+          </span>
+        {% endif %}
+      </td>
+      <td>
+        {% if r.ok %}
+          <span class="badge badge-ok">OK</span>
+        {% else %}
+          <span class="badge badge-error">Error</span>
+          {% if r.error %}
+            <div style="font-size:0.75rem;color:#e74c3c;margin-top:3px;">{{ r.error[:120] }}</div>
+          {% endif %}
+        {% endif %}
+      </td>
+      <td style="text-align:right;border-left:2px solid #c3e6cb;">
+        {{ aud.advance if aud.advance is defined else '—' }}
+      </td>
+      <td style="text-align:right;">
+        {{ aud.balance if aud.balance is defined else '—' }}
+      </td>
+      <td>
+        {% if aud.estado == 'ok' %}
+          <span class="badge badge-ok">✓ Coincide</span>
+        {% elif aud.estado == 'descuadre' %}
+          <span class="badge badge-error">⚠ Descuadre</span>
+          <div style="font-size:0.75rem;color:#e74c3c;">
+            advance={{ aud.advance }} / esperado={{ r.cantidad }}
+          </div>
+        {% elif aud.estado == 'no_ejecutado' %}
+          <span class="badge badge-gray">No ejecutado</span>
+        {% elif aud.estado == 'no_encontrado' %}
+          <span class="badge badge-warn">No encontrado</span>
+        {% elif aud.estado == 'error' %}
+          <span class="badge badge-warn">Error API</span>
+        {% else %}
+          <span class="badge badge-gray">{{ aud.estado or '—' }}</span>
+        {% endif %}
+      </td>
+      {# ── Auditoría de lider ── #}
+      {% if r.tipo == 'MAT' %}
+        <td style="font-size:0.78rem;border-left:2px solid #fde68a;color:#555;">
+          {{ aud.lider_esperado if aud.lider_esperado is defined else (r.partner_nombre or '—') }}
+        </td>
+        <td style="font-size:0.78rem;">
+          {% if aud.lider_liquidado is defined and aud.lider_liquidado %}
+            {{ aud.lider_liquidado }}
+          {% else %}
+            <span style="color:#ccc;">—</span>
+          {% endif %}
+        </td>
+        <td style="text-align:center;">
+          {% if aud.lider_ok is defined %}
+            {% if aud.lider_ok == true %}
+              <span style="color:#27ae60;font-size:1rem;font-weight:700;"
+                    title="Lider correcto: {{ aud.lider_liquidado }}">✓</span>
+            {% elif aud.lider_ok == false %}
+              <span style="color:#e74c3c;font-size:1rem;font-weight:700;"
+                    title="Se liquidó a {{ aud.lider_liquidado }} — debía ser {{ aud.lider_esperado }}">✗</span>
+              <div style="font-size:0.7rem;color:#e74c3c;max-width:140px;line-height:1.3;">
+                Se liquidó a <strong>{{ aud.lider_liquidado }}</strong>,<br>
+                debía ser <strong>{{ aud.lider_esperado }}</strong>
+              </div>
+            {% else %}
+              <span style="color:#ccc;font-size:0.8rem;">—</span>
+            {% endif %}
+          {% else %}
+            <span style="color:#ccc;font-size:0.8rem;">—</span>
+          {% endif %}
+        </td>
+      {% else %}
+        <td style="border-left:2px solid #fde68a;"></td><td></td><td></td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card" style="background:{% if audit_ok > 0 and audit_desc == 0 %}#f1f8f4{% elif audit_desc > 0 %}#fff8f0{% else %}#f8f9fa{% endif %};">
+  <h2>Auditoria SGS</h2>
+  {% set auditada = resultados | selectattr('auditoria') | selectattr('auditoria.estado') | list %}
+  {% if not auditada %}
+  <div class="alert alert-info">
+    La auditoria verifica en SGS que los balances quedaron en 0 tras la liquidacion.<br>
+    Cuando estés listo, pulsa <strong>↻ Verificar en SGS</strong> arriba.
+  </div>
+  {% elif audit_desc == 0 %}
+  <div class="alert alert-success">
+    ✓ Todos los balances en SGS coinciden. No hay descuadres.
+  </div>
+  {% else %}
+  <div class="alert alert-warning">
+    ⚠ {{ audit_desc }} item(s) con descuadre. Revisar manualmente en SGS.
+  </div>
+  {% endif %}
+  {% if auditada %}
+  <p style="font-size:0.85rem;color:#555;margin-top:8px;">
+    Coinciden: <strong>{{ audit_ok }}</strong> &nbsp;|&nbsp;
+    Descuadres: <strong>{{ audit_desc }}</strong>
+  </p>
+  {% endif %}
+</div>
+
+{# ── Auditoría de Lider ── #}
+{% set lider_auditados = resultados | selectattr('tipo','eq','MAT') | selectattr('auditoria') | list %}
+{% set lider_auditados_con_dato = lider_auditados | selectattr('auditoria.lider_ok', 'defined') | list %}
+{% if lider_auditados_con_dato %}
+{% set malos = [] %}
+{% for r in lider_auditados_con_dato %}
+  {% if r.auditoria.lider_ok == false %}{% set _ = malos.append(r) %}{% endif %}
+{% endfor %}
+<div class="card" style="background:{% if malos %}#fff8f0{% else %}#f1f8f4{% endif %};margin-top:8px;">
+  <h2>Auditoría de Lider (partner_id)</h2>
+  {% if not malos %}
+  <div class="alert alert-success">
+    ✓ Todos los materiales fueron liquidados al lider correcto.
+  </div>
+  {% else %}
+  <div class="alert alert-warning">
+    ⚠ {{ malos | length }} material(es) liquidado(s) al lider equivocado — requieren reversión.
+  </div>
+  <table style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-top:10px;">
+    <thead>
+      <tr style="background:#fff3cd;">
+        <th style="padding:7px 12px;text-align:left;">Código</th>
+        <th style="padding:7px 12px;text-align:left;">PRO</th>
+        <th style="padding:7px 12px;text-align:left;">Lider grabado en SGS</th>
+        <th style="padding:7px 12px;text-align:left;">Lider correcto (bandeja)</th>
+        <th style="padding:7px 12px;text-align:left;">Acción</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in malos %}
+    <tr style="border-bottom:1px solid #fde8b4;">
+      <td style="padding:7px 12px;font-weight:700;">{{ r.codigo }}</td>
+      <td style="padding:7px 12px;font-size:0.78rem;color:#666;">{{ r.pro_code }}</td>
+      <td style="padding:7px 12px;color:#c0392b;font-weight:600;">
+        {{ r.auditoria.lider_liquidado or '(sin lider)' }}
+      </td>
+      <td style="padding:7px 12px;color:#27ae60;font-weight:600;">
+        {{ r.auditoria.lider_esperado or '?' }}
+      </td>
+      <td style="padding:7px 12px;">
+        <span style="background:#fdecea;color:#c0392b;border-radius:8px;
+                     padding:2px 8px;font-size:0.75rem;font-weight:700;">
+          Revertir y reliquidar
+        </span>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  <p style="font-size:0.8rem;color:#888;margin-top:10px;">
+    Lider correcto: <strong>{{ lider_ok_n }}</strong> &nbsp;|&nbsp;
+    Mal asignados: <strong>{{ lider_mal_n.v }}</strong> &nbsp;|&nbsp;
+    Sin dato: <strong>{{ (lider_auditados | length) - (lider_auditados_con_dato | length) }}</strong>
+  </p>
+</div>
+{% endif %}
+
+{# ── Calcular si hay errores MAT retryables ── #}
+{% set mat_errores = resultados | rejectattr('ok') | selectattr('tipo', 'equalto', 'MAT') | list %}
+{% set RETRYABLE = ['nav_timeout','addline_timeout','edit_timeout','save_error','generic_timeout','login_timeout'] %}
+{% set has_retryable = namespace(v=false) %}
+{% if debug and debug.clases_error %}
+  {% for cls in RETRYABLE %}
+    {% if cls in debug.clases_error %}{% set has_retryable.v = true %}{% endif %}
+  {% endfor %}
+{% elif mat_errores %}
+  {# Sin debug, asumir retryable si hay errores MAT #}
+  {% set has_retryable.v = true %}
+{% endif %}
+
+<div style="margin-top:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+  <a href="{{ url_for('julian.cierre_rapido', sid=sid) }}"
+     class="btn btn-primary"
+     title="Verifica y corrige fecha, PDL y estado (registrado → terminado/balance) en todos los proyectos liquidados">
+    Verificar Cierre
+  </a>
+
+  {% if has_retryable.v %}
+  <form method="post" action="{{ url_for('julian.reintento', sid=sid) }}"
+        style="display:inline;"
+        onsubmit="return confirm('¿Reintentar los {{ mat_errores|length }} material(es) MAT fallido(s)?\n\nEl sistema verificará el balance fresco en SGS antes de liquidar.');">
+    <button type="submit" class="btn"
+            style="background:#e67e22;color:white;font-weight:700;border:none;cursor:pointer;"
+            title="Reintentar solo los materiales MAT fallidos con balance fresco de SGS">
+      ↻ Reintentar fallidos ({{ mat_errores|length }})
+    </button>
+  </form>
+  {% endif %}
+
+  <a href="{{ url_for('julian.verificar', sid=sid) }}" class="btn btn-light">
+    &larr; Volver a verificacion
+  </a>
+  <a href="{{ url_for('julian.subir') }}" class="btn btn-light">Subir otro Presupuesto</a>
+</div>
+
+{# ── Informe de depuración ── #}
+{% if debug %}
+<details style="margin-top:28px;">
+  <summary style="cursor:pointer;font-size:0.85rem;color:#888;
+                  padding:8px 0;border-top:1px solid #eee;user-select:none;">
+    Informe de depuración (para análisis de errores)
+  </summary>
+  <div style="margin-top:10px;background:#1e1e2e;color:#cdd6f4;border-radius:8px;
+              padding:16px;font-family:monospace;font-size:0.78rem;
+              white-space:pre-wrap;overflow-x:auto;line-height:1.6;">
+{%- set d = debug -%}
+=== LIQUIDACION DEBUG REPORT {{ d.timestamp }} ===
+
+RESUMEN
+  Total items   : {{ d.total }}
+  OK            : {{ d.ok }}
+  Fallidos      : {{ d.fallidos }}
+  Reintentados  : {{ d.reintentados }}
+  Retry OK      : {{ d.retry_ok }}
+  Tasa exito    : {{ ((d.ok / d.total) * 100) | round(1) if d.total else 0 }}%
+
+CLASIFICACION DE ERRORES
+{%- for clase, n in d.clases_error.items() %}
+  {{ "%-28s"|format(clase) }} x{{ n }}
+{%- else %}
+  (sin errores)
+{%- endfor %}
+
+DETALLE DE FALLIDOS ({{ d.errores_detalle | length }})
+{%- for e in d.errores_detalle %}
+  [{{ e.tipo }}] {{ e.codigo }} | W{{ e.worker }} | intento={{ e.intento }} | {{ e.clase }}
+    {{ e.error[:120] }}
+{%- else %}
+  (todos OK)
+{%- endfor %}
+  </div>
+</details>
+{% endif %}
+
+{% endblock %}

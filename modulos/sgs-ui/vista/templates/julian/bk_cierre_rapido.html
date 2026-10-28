@@ -1,0 +1,250 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Verificar Cierre — SGS UI{% endblock %}
+
+{% block extra_head %}
+<style>
+  .cr-stat { display:inline-flex;flex-direction:column;align-items:center;
+             min-width:80px;padding:10px 14px;border-radius:8px;
+             background:#f8f9fa;border:1px solid #e9ecef; }
+  .cr-stat .num { font-size:1.6rem;font-weight:800;line-height:1; }
+  .cr-stat .lbl { font-size:0.72rem;color:#666;margin-top:3px; }
+  .cr-stat.blue { background:#e3f2fd;border-color:#90caf9; }
+  .cr-stat.blue .num { color:#1565c0; }
+  .cr-stat.green { background:#e8f5e9;border-color:#a5d6a7; }
+  .cr-stat.green .num { color:#2e7d32; }
+  .cr-stat.red { background:#ffebee;border-color:#ef9a9a; }
+  .cr-stat.red .num { color:#c62828; }
+  .cr-stat.gray .num { color:#555; }
+
+  .badge-ok2   { background:#d1fae5;color:#065f46;border-radius:999px;
+                 padding:2px 8px;font-size:0.76rem;font-weight:700; }
+  .badge-pend  { background:#fef9c3;color:#78350f;border-radius:999px;
+                 padding:2px 8px;font-size:0.76rem;font-weight:700; }
+  .badge-err   { background:#fde2e1;color:#b42318;border-radius:999px;
+                 padding:2px 8px;font-size:0.76rem;font-weight:700; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;
+            flex-wrap:wrap;margin-bottom:8px;">
+  <div>
+    <h1 style="font-size:1.25rem;margin:0;">Verificacion de cierre rapido</h1>
+    <p style="margin:5px 0 0;color:#888;font-size:0.83rem;">{{ s.filename }}</p>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <a href="{{ url_for('julian.resultado', sid=sid) if s.resultados_liquidacion else url_for('julian.resumen', sid=sid) }}" class="btn btn-light">
+      &larr; Volver
+    </a>
+    <a href="{{ url_for('julian.cierre_rapido', sid=sid,
+                        fecha=meta.fecha_input, pdl=meta.pdl_esperado) }}"
+       class="btn btn-success">
+      Reconsultar SGS
+    </a>
+  </div>
+</div>
+
+{# ── Filtros ── #}
+<div class="card" style="margin-bottom:16px;">
+  <form method="GET" action="{{ url_for('julian.cierre_rapido', sid=sid) }}"
+        style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;">
+    <div>
+      <label style="display:block;font-size:0.78rem;color:#666;margin-bottom:4px;">
+        Fecha esperada
+      </label>
+      <input type="date" name="fecha" value="{{ meta.fecha_input }}"
+             style="padding:8px 10px;border:1px solid #d9d9d9;border-radius:6px;min-width:170px;">
+    </div>
+    <div style="min-width:260px;flex:1;">
+      <label style="display:block;font-size:0.78rem;color:#666;margin-bottom:4px;">
+        PDL esperado
+      </label>
+      <input type="text" name="pdl" value="{{ meta.pdl_esperado }}"
+             placeholder="CDOPPI..."
+             style="padding:8px 10px;border:1px solid #d9d9d9;border-radius:6px;width:100%;">
+    </div>
+    <button type="submit" class="btn btn-primary">Verificar</button>
+  </form>
+  <div style="margin-top:10px;font-size:0.83rem;color:#666;display:flex;gap:18px;flex-wrap:wrap;">
+    <span><strong>Estado esperado:</strong> {{ meta.estado_esperado }}</span>
+    <span><strong>Fecha:</strong> {{ meta.fecha_ui }}</span>
+    <span><strong>PDL:</strong> {{ meta.pdl_esperado or "Sin PDL" }}</span>
+  </div>
+</div>
+
+{# ── Stats ── #}
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;">
+  <div class="cr-stat blue">
+    <div class="num">{{ meta.total }}</div><div class="lbl">Identificados</div>
+  </div>
+  <div class="cr-stat gray">
+    <div class="num">{{ meta.elegibles }}</div><div class="lbl">Elegibles</div>
+  </div>
+  <div class="cr-stat {{ 'red' if meta.pendientes else 'gray' }}">
+    <div class="num">{{ meta.pendientes }}</div><div class="lbl">Pendientes</div>
+  </div>
+  <div class="cr-stat {{ 'green' if meta.listos else 'gray' }}">
+    <div class="num">{{ meta.listos }}</div><div class="lbl">Listos</div>
+  </div>
+</div>
+
+{% if not rows %}
+<div class="card">
+  <p style="margin:0;color:#666;font-size:0.88rem;">
+    No se encontraron proyectos identificados en esta sesion.
+    Primero ejecuta la liquidacion y luego vuelve a este panel.
+  </p>
+</div>
+{% else %}
+
+<form method="POST" action="{{ url_for('julian.cierre_rapido', sid=sid) }}">
+  <input type="hidden" name="fecha" value="{{ meta.fecha_input }}">
+  <input type="hidden" name="pdl"   value="{{ meta.pdl_esperado }}">
+
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+    <button type="submit" class="btn btn-primary">
+      Corregir seleccionados
+    </button>
+    <button type="button" id="mark-pending" class="btn btn-light">
+      Marcar pendientes
+    </button>
+    <button type="button" id="clear-sel" class="btn btn-light">
+      Limpiar seleccion
+    </button>
+    <span style="font-size:0.81rem;color:#777;">
+      La correccion actualiza fecha, PDL y estado usando la UI visible de SGS.
+    </span>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden;">
+    <table style="font-size:0.84rem;">
+      <thead>
+        <tr>
+          <th style="width:40px;">
+            <input type="checkbox" id="toggle-all">
+          </th>
+          <th>Proyecto</th>
+          <th>Contexto</th>
+          <th>PDL</th>
+          <th>Fechas</th>
+          <th>Estado</th>
+          <th>Situacion</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for row in rows %}
+      <tr style="background:
+          {% if row.panel_estado == 'pendiente' %}#fff8e1
+          {% elif row.panel_estado == 'ok' %}#f3fbf5
+          {% else %}#fafafa{% endif %};">
+
+        <td style="text-align:center;">
+          {% if row.elegible %}
+            <input type="checkbox" name="pid" value="{{ row.pid }}"
+                   data-pending="{{ 1 if row.necesita_actualizacion else 0 }}"
+                   {% if row.preseleccionado %}checked{% endif %}>
+          {% else %}
+            <span style="color:#bbb;">—</span>
+          {% endif %}
+        </td>
+
+        <td>
+          <div style="font-weight:700;color:#1f1f1f;font-size:0.88rem;">
+            [{{ row.pro_code or ("PID " ~ row.pid) }}] {{ row.nombre }}
+          </div>
+          <div style="font-size:0.78rem;color:#666;margin-top:2px;">
+            DF {{ row.order_number }} | Nodo(s): {{ row.nodos_txt }}
+          </div>
+          <div style="font-size:0.78rem;color:#888;margin-top:2px;">
+            Fuentes: {{ row.fuentes_txt }}
+            {% if row.liquidado_ok %}
+              <span style="margin-left:6px;background:#d1fae5;color:#065f46;
+                           border-radius:8px;padding:1px 6px;font-size:0.72rem;
+                           font-weight:700;">Liquidado OK</span>
+            {% endif %}
+          </div>
+        </td>
+
+        <td style="font-size:0.81rem;line-height:1.5;">
+          <div><strong>Cliente:</strong> {{ row.customer }}</div>
+          <div><strong>Contrato:</strong> {{ row.contract }}</div>
+          <div><strong>Territorio:</strong> {{ row.department }}</div>
+        </td>
+
+        <td style="font-size:0.81rem;line-height:1.5;">
+          <div><strong>Actual:</strong> {{ row.pdl_actual }}</div>
+          <div><strong>Esperado:</strong> {{ row.pdl_esperado }}</div>
+          <div style="margin-top:4px;">
+            <span class="{{ 'badge-ok2' if row.pdl_ok else 'badge-err' }}">
+              {{ 'OK' if row.pdl_ok else 'Pendiente' }}
+            </span>
+          </div>
+        </td>
+
+        <td style="font-size:0.81rem;line-height:1.5;">
+          <div><strong>{{ row.fechas_ok_count }}/{{ row.fechas_total }}</strong> OK</div>
+          <div style="color:#666;">Esperado: {{ row.fecha_esperada_ui }}</div>
+          {% if row.fechas_diferentes %}
+            <div style="margin-top:4px;color:#8a4b08;">
+              {% for diff in row.fechas_diferentes[:3] %}
+                <div>{{ diff.label }}: {{ diff.actual }}</div>
+              {% endfor %}
+              {% if row.fechas_diferentes|length > 3 %}
+                <div>+{{ row.fechas_diferentes|length - 3 }} mas</div>
+              {% endif %}
+            </div>
+          {% else %}
+            <div style="margin-top:4px;color:#2e7d32;font-size:0.76rem;">Todo alineado</div>
+          {% endif %}
+        </td>
+
+        <td style="font-size:0.81rem;line-height:1.5;">
+          <div><strong>Actual:</strong> {{ row.estado_actual }}</div>
+          <div><strong>Esperado:</strong>
+            <span style="font-size:0.75rem;">{{ row.estado_esperado }}</span>
+          </div>
+          <div style="margin-top:4px;">
+            <span class="{{ 'badge-ok2' if row.status_ok else 'badge-err' }}">
+              {{ 'OK' if row.status_ok else 'Pendiente' }}
+            </span>
+          </div>
+        </td>
+
+        <td style="font-size:0.81rem;">
+          <span class="{{ 'badge-ok2' if row.panel_estado == 'ok' else 'badge-pend' }}"
+                style="display:inline-block;margin-bottom:4px;">
+            {{ row.panel_label }}
+          </span>
+        </td>
+
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</form>
+
+<script>
+(() => {
+  const all        = document.getElementById('toggle-all');
+  const markPend   = document.getElementById('mark-pending');
+  const clearBtn   = document.getElementById('clear-sel');
+  const boxes      = () => Array.from(document.querySelectorAll('input[name="pid"]'));
+
+  if (all) {
+    all.addEventListener('change', () => boxes().forEach(cb => { cb.checked = all.checked; }));
+  }
+  if (markPend) {
+    markPend.addEventListener('click', () => {
+      boxes().forEach(cb => { cb.checked = cb.dataset.pending === '1'; });
+    });
+  }
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => boxes().forEach(cb => { cb.checked = false; }));
+  }
+})();
+</script>
+
+{% endif %}
+{% endblock %}

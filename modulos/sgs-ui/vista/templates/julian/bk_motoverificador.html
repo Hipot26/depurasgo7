@@ -1,0 +1,232 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Motoverificador — Corrección de Nodos{% endblock %}
+{% block content %}
+
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+  <h1 style="font-size:1.3rem;">Motoverificador — Corrección de Nodos</h1>
+  <a href="{{ url_for('julian.ver_verificacion', sid=sid) }}"
+     style="margin-left:auto;font-size:0.82rem;color:#555;text-decoration:none;">
+    ← Volver a Verificación
+  </a>
+</div>
+
+{% if error_sgs %}
+<div style="background:#fdecea;border:1px solid #e57373;border-radius:7px;
+            padding:12px 16px;margin-bottom:16px;color:#c62828;font-size:0.85rem;">
+  ⚠ Error SGS: {{ error_sgs }}
+</div>
+{% endif %}
+
+{% if cable_checks_total == 0 %}
+<div style="background:#f0fff4;border:1px solid #28a745;border-radius:8px;
+            padding:20px;text-align:center;color:#155724;">
+  ✓ Sin actividades CABLE en la sesión actual.
+</div>
+{% else %}
+
+{# ── Construir lista plana de bloques a revertir ── #}
+{% set items = [] %}
+{% for info in analisis %}
+  {% for err in info.avances_erroneos %}
+    {% if items.append({'info': info, 'err': err}) %}{% endif %}
+  {% endfor %}
+{% endfor %}
+
+{% if items %}
+
+<div style="background:#1a3e6e;color:white;border-radius:8px;padding:14px 18px;
+            margin-bottom:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+  <div>
+    <strong>{{ items|length }}</strong> bloque(s) con avances incorrectos en
+    <strong>{{ analisis | selectattr('avances_erroneos') | list | length }}</strong> actividad(es).
+  </div>
+  <button onclick="revertirTodo()"
+          style="margin-left:auto;background:#e53935;color:white;border:none;
+                 border-radius:6px;padding:9px 22px;font-size:0.9rem;
+                 font-weight:700;cursor:pointer;">
+    ↻ Revertir todo
+  </button>
+</div>
+
+<table style="width:100%;border-collapse:collapse;font-size:0.85rem;background:white;
+              border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.1);">
+  <thead>
+    <tr style="background:#1a3e6e;color:white;">
+      <th style="padding:9px 12px;text-align:left;">Actividad</th>
+      <th style="padding:9px 12px;text-align:left;">Nodo incorrecto</th>
+      <th style="padding:9px 12px;text-align:left;">Re-liquidar en</th>
+      <th style="padding:9px 12px;">Líderes / Cant.</th>
+      <th style="padding:9px 12px;text-align:center;">Total</th>
+      <th style="padding:9px 12px;text-align:center;">Acción</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for item in items %}
+  {% set info = item.info %}
+  {% set err  = item.err %}
+  <tr id="fila-{{ loop.index0 }}" style="border-bottom:1px solid #eee;">
+    <td style="padding:9px 12px;font-family:monospace;font-weight:700;color:#1a3e6e;">
+      {{ info.act_code }}
+    </td>
+    <td style="padding:9px 12px;color:#c62828;font-size:0.8rem;">
+      {{ err.nombre_nodo or err.pro_code_incorrecto }}
+    </td>
+    <td style="padding:9px 12px;color:#27ae60;font-size:0.8rem;">
+      {% if info.cable_target %}{{ info.cable_target.name }}
+      {% else %}<span style="color:#999;">— manual</span>{% endif %}
+    </td>
+    <td style="padding:9px 12px;">
+      {% for d in err.detalles %}
+      <span style="display:block;font-size:0.78rem;color:#555;">
+        {{ d.partner_nombre }}
+        <strong style="color:#c62828;">({{ d.amount|int }})</strong>
+        <span style="color:#aaa;font-size:0.72rem;">{{ d.fecha_sgs }}</span>
+      </span>
+      {% endfor %}
+    </td>
+    <td style="padding:9px 12px;text-align:center;font-weight:700;color:#c62828;">
+      {{ err.total_revertir|int }}
+    </td>
+    <td style="padding:9px 12px;text-align:center;">
+      <button onclick="revertirUno({{ loop.index0 }})"
+              id="btn-{{ loop.index0 }}"
+              style="background:#c62828;color:white;border:none;border-radius:5px;
+                     padding:6px 16px;font-size:0.82rem;font-weight:700;cursor:pointer;">
+        Revertir
+      </button>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% else %}
+<div style="background:#f0fff4;border:1px solid #28a745;border-radius:8px;
+            padding:16px;color:#155724;font-size:0.85rem;">
+  ✓ Sin avances incorrectos detectados en los {{ cable_checks_total }} actividades CABLE.
+</div>
+{% endif %}
+{% endif %}
+
+{# Panel de estado #}
+<div id="rollback-status" style="display:none;position:fixed;bottom:20px;right:20px;
+     background:#1a3e6e;color:white;border-radius:10px;padding:16px 20px;
+     min-width:300px;box-shadow:0 4px 20px rgba(0,0,0,.3);z-index:9999;">
+  <div id="rollback-title" style="font-weight:700;margin-bottom:4px;">↻ Rollback…</div>
+  <div id="rollback-msg"   style="font-size:0.82rem;opacity:.9;margin-bottom:6px;"></div>
+  <div style="height:4px;background:rgba(255,255,255,.2);border-radius:2px;">
+    <div id="rollback-bar" style="height:4px;background:#27ae60;border-radius:2px;
+         width:0%;transition:width .4s;"></div>
+  </div>
+</div>
+
+{# ── Datos embebidos: sin problemas de encoding ── #}
+<script>
+const SID = {{ sid | tojson }};
+const ROLLBACK_ITEMS = [
+{% for item in items %}
+{
+  pid:          {{ item.err.pid_incorrecto }},
+  actId:        {{ item.err.act_id }},
+  actCode:      {{ item.info.act_code | tojson }},
+  proCode:      {{ item.err.pro_code_incorrecto | tojson }},
+  proyectado:   {{ item.err.amount_proyectado }},
+  detalles:     {{ item.err.detalles | tojson }},
+  pidCable:     {{ item.info.cable_target.id if item.info.cable_target else 'null' }},
+  proCodeCable: {{ item.info.cable_target.name | tojson if item.info.cable_target else '""' }}
+}{{ "," if not loop.last }}
+{% endfor %}
+];
+
+function revertirUno(idx) {
+  const d = ROLLBACK_ITEMS[idx];
+  const lideres = d.detalles.map(x => x.partner_nombre + ' (' + Math.abs(x.amount) + ')').join('\n  ');
+  if (!confirm('Revertir ' + d.detalles.length + ' línea(s) de ' + d.actCode +
+               ' en ' + d.proCode + '?\n\n  ' + lideres + '\n\n¿Confirmar?')) return;
+  _doRollback(idx, d);
+}
+
+async function revertirTodo() {
+  if (ROLLBACK_ITEMS.length === 0) return;
+  const resumen = ROLLBACK_ITEMS.map((d, i) =>
+    d.actCode + ' en ' + d.proCode + ' (' + d.detalles.length + ' líneas)'
+  ).join('\n  ');
+  if (!confirm('Revertir TODOS (' + ROLLBACK_ITEMS.length + ' bloques):\n\n  ' +
+               resumen + '\n\n¿Confirmar?')) return;
+
+  for (let i = 0; i < ROLLBACK_ITEMS.length; i++) {
+    const ok = await _doRollback(i, ROLLBACK_ITEMS[i]);
+    if (!ok) break;
+  }
+  setTimeout(() => location.reload(), 1500);
+}
+
+async function _doRollback(idx, d) {
+  const status = document.getElementById('rollback-status');
+  const title  = document.getElementById('rollback-title');
+  const msg    = document.getElementById('rollback-msg');
+  const bar    = document.getElementById('rollback-bar');
+  const btn    = document.getElementById('btn-' + idx);
+
+  status.style.display = 'block';
+  bar.style.background = '#27ae60';
+  bar.style.width      = '0%';
+  title.textContent    = '↻ ' + d.actCode;
+  const pasos = d.pidCable
+    ? `Paso 1: restar en ${d.proCode} → Paso 2: liquidar en ${d.proCodeCable}`
+    : `Restando en ${d.proCode}…`;
+  msg.textContent = pasos;
+  if (btn) btn.disabled = true;
+
+  let pct = 0;
+  const iv = setInterval(() => { pct = Math.min(pct + 2, 85); bar.style.width = pct + '%'; }, 600);
+
+  const detallesBack = d.detalles.map(x => ({
+    partner_nombre:  x.partner_nombre,
+    cantidad_restar: Math.abs(x.amount),
+    fecha:           x.fecha_pw
+  }));
+
+  try {
+    const form = new FormData();
+    form.append('pid_incorrecto',    d.pid);
+    form.append('act_id',            d.actId);
+    form.append('act_code',          d.actCode);
+    form.append('pro_code',          d.proCode);
+    form.append('proyectado_actual', d.proyectado);
+    form.append('detalles_json',     JSON.stringify(detallesBack));
+    if (d.pidCable)     form.append('pid_cable',      d.pidCable);
+    if (d.proCodeCable) form.append('pro_code_cable', d.proCodeCable);
+
+    const resp = await fetch('/julian/ejecutar_rollback_lote_mo/' + SID, {
+      method: 'POST', body: form
+    });
+    const data = await resp.json();
+    clearInterval(iv);
+    bar.style.width = '100%';
+
+    if (data.ok) {
+      msg.textContent = '✓ ' + d.actCode + ': ' + (data.lineas_revertidas || 0) + ' línea(s) revertidas';
+      const fila = document.getElementById('fila-' + idx);
+      if (fila) { fila.style.opacity = '0.35'; fila.style.textDecoration = 'line-through'; }
+      setTimeout(() => { status.style.display = 'none'; }, 2500);
+      return true;
+    } else {
+      msg.textContent      = '✗ ' + d.actCode + ': ' + (data.error || 'error desconocido');
+      bar.style.background = '#c62828';
+      if (btn) btn.disabled = false;
+      setTimeout(() => { status.style.display = 'none'; }, 8000);
+      return false;
+    }
+  } catch(e) {
+    clearInterval(iv);
+    msg.textContent      = '✗ Error de red: ' + e;
+    bar.style.background = '#c62828';
+    if (btn) btn.disabled = false;
+    setTimeout(() => { status.style.display = 'none'; }, 5000);
+    return false;
+  }
+}
+</script>
+
+{% endblock %}

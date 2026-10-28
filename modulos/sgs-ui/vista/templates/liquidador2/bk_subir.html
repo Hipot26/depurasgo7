@@ -1,0 +1,63 @@
+{% extends "liquidador2/base.html" %}
+{% block title %}Subir Excel — SGS UI{% endblock %}
+{% block content %}
+<div class="card" style="max-width:500px;margin:60px auto;">
+  <h2>Subir plantilla Excel</h2>
+  <p style="color:#666;margin-bottom:20px;font-size:0.9rem;">
+    El sistema detectara automaticamente las hojas de
+    <strong>Mano de Obra</strong> (SIP_MANO_OBRA) y
+    <strong>Materiales</strong> (CRUCE_LIQUIDADOR).
+  </p>
+  <form method="post" enctype="multipart/form-data">
+    <div style="border:2px dashed #ddd;border-radius:8px;padding:30px;text-align:center;margin-bottom:16px;background:#fafbfc;">
+      <input type="file" name="excel" accept=".xlsx,.xlsm,.xls"
+             style="font-size:0.9rem;" required>
+      <p style="margin-top:10px;color:#aaa;font-size:0.8rem;">.xlsx / .xlsm / .xls</p>
+    </div>
+    <div style="margin-bottom:18px;">
+      <label style="display:block;font-weight:700;font-size:0.9rem;margin-bottom:6px;">
+        Fecha de planilla
+        <span style="font-weight:400;color:#888;font-size:0.8rem;margin-left:6px;">
+          — fecha real de las planillas físicas de los trabajadores
+        </span>
+      </label>
+      <input type="date" name="fecha_planilla"
+             style="padding:10px 12px;border:2px solid #1565c0;border-radius:6px;
+                    font-size:1rem;width:100%;box-sizing:border-box;">
+      <p style="margin:5px 0 0;font-size:0.78rem;color:#666;">
+        Si la dejas vacía, se toma automáticamente de la hoja <strong>LIQUIDACION</strong>
+        del Excel ("Fecha real de ejecución"). Si el Excel tampoco la trae, la carga se rechaza.
+        Define la fecha que se registra en SGS para todas las actividades de esta planilla.
+      </p>
+      <p style="margin:6px 0 0;font-size:0.78rem;color:#6a1b9a;">
+        <strong>Plantilla MAT masiva</strong> (Verificador SGS → Automático por Mes): la fecha es
+        opcional. Solo se liquidan materiales y el cierre pone
+        <strong>1.4-TERMINADO/EN BALANCE</strong> a los nodos que no lo tengan, sin tocar fechas ni PDL.
+      </p>
+    </div>
+    <button type="submit" class="btn btn-primary" id="btn-subir" style="width:100%">
+      Cargar y verificar contra SGS
+    </button>
+    <p id="aviso-subir" style="display:none;margin:12px 0 0;padding:10px 12px;border-radius:6px;
+       background:#e8f1fb;color:#1565c0;font-size:0.85rem;line-height:1.4;">
+      <strong>Verificando contra SGS&hellip;</strong> se consulta cada fila del Excel (mano de obra y
+      materiales). Suele tardar <strong>1 a 2 minutos</strong>. No cierres ni reenvíes el formulario.
+    </p>
+  </form>
+</div>
+<script>
+  // SGO7: feedback mientras el servidor verifica contra SGS (antes no había señal y se reenviaba)
+  (function () {
+    var form = document.querySelector("form[enctype]");
+    var btn = document.getElementById("btn-subir");
+    var aviso = document.getElementById("aviso-subir");
+    if (!form || !btn) return;
+    form.addEventListener("submit", function () {
+      btn.disabled = true;
+      btn.textContent = "Verificando contra SGS…";
+      btn.style.opacity = "0.7";
+      if (aviso) aviso.style.display = "block";
+    });
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,383 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Acción Manual — Paso 3: Materiales{% endblock %}
+{% block extra_head %}
+<style>
+  .steps { display:flex; align-items:center; margin-bottom:8px; }
+  .step-circle {
+    width:30px; height:30px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:0.82rem; font-weight:700; flex-shrink:0;
+  }
+  .step-circle.active  { background:#27ae60; color:white; }
+  .step-circle.done    { background:#c8f0da; color:#1a7a40; }
+  .step-circle.pending { background:#e0e0e0; color:#999; }
+  .step-bar  { flex:1; height:3px; }
+  .step-bar.done    { background:#27ae60; }
+  .step-bar.pending { background:#e0e0e0; }
+  .step-labels { display:flex; font-size:0.7rem; color:#aaa; margin-bottom:28px; }
+  .step-labels span { flex:1; text-align:center; }
+  .step-labels span.done   { color:#27ae60; }
+  .step-labels span.active { color:#1a3e2e; font-weight:700; }
+
+  .paste-area {
+    width:100%; min-height:150px; padding:14px;
+    font-family:'Consolas','Courier New',monospace; font-size:0.87rem;
+    border:2px solid #c3e6cb; border-radius:8px;
+    resize:vertical; outline:none; line-height:1.55;
+    background:#fafffe; transition:border-color 0.15s;
+  }
+  .paste-area:focus { border-color:#27ae60; }
+  .paste-area::placeholder { color:#bbb; font-family:'Segoe UI',sans-serif; font-size:0.84rem; }
+
+  #tbl-preview { display:none; }
+  #tbl-preview table { font-size:0.82rem; }
+  .estado-bar {
+    display:flex; align-items:center; gap:10px;
+    padding:8px 12px; border-radius:6px; font-size:0.83rem;
+    margin-bottom:12px; min-height:36px;
+    background:#f8f9fa; color:#888; transition:all 0.2s;
+  }
+  .estado-bar.ok    { background:#d4edda; color:#155724; }
+  .estado-bar.warn  { background:#fff3cd; color:#856404; }
+  .estado-bar.error { background:#f8d7da; color:#721c24; }
+  .estado-bar.info  { background:#cce5ff; color:#004085; }
+  .spinner { display:inline-block; width:14px; height:14px; border:2px solid #ccc;
+             border-top-color:#27ae60; border-radius:50%; animation:spin 0.6s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .hint-box {
+    background:#f1f8f4; border:1px solid #c3e6cb; border-radius:8px;
+    padding:12px 16px; font-size:0.83rem; color:#155724; margin-bottom:18px;
+  }
+  .hint-box code {
+    background:#e8f5e9; padding:2px 6px; border-radius:4px;
+    font-family:monospace; font-size:0.85rem;
+  }
+
+  .mo-summary {
+    background:#f1f8f4; border:1px solid #c3e6cb; border-radius:8px;
+    padding:12px 18px; margin-bottom:20px; font-size:0.85rem;
+  }
+
+  /* Panel nodo-only */
+  #panel-nodo-only {
+    display:none;
+    background:#cce5ff; border:1px solid #b8daff; border-radius:8px;
+    padding:14px 16px; margin:14px 0; font-size:0.85rem; color:#004085;
+  }
+  #panel-nodo-only .nodos-chips {
+    display:flex; flex-wrap:wrap; gap:6px; margin:8px 0;
+  }
+  .chip {
+    background:#0056b3; color:white; padding:4px 12px; border-radius:20px;
+    font-weight:700; font-size:0.82rem;
+  }
+  #btn-sgs-load {
+    background:#0056b3; color:white; border:none;
+    padding:9px 20px; border-radius:6px; font-weight:600;
+    font-size:0.88rem; cursor:pointer; margin-top:6px;
+  }
+  #btn-sgs-load:hover { background:#003d80; }
+  #btn-sgs-load:disabled { background:#9ec5fe; cursor:default; }
+</style>
+{% endblock %}
+{% block content %}
+
+<div style="max-width:860px; margin:36px auto;">
+
+  <!-- Indicador de pasos -->
+  <div class="steps">
+    <div class="step-circle done">✓</div>
+    <div class="step-bar done"></div>
+    <div class="step-circle done">✓</div>
+    <div class="step-bar done"></div>
+    <div class="step-circle active">3</div>
+    <div class="step-bar pending"></div>
+    <div class="step-circle pending">4</div>
+  </div>
+  <div class="step-labels">
+    <span class="done">Datos del proyecto</span>
+    <span class="done">Mano de Obra</span>
+    <span class="active">Materiales</span>
+    <span>Vista previa</span>
+  </div>
+
+  <!-- Header proyecto -->
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+    <div style="background:#1a3e2e;color:white;padding:6px 14px;border-radius:6px;
+                font-family:monospace;font-size:0.95rem;font-weight:700;letter-spacing:1px;">
+      {{ sm.lcl }}
+    </div>
+    <div class="badge {{ 'badge-ok' if sm.tipo == 'mi' else 'badge-warn' }}"
+         style="font-size:0.8rem;padding:4px 10px;">
+      {{ 'Mayor Impacto' if sm.tipo == 'mi' else 'Programado' }}
+    </div>
+  </div>
+
+  <!-- Resumen MO confirmada -->
+  <div class="mo-summary">
+    <strong>✓ MO confirmada:</strong>
+    {{ sm.rows_mo | length }} actividad{{ 'es' if sm.rows_mo | length != 1 else '' }} —
+    {% set qps = sm.rows_mo | map(attribute='qp_code') | list %}
+    {{ qps[:4] | join(', ') }}{% if qps | length > 4 %} y {{ qps | length - 4 }} más{% endif %}
+    &nbsp;|&nbsp;
+    <a href="/julian/manual/mo/{{ sid }}" style="color:#1a7a40;font-size:0.82rem;">✎ Editar MO</a>
+  </div>
+
+  <div class="card">
+    <h2>Paso 3 — Materiales</h2>
+
+    <div class="hint-box">
+      <strong>Dos modos disponibles:</strong><br>
+      &nbsp;• <strong>Solo nodos</strong> (p.ej. <code>67</code> <code>69</code>):
+        el sistema consulta SGS y trae todos los materiales pendientes automáticamente.<br>
+      &nbsp;• <strong>Con SAP</strong>: pega <code>Nodo</code> <code>SAP</code> <code>Cant</code>
+        — el sistema los usa tal cual.
+    </div>
+
+    <div class="estado-bar" id="estado-bar">
+      <span id="estado-icono">·</span>
+      <span id="estado-txt">Pega nodos o materiales, o salta si no hay materiales</span>
+    </div>
+
+    <!-- Panel nodo-only (aparece cuando se detecta solo números de nodo) -->
+    <div id="panel-nodo-only">
+      <strong>Modo nodo-only detectado</strong> — nodos: <span id="nodos-display"></span>
+      <div class="nodos-chips" id="nodos-chips"></div>
+      <div style="font-size:0.8rem;opacity:0.85;margin-bottom:8px;">
+        El sistema consultará SGS y traerá todos los materiales con balance pendiente para estos nodos.
+      </div>
+      <button type="button" id="btn-sgs-load"
+              onclick="cargarDesdeSGS()">
+        Cargar materiales desde SGS
+      </button>
+    </div>
+
+    <form method="post" id="frm-mat">
+      <!-- Campo oculto para filas cargadas desde SGS -->
+      <input type="hidden" name="sgs_rows" id="sgs_rows_hidden" value="">
+
+      <textarea
+        name="texto_mat"
+        id="txt-mat"
+        class="paste-area"
+        placeholder="Opciones de pegado:
+
+1) Solo nodos (consulta automática a SGS):
+   67
+   69
+
+2) Nodo + SAP + Cantidad:
+   67   230965   5
+   69   231052   2
+
+3) Nodo + SAP + Descripción + Cantidad:
+   67   230965   CONDUCTOR CUADRUPLEX   5
+
+(Deja vacío si no hay materiales)"
+        autocomplete="off"
+        spellcheck="false"
+      ></textarea>
+
+      <!-- Vista previa dinámica -->
+      <div id="tbl-preview" style="margin-top:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <strong style="font-size:0.9rem;color:#1a3e2e;">
+            Vista previa — <span id="n-filas">0</span> materiales
+          </strong>
+          <span id="fuente-badge" style="font-size:0.75rem;color:#888;"></span>
+        </div>
+        <div style="overflow-x:auto;">
+          <table id="tbl-mat">
+            <thead>
+              <tr>
+                <th style="width:70px;">Nodo</th>
+                <th style="width:110px;">Código SAP</th>
+                <th>Descripción</th>
+                <th style="width:90px;text-align:right;">Cantidad</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-mat"></tbody>
+          </table>
+        </div>
+        <div id="errs-mat" style="margin-top:10px;"></div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:22px;flex-wrap:wrap;">
+        <a href="/julian/manual/mo/{{ sid }}" class="btn btn-light">← MO</a>
+        <button type="submit" name="accion" value="omitir" class="btn btn-light"
+                onclick="document.getElementById('sgs_rows_hidden').value='';
+                         document.getElementById('txt-mat').value='';"
+                style="border:1.5px solid #ccc;">
+          Omitir materiales
+        </button>
+        <button type="submit" name="accion" value="continuar" class="btn btn-success"
+                id="btn-continuar"
+                style="flex:1;padding:13px;font-size:1rem;">
+          Ver vista previa →
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  const txt        = document.getElementById('txt-mat');
+  const tbody      = document.getElementById('tbody-mat');
+  const tPrev      = document.getElementById('tbl-preview');
+  const eBar       = document.getElementById('estado-bar');
+  const eIco       = document.getElementById('estado-icono');
+  const eTxt       = document.getElementById('estado-txt');
+  const nFilas     = document.getElementById('n-filas');
+  const errDiv     = document.getElementById('errs-mat');
+  const sgsHidden  = document.getElementById('sgs_rows_hidden');
+  const panelNodo  = document.getElementById('panel-nodo-only');
+  const nodosChips = document.getElementById('nodos-chips');
+  const fuenteBadge = document.getElementById('fuente-badge');
+  const LCL        = "{{ sm.lcl }}";
+
+  let timer = null;
+  let nodosActuales = [];
+
+  function setEstado(state, msg) {
+    eBar.className = 'estado-bar ' + (state || '');
+    const icons = { ok:'✓', warn:'⚠', error:'✗', info:'', loading:'', '':'·' };
+    eIco.innerHTML = state === 'loading'
+      ? '<span class="spinner"></span>'
+      : (icons[state] || '·');
+    eTxt.textContent = msg;
+  }
+
+  function renderTabla(rows, fuente) {
+    tbody.innerHTML = '';
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${r.nodo}</td>
+        <td><code style="background:#f1f8f4;padding:2px 5px;border-radius:3px;">${r.codigo}</code></td>
+        <td>${r.desc || '—'}</td>
+        <td style="text-align:right;font-weight:600;">${r.cantidad}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+    nFilas.textContent  = rows.length;
+    tPrev.style.display = rows.length > 0 ? 'block' : 'none';
+    fuenteBadge.textContent = fuente || '';
+  }
+
+  async function parsear() {
+    const texto = txt.value.trim();
+    panelNodo.style.display = 'none';
+    sgsHidden.value = '';
+    tPrev.style.display = 'none';
+
+    if (!texto) {
+      setEstado('', 'Pega nodos o materiales, o salta si no hay materiales');
+      return;
+    }
+    setEstado('loading', 'Procesando…');
+
+    const fd = new FormData();
+    fd.append('texto', texto);
+    fd.append('lcl', LCL);
+
+    try {
+      const res  = await fetch('/julian/manual/api/parse_mat', { method:'POST', body:fd });
+      const data = await res.json();
+
+      if (data.modo === 'nodo_only') {
+        // Modo nodo-only — mostrar panel y chips
+        nodosActuales = data.nodos;
+        nodosChips.innerHTML = data.nodos.map(n =>
+          `<span class="chip">Nodo ${n}</span>`).join('');
+        panelNodo.style.display = 'block';
+        setEstado('info', `Nodos detectados: ${data.nodos.join(', ')} — haz clic en "Cargar desde SGS"`);
+        return;
+      }
+
+      // Modo normal
+      if (!data.rows || data.rows.length === 0) {
+        setEstado('warn', 'No se detectaron materiales — revisa el formato');
+        return;
+      }
+
+      renderTabla(data.rows, 'del texto pegado');
+
+      const warns = (data.errs || []).filter(e => !e.startsWith('[INFO]'));
+      errDiv.innerHTML = warns.length
+        ? '<div class="alert alert-warning" style="font-size:0.8rem;padding:8px 12px;">'
+          + warns.map(e => `<div>⚠ ${e}</div>`).join('') + '</div>'
+        : '';
+
+      setEstado('ok', `${data.rows.length} material(es) — formato correcto`);
+
+    } catch(e) {
+      setEstado('error', 'Error de comunicación con el servidor');
+    }
+  }
+
+  window.cargarDesdeSGS = async function() {
+    if (!nodosActuales.length) return;
+    const btn = document.getElementById('btn-sgs-load');
+    btn.disabled = true;
+    btn.textContent = '⏳ Consultando SGS…';
+    setEstado('loading', 'Consultando SGS — esto puede tomar unos segundos…');
+
+    const fd = new FormData();
+    fd.append('lcl',   LCL);
+    fd.append('nodos', nodosActuales.join(','));
+
+    try {
+      const res  = await fetch('/julian/manual/api/sgs_mat_by_nodo', { method:'POST', body:fd });
+      const data = await res.json();
+
+      if (data.error) {
+        setEstado('error', data.error);
+        btn.disabled = false;
+        btn.textContent = 'Cargar materiales desde SGS';
+        return;
+      }
+
+      if (!data.rows || data.rows.length === 0) {
+        setEstado('warn', 'SGS no encontró materiales pendientes para estos nodos');
+        btn.disabled = false;
+        btn.textContent = '↻ Intentar de nuevo';
+        return;
+      }
+
+      // Guardar en hidden field y mostrar tabla
+      sgsHidden.value = JSON.stringify(data.rows);
+      renderTabla(data.rows, 'cargado de SGS');
+
+      if (data.errors && data.errors.length > 0) {
+        errDiv.innerHTML = '<div class="alert alert-warning" style="font-size:0.8rem;padding:8px 12px;">'
+          + data.errors.map(e => `<div>⚠ ${e}</div>`).join('') + '</div>';
+      } else {
+        errDiv.innerHTML = '';
+      }
+
+      panelNodo.style.display = 'none';
+      setEstado('ok', `${data.rows.length} material(es) cargado(s) desde SGS`);
+
+    } catch(e) {
+      setEstado('error', 'Error al consultar SGS — verifica la conexión');
+      btn.disabled = false;
+      btn.textContent = 'Cargar materiales desde SGS';
+    }
+  };
+
+  txt.addEventListener('paste', () => {
+    clearTimeout(timer);
+    // Limpiar hidden field al pegar nueva info
+    sgsHidden.value = '';
+    timer = setTimeout(parsear, 120);
+  });
+  txt.addEventListener('input', () => {
+    clearTimeout(timer);
+    sgsHidden.value = '';
+    timer = setTimeout(parsear, 400);
+  });
+})();
+</script>
+{% endblock %}

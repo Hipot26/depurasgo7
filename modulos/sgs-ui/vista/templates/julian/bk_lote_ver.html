@@ -1,0 +1,503 @@
+{% extends "julian/base_julian.html" %}
+{% block title %}Verificación Lote — SGS UI{% endblock %}
+
+{% block extra_head %}
+<style>
+.proy-header {
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  padding: 10px 0 8px 0; border-bottom: 1px solid #e8f5e9; margin-bottom: 8px;
+}
+.lider-panel {
+  background:#f0f8ff; border:1px solid #b8daff; border-radius:8px;
+  padding:14px 18px; margin: 8px 0 12px 0; font-size:0.88rem;
+}
+.lider-panel h4 { margin:0 0 10px 0; color:#004085; font-size:0.9rem; }
+.mode-tabs { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
+.mode-tab {
+  padding:5px 14px; border-radius:20px; font-size:0.82rem; font-weight:600;
+  cursor:pointer; border:2px solid #dee2e6; background:#fff; color:#555;
+  transition: all 0.15s;
+}
+.mode-tab.active { border-color:#1a3e2e; background:#1a3e2e; color:#fff; }
+.buscar-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+.buscar-row input[type=text] {
+  padding:6px 10px; border:1px solid #ccc; border-radius:5px;
+  font-size:0.85rem; flex:1; min-width:140px; max-width:220px;
+}
+.resultados-lista {
+  list-style:none; margin:4px 0 0 0; padding:0; max-height:160px; overflow-y:auto;
+  border:1px solid #cce5ff; border-radius:5px; background:#fff;
+}
+.resultados-lista li {
+  padding:7px 12px; cursor:pointer; font-size:0.85rem; border-bottom:1px solid #f0f0f0;
+}
+.resultados-lista li:hover { background:#e3f2fd; }
+.resultados-lista li .vat { color:#888; font-size:0.78rem; margin-left:8px; }
+.lider-display {
+  font-weight:700; color:#155724; font-size:0.9rem;
+}
+.cedula-display { color:#888; font-size:0.8rem; margin-left:6px; }
+.split-pct-row { display:flex; align-items:center; gap:10px; margin-top:10px; flex-wrap:wrap; }
+.pct-num { font-weight:700; min-width:28px; text-align:right; }
+tr.fila-ok td   { background:#f9fffe; }
+tr.fila-err td  { background:#fff8f8; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    {% for msg in messages %}
+      <div class="alert alert-warning">{{ msg }}</div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="stat-row">
+  <div class="stat blue">
+    <div class="num">{{ grupos|length }}</div>
+    <div class="lbl">DFs</div>
+  </div>
+  <div class="stat {{ 'green' if ok_total > 0 else 'gray' }}">
+    <div class="num">{{ ok_total }}</div>
+    <div class="lbl">Listos</div>
+  </div>
+  <div class="stat {{ 'red' if err_total > 0 else 'gray' }}">
+    <div class="num">{{ err_total }}</div>
+    <div class="lbl">Con error</div>
+  </div>
+  <div class="stat gray">
+    <div class="num">{{ s.rows_mo|length }}</div>
+    <div class="lbl">Prestaciones</div>
+  </div>
+</div>
+
+{# ── Banner de sesión browser con polling ── #}
+<div id="banner-sesion"
+     style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+            padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:0.88rem;
+            {{ 'background:#d4edda;border:1px solid #c3e6cb;color:#155724;' if sesion_browser_ok
+               else 'background:#f8d7da;border:1px solid #f5c6cb;color:#721c24;' }}">
+  <span id="dot-sesion" style="font-size:1.3rem;">
+    {{ '●' if sesion_browser_ok else '○' }}
+  </span>
+  <span id="txt-sesion">
+    {% if sesion_browser_ok %}
+      Sesión SGS activa — listo para liquidar.
+    {% else %}
+      Browser sin sesión SGS. Ábrelo e inicia sesión.
+    {% endif %}
+  </span>
+  <form method="post" action="{{ url_for('julian.abrir_browser') }}" style="margin:0;">
+    <button type="submit" class="btn btn-light"
+            style="font-size:0.82rem;padding:5px 14px;border:1px solid #aaa;">
+      Abrir / reiniciar browser
+    </button>
+  </form>
+</div>
+
+<form method="post" action="{{ url_for('julian_lote.liquidar', sid=sid) }}" id="form-lote">
+
+<div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap;">
+  <button type="submit" class="btn btn-success" {% if not sesion_browser_ok %}disabled{% endif %}>
+    Liquidar seleccionados
+  </button>
+  <button type="button" class="btn btn-light" onclick="toggleAll(true)">Marcar todos</button>
+  <button type="button" class="btn btn-light" onclick="toggleAll(false)">Desmarcar todos</button>
+  <a href="{{ url_for('julian_lote.verificar', sid=sid) }}" class="btn btn-light">Re-verificar</a>
+  <span style="color:#888;font-size:0.82rem;">{{ s.filename }} — {{ s.verificado_at }}</span>
+</div>
+
+{% for grupo in grupos %}
+{% set df = grupo.df %}
+
+<div class="card" style="margin-bottom:16px;">
+
+  {# ── Cabecera DF ── #}
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+    <span style="font-family:monospace;font-weight:700;font-size:1.05rem;color:#1a3e2e;">{{ df }}</span>
+    <div style="display:flex;gap:6px;">
+      <button type="button" class="btn btn-light" style="padding:3px 10px;font-size:0.78rem;"
+              onclick="toggleGrupo('{{ df }}', true)">Todos</button>
+      <button type="button" class="btn btn-light" style="padding:3px 10px;font-size:0.78rem;"
+              onclick="toggleGrupo('{{ df }}', false)">Ninguno</button>
+    </div>
+  </div>
+
+  {% for proj in grupo.proyectos %}
+  {% set pk = proj.pro_key %}
+  {% set ok_p = proj.filas | selectattr('2') | selectattr('2.ok') | list | length %}
+  {% set total_p = proj.filas | length %}
+
+  <div style="margin-bottom:14px;padding:10px 12px;border:1px solid #e8f5e9;border-radius:8px;
+              background:{{ '#f9fffe' if ok_p == total_p else '#fffaf5' }};">
+
+    {# Cabecera proyecto #}
+    <div class="proy-header">
+      <span class="badge badge-blue" style="font-family:monospace;font-size:0.85rem;">
+        NODO {{ proj.nodo }}
+      </span>
+      {% if proj.pro_code %}
+        <span style="font-weight:700;color:#1a1a2e;">{{ proj.pro_code }}</span>
+      {% endif %}
+      {% if ok_p == total_p %}
+        <span class="badge badge-ok">{{ ok_p }}/{{ total_p }}</span>
+      {% elif ok_p == 0 %}
+        <span class="badge badge-error">0/{{ total_p }}</span>
+      {% else %}
+        <span class="badge badge-warn">{{ ok_p }}/{{ total_p }}</span>
+      {% endif %}
+
+      {# Líder SGS actual #}
+      {% if proj.partner_nombre %}
+        <span style="font-size:0.85rem;color:#555;">
+          Líder SGS:
+          <strong style="color:#1a3e2e;">{{ proj.partner_nombre }}</strong>
+          {% if proj.partner_cedula %}
+            <span style="color:#888;font-size:0.78rem;">— {{ proj.partner_cedula }}</span>
+          {% endif %}
+        </span>
+      {% endif %}
+
+      {# Botón para abrir el panel de asignación #}
+      {% if ok_p > 0 %}
+        <button type="button"
+                onclick="toggleLiderPanel('{{ pk }}')"
+                id="btn-lider-{{ pk | replace('/', '_') | replace(' ', '_') }}"
+                style="padding:3px 10px;font-size:0.78rem;border:1px solid #2980b9;
+                       background:#fff;color:#2980b9;border-radius:4px;cursor:pointer;">
+          Asignar líder
+        </button>
+      {% endif %}
+    </div>
+
+    {# ── Panel de asignación de líder (por proyecto) ── #}
+    {% if ok_p > 0 %}
+    <div id="lider-panel-{{ pk | replace('/', '_') | replace(' ', '_') }}"
+         class="lider-panel" style="display:none;">
+      <h4>Asignación de líder — {{ proj.pro_code or pk }} ({{ ok_p }} prestaciones)</h4>
+
+      {# Tabs de modo #}
+      <div class="mode-tabs">
+        <div class="mode-tab active"
+             onclick="setModo('{{ pk }}', 'sgs', this)">
+          Usar líder SGS
+        </div>
+        <div class="mode-tab"
+             onclick="setModo('{{ pk }}', 'otro', this)">
+          Cambiar líder
+        </div>
+        <div class="mode-tab"
+             onclick="setModo('{{ pk }}', 'dividir', this)">
+          Dividir entre dos
+        </div>
+      </div>
+
+      <input type="hidden" name="lider_mode_{{ pk }}" id="mode-input-{{ pk }}" value="sgs">
+
+      {# Info líder SGS siempre visible #}
+      <div style="margin-bottom:10px;font-size:0.85rem;">
+        <span style="color:#888;">Líder SGS actual:</span>
+        <span class="lider-display">{{ proj.partner_nombre or '(sin líder)' }}</span>
+        {% if proj.partner_cedula %}
+          <span class="cedula-display">{{ proj.partner_cedula }}</span>
+        {% endif %}
+      </div>
+
+      {# Bloque "cambiar" o "dividir": buscador de líder B #}
+      <div id="bloque-b-{{ pk }}" style="display:none;">
+        <div style="font-size:0.83rem;color:#555;margin-bottom:6px;">
+          <span id="label-b-{{ pk }}">Nuevo líder</span> — busca por nombre o cédula:
+        </div>
+        <div class="buscar-row">
+          <input type="text" id="q-b-{{ pk }}"
+                 placeholder="Nombre o cédula..."
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();buscarLider('{{ pk }}');}">
+          <button type="button" class="btn btn-light"
+                  style="padding:5px 12px;font-size:0.83rem;"
+                  onclick="buscarLider('{{ pk }}')">Buscar</button>
+        </div>
+        <ul class="resultados-lista" id="lista-{{ pk }}" style="display:none;"></ul>
+        <div id="warn-b-{{ pk }}" style="color:#856404;font-size:0.78rem;margin-top:3px;"></div>
+
+        {# Líder B seleccionado #}
+        <div id="sel-b-{{ pk }}" style="margin-top:6px;display:none;">
+          <span class="lider-display" id="nombre-b-{{ pk }}"></span>
+          <span class="cedula-display" id="ced-b-display-{{ pk }}"></span>
+        </div>
+        <input type="hidden" name="lider_b_nombre_{{ pk }}" id="hidden-b-nombre-{{ pk }}">
+        <input type="hidden" name="lider_b_ced_{{ pk }}"    id="hidden-b-ced-{{ pk }}">
+      </div>
+
+      {# Slider de porcentaje (solo en modo dividir) #}
+      <div id="bloque-pct-{{ pk }}" style="display:none;">
+        <div class="split-pct-row">
+          <span style="font-size:0.83rem;color:#555;min-width:90px;">
+            {{ proj.partner_nombre | truncate(20, True, '…') }}:
+          </span>
+          <input type="range" id="range-{{ pk }}" name="pct_a_{{ pk }}"
+                 min="1" max="99" value="50" step="1"
+                 oninput="onPct('{{ pk }}', this.value)"
+                 style="width:140px;">
+          <span class="pct-num" id="pct-a-{{ pk }}">50</span>%
+
+          <span style="color:#888;font-size:0.82rem;margin:0 6px;">|</span>
+
+          <span style="font-size:0.83rem;color:#555;min-width:60px;" id="label-b-pct-{{ pk }}">
+            Líder B:
+          </span>
+          <span class="pct-num" id="pct-b-{{ pk }}">50</span>%
+        </div>
+      </div>
+
+    </div>{# /lider-panel #}
+    {% endif %}
+
+    {# ── Tabla de prestaciones ── #}
+    <table style="margin-top:6px;">
+      <thead>
+        <tr>
+          <th style="width:32px;"></th>
+          <th>Prestación</th>
+          <th>Cant.</th>
+          <th>Líder Excel</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for idx, row, ck in proj.filas %}
+      {% set ok = ck and ck.get('ok') %}
+      <tr class="{{ 'fila-ok' if ok else 'fila-err' }}">
+        <td>
+          {% if ok %}
+            <input type="checkbox" name="idx_mo" value="{{ idx }}"
+                   class="chk-lote" data-df="{{ df }}" checked>
+          {% else %}
+            <input type="checkbox" name="idx_mo" value="{{ idx }}"
+                   class="chk-lote" data-df="{{ df }}" disabled>
+          {% endif %}
+        </td>
+        <td style="font-family:monospace;font-weight:600;">{{ row.codigo }}</td>
+        <td>{{ row.cantidad }}</td>
+        <td style="font-size:0.82rem;color:#666;">{{ row.lider or '—' }}</td>
+        <td>
+          {% if ck %}
+            {% if ck.get('ok') %}
+              <span class="badge badge-ok">OK</span>
+            {% else %}
+              <span class="badge badge-error">Error</span>
+            {% endif %}
+            {% for err in (ck.get('errores') or []) %}
+              <div style="color:#e74c3c;font-size:0.75rem;">✗ {{ err[:100] }}</div>
+            {% endfor %}
+            {% for adv in (ck.get('advertencias') or []) %}
+              <div style="color:#856404;font-size:0.75rem;">⚠ {{ adv[:80] }}</div>
+            {% endfor %}
+          {% else %}
+            <span class="badge badge-gray">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+  </div>{# /proyecto #}
+  {% endfor %}{# /proyectos #}
+
+</div>{# /card DF #}
+{% endfor %}{# /grupos #}
+
+<div style="margin-top:8px;display:flex;gap:10px;">
+  <button type="submit" class="btn btn-success" {% if not sesion_browser_ok %}disabled{% endif %}>
+    Liquidar seleccionados
+  </button>
+  <a href="{{ url_for('julian_lote.subir') }}" class="btn btn-light">Subir otro archivo</a>
+</div>
+
+</form>
+
+<script>
+const URL_BUSCAR = "{{ url_for('julian_lote.buscar_lider') }}";
+
+function toggleAll(state) {
+  document.querySelectorAll('.chk-lote:not([disabled])').forEach(cb => cb.checked = state);
+}
+function toggleGrupo(df, state) {
+  document.querySelectorAll(`.chk-lote[data-df="${df}"]:not([disabled])`).forEach(cb => cb.checked = state);
+}
+
+// ── Panel de líder por proyecto ──────────────────────────────────────────────
+
+function _safeId(pk) { return pk.replace(/[\/\s]/g, '_'); }
+
+function toggleLiderPanel(pk) {
+  const id   = _safeId(pk);
+  const panel = document.getElementById(`lider-panel-${id}`);
+  const btn   = document.getElementById(`btn-lider-${id}`);
+  if (!panel) return;
+  const visible = panel.style.display !== 'none';
+  panel.style.display = visible ? 'none' : 'block';
+  if (btn) btn.textContent = visible ? 'Asignar líder' : '✕ cerrar';
+}
+
+function setModo(pk, modo, tabEl) {
+  const id = _safeId(pk);
+  // Actualizar input hidden
+  const inp = document.getElementById(`mode-input-${pk}`);
+  if (inp) inp.value = modo;
+
+  // Tabs activos
+  tabEl.closest('.mode-tabs').querySelectorAll('.mode-tab')
+       .forEach(t => t.classList.remove('active'));
+  tabEl.classList.add('active');
+
+  // Mostrar/ocultar bloques
+  const bloqueB   = document.getElementById(`bloque-b-${pk}`);
+  const bloquePct = document.getElementById(`bloque-pct-${pk}`);
+  const labelB    = document.getElementById(`label-b-${pk}`);
+
+  if (bloqueB)   bloqueB.style.display   = (modo === 'sgs')  ? 'none' : 'block';
+  if (bloquePct) bloquePct.style.display = (modo === 'dividir') ? 'block' : 'none';
+  if (labelB)    labelB.textContent = modo === 'dividir' ? 'Líder B (segundo)' : 'Nuevo líder';
+}
+
+function onPct(pk, val) {
+  val = parseInt(val, 10);
+  const elA = document.getElementById(`pct-a-${pk}`);
+  const elB = document.getElementById(`pct-b-${pk}`);
+  if (elA) elA.textContent = val;
+  if (elB) elB.textContent = 100 - val;
+}
+
+async function buscarLider(pk) {
+  const qEl = document.getElementById(`q-b-${pk}`);
+  const q   = qEl ? qEl.value.trim() : '';
+  if (!q) { alert('Escribe un nombre o cédula para buscar.'); return; }
+
+  const listaEl = document.getElementById(`lista-${pk}`);
+  const warnEl  = document.getElementById(`warn-b-${pk}`);
+  if (warnEl) warnEl.textContent = '';
+  if (listaEl) { listaEl.innerHTML = '<li style="color:#888;">Buscando...</li>'; listaEl.style.display = 'block'; }
+
+  // Detectar si es cédula (contiene dígitos, puede tener C al inicio)
+  const esCedula = /^[Cc]?\d{5,}$/.test(q.replace(/\s/g,''));
+  const body = esCedula ? {cedula: q} : {nombre: q};
+
+  try {
+    const resp = await fetch(URL_BUSCAR, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await resp.json();
+
+    if (warnEl && d.advertencia) warnEl.textContent = '⚠ ' + d.advertencia;
+
+    if (!d.ok) {
+      if (listaEl) listaEl.innerHTML =
+        `<li style="color:#e74c3c;">✗ ${d.error || 'No encontrado'}</li>`;
+      return;
+    }
+
+    const resultados = d.resultados || [];
+    if (listaEl) {
+      listaEl.innerHTML = '';
+      if (resultados.length === 0) {
+        const li = document.createElement('li');
+        li.style.color = '#aaa';
+        li.textContent = 'Sin resultados';
+        listaEl.appendChild(li);
+      } else {
+        resultados.forEach(r => {
+          const li   = document.createElement('li');
+          const span = document.createElement('span');
+          span.className   = 'vat';
+          span.textContent = r.vat || '—';
+          li.textContent   = r.nombre + ' ';
+          li.appendChild(span);
+          li.addEventListener('click', () => seleccionarLider(pk, r.nombre, r.vat || ''));
+          listaEl.appendChild(li);
+        });
+      }
+    }
+  } catch(e) {
+    if (listaEl) listaEl.innerHTML = '<li style="color:#e74c3c;">Error de conexión</li>';
+  }
+}
+
+// ── Polling de sesión browser ─────────────────────────────────────────────
+(function pollSesion() {
+  fetch("{{ url_for('julian.sesion_estado') }}")
+    .then(r => r.json())
+    .then(d => {
+      const banner = document.getElementById('banner-sesion');
+      const dot    = document.getElementById('dot-sesion');
+      const txt    = document.getElementById('txt-sesion');
+      const btnLiq = document.querySelector('button[type=submit].btn-success');
+      if (!banner) return;
+
+      if (d.activa) {
+        banner.style.cssText = 'display:flex;align-items:center;gap:14px;flex-wrap:wrap;' +
+          'padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:0.88rem;' +
+          'background:#d4edda;border:1px solid #c3e6cb;color:#155724;';
+        dot.textContent = '●';
+        txt.textContent = 'Sesión SGS activa — listo para liquidar.';
+        if (btnLiq) btnLiq.disabled = false;
+      } else {
+        banner.style.cssText = 'display:flex;align-items:center;gap:14px;flex-wrap:wrap;' +
+          'padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:0.88rem;' +
+          'background:#f8d7da;border:1px solid #f5c6cb;color:#721c24;';
+        dot.textContent = d.iniciando ? '◐' : '○';
+        txt.textContent = d.iniciando
+          ? 'Browser abierto — inicia sesión en la ventana...'
+          : 'Browser sin sesión SGS. Ábrelo e inicia sesión.';
+        if (btnLiq) btnLiq.disabled = true;
+      }
+      setTimeout(pollSesion, d.activa ? 10000 : 2500);
+    })
+    .catch(() => setTimeout(pollSesion, 5000));
+})();
+
+function seleccionarLider(pk, nombre, vat) {
+  // Guardar en hidden inputs
+  const hNombre = document.getElementById(`hidden-b-nombre-${pk}`);
+  const hCed    = document.getElementById(`hidden-b-ced-${pk}`);
+  if (hNombre) hNombre.value = nombre;
+  if (hCed)    hCed.value    = vat;
+
+  // Si el modo sigue en "sgs", cambiarlo automáticamente a "otro"
+  const modeInp = document.getElementById(`mode-input-${pk}`);
+  if (modeInp && modeInp.value === 'sgs') {
+    modeInp.value = 'otro';
+    const id = _safeId(pk);
+    const panel = document.getElementById(`lider-panel-${id}`);
+    if (panel) {
+      panel.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+      const tabOtro = panel.querySelectorAll('.mode-tab')[1];
+      if (tabOtro) tabOtro.classList.add('active');
+    }
+    const bloqueB   = document.getElementById(`bloque-b-${pk}`);
+    const bloquePct = document.getElementById(`bloque-pct-${pk}`);
+    if (bloqueB)   bloqueB.style.display   = 'block';
+    if (bloquePct) bloquePct.style.display = 'none';
+  }
+
+  // Mostrar seleccionado
+  const sel      = document.getElementById(`sel-b-${pk}`);
+  const nombreEl = document.getElementById(`nombre-b-${pk}`);
+  const cedEl    = document.getElementById(`ced-b-display-${pk}`);
+  const labelPct = document.getElementById(`label-b-pct-${pk}`);
+  if (nombreEl) nombreEl.textContent = nombre;
+  if (cedEl)    cedEl.textContent    = vat ? `— ${vat}` : '';
+  if (sel)      sel.style.display    = 'block';
+  if (labelPct) labelPct.textContent = nombre.split(' ')[0] + ':';
+
+  // Cerrar lista
+  const lista = document.getElementById(`lista-${pk}`);
+  if (lista) lista.style.display = 'none';
+}
+</script>
+
+{% endblock %}

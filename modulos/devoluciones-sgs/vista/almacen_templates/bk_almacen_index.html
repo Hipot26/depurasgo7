@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Almacén — Devoluciones y cargue</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Calibri, 'Segoe UI', Arial, sans-serif; background: #f0f2f5; min-height: 100vh;
+         display: flex; align-items: flex-start; justify-content: center; padding: 28px 16px; }
+  .card { background: #fff; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,.12);
+          padding: 30px 38px; width: 780px; max-width: 98vw; }
+  .logo-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+  .logo-icon { width: 40px; height: 40px; background: #0F5E75; border-radius: 8px; display: flex;
+               align-items: center; justify-content: center; color: #fff; font-size: 18px; }
+  .logo-title { font-size: 17px; font-weight: 700; color: #0F5E75; }
+  .subtitle { font-size: 12px; color: #888; margin-bottom: 18px; display:flex; gap:10px; align-items:center; flex-wrap:wrap }
+  .subtitle a { color: #0F5E75; }
+  h2 { font-size: 13px; font-weight: 700; color: #0F5E75; margin-bottom: 8px; }
+  .bloque { border: 1.5px solid #d5e5eb; border-radius: 7px; padding: 14px 16px; margin-top: 16px; background: #fafcfd; }
+  .bloque.foto { border-color: #bfd8e0; background: #f3f9fb; }
+  .bloque.ok { border-color: #bfe0d0; background: #f4faf6; }
+  .bloque.warn { border-color: #f0d9a8; background: #fdf8ec; }
+  .fila { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .btn { display: inline-block; padding: 10px 16px; border-radius: 6px; border: none; cursor: pointer;
+         font-size: 13px; font-weight: 700; text-decoration: none; }
+  .btn-p { background: #0F5E75; color: #fff; }
+  .btn-s { background: #e6f1f5; color: #0F5E75; border: 1px solid #bfd8e0; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; background: #fff; border: 1px solid #bfd8e0; color: #0F5E75; border-radius: 5px; cursor: pointer; }
+  label { display: block; font-size: 12px; color: #555; margin: 10px 0 5px; font-weight: 600; }
+  input[type=text] { width: 100%; padding: 11px 12px; border: 1.5px solid #cfd8dc; border-radius: 6px; font-size: 14px; }
+  .hint { font-size: 11px; color: #888; margin-top: 5px; }
+  .error { margin-top: 14px; padding: 10px 14px; background: #fdecea; border-left: 4px solid #c00; border-radius: 4px; font-size: 13px; color: #900; }
+  .okmsg { margin-top: 14px; padding: 10px 14px; background: #e8f5ec; border-left: 4px solid #2e9e5b; border-radius: 4px; font-size: 13px; color: #1d6f3f; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  th { text-align: left; color: #666; font-size: 11px; padding: 5px 6px; border-bottom: 1px solid #e4edf1; }
+  td { padding: 6px; border-bottom: 1px solid #f0f4f6; }
+  .chip { display:inline-block; font-size:10px; font-weight:700; border-radius:6px; padding:2px 7px; }
+  .chip.v { background:#dff3e7; color:#1d7a4b; } .chip.a { background:#fff1d6; color:#9a5b00; } .chip.g { background:#eee; color:#777; }
+  .pasos { font-size: 12px; color: #444; margin-top: 8px; display: grid; gap: 4px; }
+  .pasos b { color: #0F5E75; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo-bar"><div class="logo-icon">🏬</div><div class="logo-title">Almacén — hojas de bandeja y cargue</div></div>
+  <div class="subtitle">
+    <span>👤 {{ usuario or '' }}</span>
+    {% if es_admin %}<a href="/?pc=1">↩ Panel de devoluciones (administrador)</a>{% endif %}
+    <a href="/logout">salir</a>
+  </div>
+
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  {% if ok %}<div class="okmsg">{{ ok }}</div>{% endif %}
+
+  <!-- 1. Hojas físicas -->
+  <div class="bloque foto">
+    <h2>1 · Hojas de bandeja (foto + OCR)</h2>
+    <div class="fila">
+      <a class="btn btn-p" href="/movil">📷 Fotografiar hojas (celular)</a>
+      <a class="btn btn-s" href="/?pc=1">🖥 Revisar y validar hojas (PC)</a>
+    </div>
+    <div class="hint">Cada foto se lee sola. En el PC corriges lo que haga falta contra el material contado y pulsas <b>✅ Validar hoja</b>. Luego <b>📗 cargue</b> en la fila de la sesión: arma el cargue de instalaciones con esas hojas de una vez, sin esperar las bandejas de devolución de SGS.</div>
+    <div style="margin-top:10px">
+      <input type="search" id="q" placeholder="🔍 Buscar una hoja: BAN, PRO, NODO o líder" autocomplete="off"
+        style="width:100%;padding:9px 12px;border:1.5px solid #cfd8dc;border-radius:6px;font-size:13px"
+        oninput="buscarHoja(this.value)">
+      <div id="res-q" style="margin-top:6px;font-size:12px"></div>
+    </div>
+    <script>
+    let _t=null;
+    function buscarHoja(q){
+      clearTimeout(_t); const R=document.getElementById('res-q');
+      if(!q||q.trim().length<3){R.innerHTML='';return;}
+      _t=setTimeout(async()=>{
+        const rs=await (await fetch('/api/dev/buscar?q='+encodeURIComponent(q.trim()))).json();
+        if(!rs.length){R.innerHTML='<span style="color:#888">Sin resultados en el último año</span>';return;}
+        const e=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+        R.innerHTML='<table><tr><th>Bandeja</th><th>PRO / NODO</th><th>Líder</th><th>Sesión</th><th>Estado</th><th></th></tr>'+
+          rs.map(r=>`<tr><td><b>${e(r.ban)}</b></td><td>${e(r.pro)} ${e(r.nodo)}</td><td>${e(r.lider)}</td>
+            <td>${e(r.sesion)} · foto #${r.foto_n}</td>
+            <td>${r.validada?('✅ '+e(r.validada)):'sin validar'}${r.ban_dev?(' · ↩ '+e(r.ban_dev)):''}</td>
+            <td><a href="/?pc=1#${e(r.sesion)}/${r.foto_n}">abrir</a></td></tr>`).join('')+'</table>';
+      },300);
+    }
+    </script>
+    {% if sesiones %}
+    <table>
+      <tr><th>Sesión</th><th>Fotos</th><th>Hojas validadas</th><th>Estado</th><th></th></tr>
+      {% for s in sesiones %}
+      <tr>
+        <td><b>{{ s.id }}</b> {% if s.creada_por %}<span style="color:#888">· {{ s.creada_por }}</span>{% endif %}</td>
+        <td>{{ s.n_fotos }}</td>
+        <td>{% if s.n_reales %}<span class="chip {{ 'v' if s.n_validadas == s.n_reales else 'a' }}">{{ s.n_validadas }}/{{ s.n_reales }}</span>{% else %}<span class="chip g">—</span>{% endif %}</td>
+        <td>{{ s.estado }}</td>
+        <td><a href="/?pc=1#{{ s.id }}">revisar</a> · <a href="/almacen/cargue-sesion/{{ s.id }}"><b>📗 cargue</b></a></td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+  </div>
+
+  <!-- 2. ANEXO 14 -->
+  <div class="bloque {{ 'ok' if anexo_info and anexo_info.cargado else 'warn' }}">
+    <h2>2 · ANEXO Nº 14 — Listado material menor (aportaciones)</h2>
+    {% if anexo_info and anexo_info.cargado %}
+      <div style="font-size:12px;color:#333">✔ Cargado: <strong>{{ anexo_info.filename }}</strong> · {{ anexo_info.total }} materiales de aportación
+        {% if anexo_info.sin_e4e %}({{ anexo_info.sin_e4e }} sin código E4E — se cruzan por descripción){% endif %} · subido el {{ anexo_info.subido }}</div>
+      <div class="fila" style="margin-top:10px">
+        <form method="POST" action="/almacen/anexo" enctype="multipart/form-data" class="fila" style="flex:1">
+          <input type="file" name="anexo_file" accept=".xlsx" style="font-size:12px;flex:1" required>
+          <button type="submit" class="btn-sm">Actualizar</button>
+        </form>
+        <form method="POST" action="/almacen/anexo/eliminar" onsubmit="return confirm('¿Eliminar el ANEXO Nº 14 actual?')">
+          <button type="submit" class="btn-sm" style="color:#c00;border-color:#e5b5b5">Eliminar</button>
+        </form>
+      </div>
+    {% else %}
+      <div style="font-size:12px;color:#8a6d1a">⚠ Sin ANEXO cargado — la columna <strong>Aportación</strong> del cargue saldrá en 0.</div>
+      <form method="POST" action="/almacen/anexo" enctype="multipart/form-data" class="fila" style="margin-top:10px">
+        <input type="file" name="anexo_file" accept=".xlsx" style="font-size:12px;flex:1" required>
+        <button type="submit" class="btn-sm">Subir ANEXO</button>
+      </form>
+    {% endif %}
+  </div>
+
+  <!-- 3. Cargue -->
+  <div class="bloque">
+    <h2>3 · Cargue de instalaciones por proyecto (sin fotos)</h2>
+    <div class="hint" style="margin-bottom:6px">Camino largo: buscar el PRO en SGS y elegir bandejas a mano. Úsalo cuando no haya hojas fotografiadas; si las hay, el botón 📗 cargue de arriba es más rápido.</div>
+    <form method="POST" action="/almacen/buscar" id="frm-buscar" onsubmit="document.getElementById('btn-buscar').textContent='Consultando SGS…'">
+      <label for="pro">Código PRO — hijo o padre</label>
+      <input type="text" id="pro" name="pro_materiales" placeholder="Ej: PRO-060341 (puede ser cualquier nodo hijo)" value="{{ pro_materiales or '' }}" autocomplete="off">
+      <div class="hint">Si es un PRO hijo, el sistema sube al proyecto padre y muestra todos sus nodos con sus bandejas.</div>
+      <button type="submit" class="btn btn-p" id="btn-buscar" style="margin-top:12px;width:100%">Buscar nodos →</button>
+    </form>
+    <div class="pasos">
+      <div><b>1.</b> Eliges los nodos y sus bandejas (igual que se ven en SGS).</div>
+      <div><b>2.</b> El cuadre trae la devolución de cada bandeja: de la <b>hoja fotografiada</b> si la validaste, o de la bandeja de devolución de SGS si ya existe. También puedes escribirla a mano.</div>
+      <div><b>3.</b> Descargas el cargue con el formato de la plantilla (Aportación 1 / Enel 0).</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

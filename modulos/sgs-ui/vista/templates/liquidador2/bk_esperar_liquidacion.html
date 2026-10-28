@@ -1,0 +1,257 @@
+{% extends "liquidador2/base.html" %}
+{% block title %}Liquidando… — SGS UI{% endblock %}
+
+{% block extra_head %}
+<style>
+  .prog-wrap {
+    background: #f0f2f5; border-radius: 8px; overflow: hidden;
+    height: 18px; margin: 10px 0 4px;
+  }
+  .prog-bar {
+    height: 100%; background: #27ae60;
+    transition: width 0.4s ease;
+    border-radius: 8px;
+  }
+
+  .worker-panel {
+    background: white; border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    margin-bottom: 14px; overflow: hidden;
+  }
+  .worker-hdr {
+    padding: 10px 18px; display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 0.9rem; border-bottom: 1px solid #eee;
+  }
+  .w-vis  { background: #f0faf4; border-left: 4px solid #27ae60; color: #1a3e2e; }
+  .w-0    { background: #e3f2fd; border-left: 4px solid #1565c0; color: #1565c0; }
+  .w-1    { background: #e8f5e9; border-left: 4px solid #2e7d32; color: #2e7d32; }
+  .w-2    { background: #f3e5f5; border-left: 4px solid #6a1b9a; color: #6a1b9a; }
+
+  .item-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 18px; border-bottom: 1px solid #f5f5f5; font-size: 0.85rem;
+  }
+  .item-row:last-child { border-bottom: none; }
+
+  .estado-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  }
+  .dot-pendiente { background: #bbb; }
+  .dot-corriendo { background: #f39c12; animation: pulso 0.9s infinite; }
+  .dot-ok        { background: #27ae60; }
+  .dot-error     { background: #e74c3c; }
+
+  @keyframes pulso {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.5; transform: scale(1.3); }
+  }
+
+  .badge-tipo-mo  { background: #e8f5e9; color: #2e7d32; }
+  .badge-tipo-mat { background: #e3f2fd; color: #1565c0; }
+
+  .spinner {
+    display: inline-block; width: 18px; height: 18px;
+    border: 3px solid #ddd; border-top-color: #27ae60;
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .cronometro { font-variant-numeric: tabular-nums; font-size: 0.88rem; color: #888; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div style="display:flex;align-items:center;gap:14px;margin-bottom:6px;">
+  <h1 style="font-size:1.25rem;margin:0;" id="lbl-titulo">Liquidando en curso…</h1>
+  <div class="spinner" id="spinner"></div>
+  <span class="cronometro" id="lbl-tiempo">0s</span>
+</div>
+<p style="color:#666;font-size:0.87rem;margin-bottom:20px;">
+  {{ s.filename }} — <strong id="lbl-hechos">0</strong> /
+  <strong>{{ total }}</strong> item(s) completados
+</p>
+
+{# ── Barra de progreso global ── #}
+<div class="prog-wrap">
+  <div class="prog-bar" id="prog-bar" style="width:0%"></div>
+</div>
+<p style="font-size:0.78rem;color:#888;margin-bottom:20px;" id="lbl-pct">0%</p>
+
+{# ── Paneles de workers — se rellenan por JS ── #}
+<div id="workers-container"></div>
+
+{# ── Mensaje de error global ── #}
+<div id="error-global" style="display:none;background:#fdecea;border:1px solid #e74c3c;
+     border-radius:8px;padding:14px 18px;color:#c0392b;margin-bottom:16px;"></div>
+
+{# ── Botón cancelar ── #}
+<div style="margin-top:20px;display:flex;align-items:center;gap:16px;">
+  <form method="POST" action="{{ url_for('liquidador2.cancelar', sid=sid) }}" id="form-cancelar">
+    <button type="submit" id="btn-cancelar"
+            onclick="return confirm('Cancelar la liquidación?\n\nLos items ya procesados quedaron grabados en SGS.')"
+            style="background:#e74c3c;color:white;border:none;border-radius:6px;
+                   padding:8px 18px;cursor:pointer;font-size:0.88rem;font-weight:700;">
+      Cancelar y ver resultados parciales
+    </button>
+  </form>
+  <span style="font-size:0.8rem;color:#aaa;">
+    Los items ya completados quedan guardados en SGS.
+  </span>
+</div>
+
+<div style="margin-top:12px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+  <a href="{{ url_for('liquidador2.cierre_rapido', sid=sid) }}"
+     style="display:inline-flex;align-items:center;text-decoration:none;background:#1565c0;
+            color:white;border:none;border-radius:6px;padding:8px 18px;cursor:pointer;
+            font-size:0.88rem;font-weight:700;">
+    Verificar fecha + PDL + balance
+  </a>
+  <span style="font-size:0.8rem;color:#888;">
+    Util para revisar rapido los proyectos identificados y corregir solo los pendientes.
+  </span>
+</div>
+
+{# ── Panel de debug en tiempo real ── #}
+<details id="debug-panel" style="margin-top:20px;" open>
+  <summary style="cursor:pointer;font-size:0.85rem;font-weight:700;color:#555;
+                  padding:8px 12px;background:#f8f9fa;border-radius:6px;user-select:none;">
+    Debug en tiempo real — errores
+  </summary>
+  <div id="debug-log"
+       style="margin-top:6px;background:#1e1e2e;color:#cdd6f4;border-radius:8px;
+              padding:12px 16px;font-family:monospace;font-size:0.78rem;
+              white-space:pre-wrap;overflow-x:auto;line-height:1.6;max-height:320px;overflow-y:auto;">
+(sin errores aún)
+  </div>
+</details>
+
+<script>
+const SID   = {{ sid | tojson }};
+const TOTAL = {{ total }};
+
+const ITEMS_MO_INIT  = {{ job.items_mo  | tojson }};
+const ITEMS_MAT_INIT = {{ job.items_mat | tojson }};
+
+let tInicio = Date.now();
+let tickInterval = null;
+
+function tickTimer() {
+  const seg = Math.floor((Date.now() - tInicio) / 1000);
+  const mm = String(Math.floor(seg / 60)).padStart(2, '0');
+  const ss = String(seg % 60).padStart(2, '0');
+  document.getElementById('lbl-tiempo').textContent =
+    seg < 60 ? seg + 's' : mm + ':' + ss;
+}
+
+function renderWorkers(items_mo, items_mat) {
+  const container = document.getElementById('workers-container');
+  const grupos = {};
+
+  items_mo.forEach(it => {
+    const key = 'vis.';
+    if (!grupos[key]) grupos[key] = { items: [] };
+    grupos[key].items.push(it);
+  });
+
+  items_mat.forEach(it => {
+    const key = String(it.worker_id);
+    if (!grupos[key]) grupos[key] = { items: [] };
+    grupos[key].items.push(it);
+  });
+
+  let html = '';
+  for (const [key, grupo] of Object.entries(grupos)) {
+    const tipoClass = key === 'vis.' ? 'w-vis' : ('w-' + key);
+    const titulo    = key === 'vis.' ? 'Browser visible' : '⚡ Worker ' + key;
+    const total     = grupo.items.length;
+    const hechos    = grupo.items.filter(i => i.estado === 'ok' || i.estado === 'error').length;
+    const pct       = total ? Math.round(hechos / total * 100) : 0;
+
+    html += `<div class="worker-panel">
+      <div class="worker-hdr ${tipoClass}">
+        <span>${titulo}</span>
+        <span style="font-weight:400;font-size:0.78rem;opacity:0.8;">
+          — ${hechos}/${total} · ${pct}%
+        </span>
+      </div>`;
+
+    grupo.items.forEach(it => {
+      const dotClass    = 'dot-' + (it.estado || 'pendiente');
+      const tipoBadge   = it.tipo === 'MO' ? 'badge-tipo-mo' : 'badge-tipo-mat';
+      const estadoLabel = { pendiente:'En cola', corriendo:'Procesando…', ok:'OK', error:'Error' }[it.estado] || it.estado;
+      const errorHtml   = it.error
+        ? `<span style="color:#e74c3c;font-size:0.75rem;margin-left:6px;">— ${it.error}</span>`
+        : '';
+
+      html += `<div class="item-row">
+        <div class="estado-dot ${dotClass}"></div>
+        <span class="badge ${tipoBadge}" style="font-size:0.72rem;padding:2px 6px;">${it.tipo}</span>
+        <strong style="font-family:monospace;font-size:0.82rem;">${it.codigo}</strong>
+        <span style="color:#888;font-size:0.8rem;">${estadoLabel}</span>
+        ${errorHtml}
+      </div>`;
+    });
+
+    html += '</div>';
+  }
+  container.innerHTML = html;
+}
+
+async function poll() {
+  try {
+    const resp = await fetch('/liquidador2/progreso/' + SID);
+    if (!resp.ok) return;
+    const data = await resp.json();
+
+    const hechos = data.hechos || 0;
+    const total  = data.total  || TOTAL || 1;
+    const pct    = Math.round(hechos / total * 100);
+    document.getElementById('prog-bar').style.width  = pct + '%';
+    document.getElementById('lbl-pct').textContent   = pct + '%';
+    document.getElementById('lbl-hechos').textContent = hechos;
+
+    renderWorkers(data.items_mo || [], data.items_mat || []);
+
+    /* Debug log */
+    const errItems = (data.items_mat || []).concat(data.items_mo || [])
+                       .filter(it => it.estado === 'error' && it.error);
+    if (errItems.length > 0) {
+      const lines = errItems.map(it =>
+        `[W${it.worker_id ?? 'vis'}] ${it.codigo} → ${it.error}`
+      ).join('\n');
+      const dbg = document.getElementById('debug-log');
+      dbg.textContent = lines;
+      dbg.scrollTop = dbg.scrollHeight;
+    }
+
+    if (data.estado === 'listo' || data.estado === 'cancelado') {
+      clearInterval(tickInterval);
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('btn-cancelar').disabled = true;
+      if (data.estado === 'listo') {
+        document.getElementById('prog-bar').style.width = '100%';
+        document.getElementById('lbl-pct').textContent  = '100%';
+        document.getElementById('lbl-hechos').textContent = total;
+      }
+      setTimeout(() => { window.location.href = '/liquidador2/resultado/' + SID; }, 800);
+      return;
+    }
+
+    if (data.estado === 'error') {
+      clearInterval(tickInterval);
+      document.getElementById('spinner').style.display = 'none';
+      const errDiv = document.getElementById('error-global');
+      errDiv.style.display = 'block';
+      errDiv.textContent   = 'Error en liquidacion: ' + (data.error || 'desconocido');
+    }
+  } catch(e) {}
+}
+
+renderWorkers(ITEMS_MO_INIT, ITEMS_MAT_INIT);
+tickInterval = setInterval(tickTimer, 1000);
+setInterval(poll, 1000);
+poll();
+</script>
+
+{% endblock %}

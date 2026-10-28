@@ -1,0 +1,8 @@
+# Balance Integrado. Versiones de producción. Solo paquetes que el código importa.
+Flask==3.1.3
+gunicorn==26.2.0
+openpyxl==3.1.5
+beautifulsoup4==4.15.0    # parser del acta de Sonny (balance_liquidar.py)
+lxml==6.1.3               # motor HTML de BeautifulSoup
+pdfplumber==0.11.10       # lectura de RG02/RG03 en PDF
+anthropic==1.12.1         # observaciones RG03 con IA (rg03_ia.py), opcional por ANTHROPIC_API_KEY

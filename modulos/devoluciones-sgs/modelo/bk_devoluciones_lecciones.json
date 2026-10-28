@@ -1,0 +1,54 @@
+{
+ "lecciones": [
+  {
+   "texto": "Cuando la foto no encuadre completa la columna 'Consu mido' (o 'Entregado'), NO devuelvas null ni inventes: marca la fila como ILEGIBLE_FUERA_DE_ENCUADRE y pide re-foto; nunca asumas 0 por ausencia de trazo si la columna no es visible.",
+   "fecha": "2026-08-04T16:05:48",
+   "sesion": "20260804-140933"
+  },
+  {
+   "texto": "Alinea cada cifra manuscrita a su fila usando la línea horizontal de la tabla y la inclinación de la hoja, no la altura aparente: en hojas fotografiadas en diagonal el trazo se desplaza uno o dos renglones. Si hay descripciones que ocupan dos renglones, cuenta filas por la línea de subrayado, no por el texto.",
+   "fecha": "2026-08-04T16:05:48",
+   "sesion": "20260804-140933"
+  },
+  {
+   "texto": "No conviertas los chulos de verificación (✓, ✔, guion o punto junto al valor de Entregado) en cifras de devolución; si en Consumido solo hay un chulo, man = null y txt = \"chulo\".",
+   "fecha": "2026-08-04T16:05:48",
+   "sesion": "20260804-140933"
+  },
+  {
+   "texto": "Las notas manuscritas al pie 'código = cantidad' SIN la palabra Dev son PEDIDOS ADICIONALES (tipo adicional), nunca devoluciones: no las apliques a la columna de devolución. Solo las que dicen 'Dev' son devoluciones; asígnalas por coincidencia exacta del código y, si el código está cortado o dudoso, tipo duda.",
+   "fecha": "2026-09-16T00:00:00",
+   "sesion": "analisis-produccion-20260903-20260916"
+  },
+  {
+   "texto": "Un trazo vertical con base o serifa (⊥, T, L) en la columna Consumido es la forma en que las cuadrillas escriben el dígito 1: man = 1, txt = \"⊥\", conf media. Solo el gancho superior tipo 7 es ambiguo (txt \"7/1\", man null). Verificado en 13 de 13 correcciones humanas.",
+   "fecha": "2026-09-16T00:00:00",
+   "sesion": "analisis-produccion-20260903-20260916"
+  },
+  {
+   "texto": "Cuando un trazo esté físicamente entre dos filas, no lo asignes a ambas ni lo dupliques: elige una sola fila por la línea de subrayado y, si no hay certeza, déjalo en null con txt describiendo el trazo y en qué filas podría ir.",
+   "fecha": "2026-08-04T19:35:42",
+   "sesion": "20260804-172306"
+  },
+  {
+   "texto": "Trata el '7' con barra o gancho superior como candidato a '1': si el valor leído supera la cantidad Entregada de esa fila, descártalo y reduce a la lectura coherente (o marca dudoso), nunca registres una devolución mayor que lo entregado.",
+   "fecha": "2026-08-04T19:35:42",
+   "sesion": "20260804-172306"
+  },
+  {
+   "texto": "No propongas devoluciones en filas cuyo Entregado sea 0,0: si un trazo aparece alineado ahí, es de otra fila o es un chulo; reasigna o marca dudoso.",
+   "fecha": "2026-08-04T19:35:42",
+   "sesion": "20260804-172306"
+  },
+  {
+   "texto": "Interpreta la columna Consumido solo cuando el dígito esté claramente separado del chulo de verificación y a la derecha de él; si el único trazo visible toca o continúa el chulo, no generes cifra de devolución.",
+   "fecha": "2026-08-04T19:35:42",
+   "sesion": "20260804-172306"
+  },
+  {
+   "texto": "Cuando exista nota al pie 'código = N Dev' y además un trazo en la columna Consumido para el mismo material, no sumes ni dupliques: deja man como lo leas y describe la contradicción en nota; el sistema decide.",
+   "fecha": "2026-08-04T19:35:42",
+   "sesion": "20260804-172306"
+  }
+ ]
+}
